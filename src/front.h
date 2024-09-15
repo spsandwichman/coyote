@@ -130,3 +130,9 @@ enum {
 };
 
 TokenBuf lex_tokenize(SourceFile* src);
+
+void lex_advance(Lexer* l);
+void lex_advance_n(Lexer* l, int n);
+void lex_skip_whitespace(Lexer* l);
+
+void preproc_dispatch(Lexer* l);
