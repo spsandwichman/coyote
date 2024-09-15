@@ -1,3 +1,5 @@
+// (sandwichman): removed # for the moment cause i dont want to 
+// deal with getting a preprocessor working rn
 //
 // Implementation of "turnstiles" (invented by Solaris) for the MINTIA Kernel.
 //
