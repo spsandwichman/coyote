@@ -1,4 +1,4 @@
 *.o
 *.d
-./jacc.exe
-./jacc
+jacc.exe
+jacc
