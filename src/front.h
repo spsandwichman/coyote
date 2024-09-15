@@ -1,6 +1,24 @@
+#pragma once
+
 #include "jacc.h"
 
-#define _KEYWORDS_ \
+typedef struct Token {
+    char* raw;
+    u16 len;
+    u8 kind;
+} Token;
+
+da_typedef(Token);
+typedef da(Token) TokenBuf;
+
+typedef struct Lexer {
+    TokenBuf* tb;
+    string text;
+    u32 cursor;
+    char current;
+} Lexer;
+
+#define _LEX_KEYWORDS_ \
     T(AND), \
     T(BREAK), \
     T(BYTE), \
@@ -54,6 +72,7 @@
 
 enum {
     TOK__INVALID,
+    TOK_EOF,
 
     TOK_OPEN_PAREN,     // (
     TOK_CLOSE_PAREN,    // )
@@ -100,17 +119,14 @@ enum {
 
     TOK_IDENTIFIER,
 
+    TOK_CHAR,
+    TOK_STRING,
+
+    TOK_NUMERIC,
+
     #define T(ident) TOK_KEYWORD_##ident
-        _KEYWORDS_
+        _LEX_KEYWORDS_
     #undef T
 };
 
-typedef struct Token {
-    u16 file_index;
-    u8  kind;
-    u32 src_offset;
-} Token;
-static_assert(sizeof(Token) == 8);
-
-da_typedef(Token);
-typedef da(Token) TokenBuf;
+TokenBuf lex_tokenize(SourceFile* src);
