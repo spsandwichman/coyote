@@ -51,6 +51,7 @@
     T(UQUAD), \
     T(QUAD), \
 
+
 enum {
     TOK__INVALID,
 
@@ -97,8 +98,19 @@ enum {
     TOK_LSHIFT_EQ,  // <<=
     TOK_RSHIFT_EQ,  // >>=
 
+    TOK_IDENTIFIER,
 
     #define T(ident) TOK_KEYWORD_##ident
         _KEYWORDS_
     #undef T
 };
+
+typedef struct Token {
+    u16 file_index;
+    u8  kind;
+    u32 src_offset;
+} Token;
+static_assert(sizeof(Token) == 8);
+
+da_typedef(Token);
+typedef da(Token) TokenBuf;
