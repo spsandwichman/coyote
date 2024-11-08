@@ -24,7 +24,6 @@ decl =
     | [storageclass] ident ":" type ["=" expr]
     | [storageclass] ident ":" "=" expr
     | [storageclass] fndecl
-(* EXTERN parses differently so it cant go in storageclass *)
     | EXTERN ident ":" type 
     | EXTERN fn-proto 
 
