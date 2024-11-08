@@ -1,0 +1,101 @@
+(* JACKAL formal grammar by spsandwichman 
+
+    TODO: I'm not sure if i interpreted PROBE correctly? 
+          verify that with hyenasky or other JACKAL users
+    
+    all words in UPPERCASE are jackal keywords. 
+    {} indicates repetition (0 or more)
+    [] indicates optionals (0 or 1)
+    () indicates grouping
+    things like "ident" and "literal" are not defined here but are assumed to exist
+*)
+
+(* comma-separated list with optional trailing comma *)
+list<X> = [X {"," X} [","]]
+
+file = {globaldecl}
+
+storageclass = PUBLIC | PRIVATE | EXPORT
+
+decl =
+    | [storageclass] ident ":" type ["=" expr]
+    | [storageclass] ident ":" "=" expr
+    | [storageclass] fndecl
+    | EXTERN ident ":" type 
+    | EXTERN fn-proto (* EXTERN indicates theres no body past the prototype *)
+
+fnproto = FN ["(" type ")"] ident "(" list<param> ")" [":" expr]
+fndecl = fn-proto {stmt} END
+typedecl = 
+    | STRUCT [PACKED] ident list<field> END
+    | UNION ident list<field> END
+    | ENUM ident : type list<variant> END
+    | TYPE ident : type
+    | FNPTR ident "(" list<param> ")" [":" type]
+
+param = (IN | OUT) field | "..." (* fn and fnptr *)
+field = ident : type (* structs and unions *)
+variant = ident | ident "=" expr (* enums *)
+
+assignop = 
+    | "=" 
+    | "+=" | "-=" | "*=" | "/=" | "%=" 
+    | "&=" | "|=" | "$=" | "<<=" | ">>="
+
+stmt = 
+    | [PROBE] expr assignop expr
+    | decl
+    | typedecl
+    | BARRIER
+    | BREAK
+    | CONTINUE
+    | LEAVE
+    | RETURN expr
+    | IF expr THEN {stmt} (END | else)
+    | WHILE expr DO {stmt} END
+    | "@" ident  (* label *)
+    | GOTO ident
+    | NOTHING (* blank statement *)
+
+else = 
+    | ELSEIF expr THEN {STMT} else
+    | ELSE {stmt} END
+
+
+binop =
+    | "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "~" | "|" | "&" | "$"
+    | "!=" | "==" | "<" | ">" | "<=" | ">=" | AND | OR
+
+expr = 
+    | CAST expr TO type
+    | CONTAINEROF expr TO type "." field
+    | expr binop expr (* no precedence for now its ok *)
+    | unary
+
+unop =
+    | "&" | NOT | SIZEOF | SIZEOFVALUE
+
+unary = 
+    | unop unary
+    | atomic
+
+atomic = 
+    | ident | literal | TRUE | FALSE | NULLPTR
+    | "(" expr ")"
+    | OFFSETOF type "." ident
+    | atomic "[" expr "]"
+    | atomic "^"
+    | atomic "." ident
+    | atomic "(" list<argument> ")"
+
+argument = [OUT] expr
+
+type = 
+    | basetype
+    | basetype "[" expr "]"
+
+basetype = 
+    | QUAD | UQUAD | LONG | ULONG | INT | UINT | BYTE | UBYTE | VOID
+    | ident
+    | "(" type ")"
+    | "^" basetype
