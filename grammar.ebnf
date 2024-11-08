@@ -8,6 +8,9 @@
     [] indicates optionals (0 or 1)
     () indicates grouping
     things like "ident" and "literal" are not defined here but are assumed to exist
+
+    some things like nested function decls, PUBLIC/EXPORT declarations in functions, etc.
+    will be parsed as valid but eliminated during a semantic analysis phase.
 *)
 
 (* comma-separated list with optional trailing comma *)
@@ -21,20 +24,21 @@ decl =
     | [storageclass] ident ":" type ["=" expr]
     | [storageclass] ident ":" "=" expr
     | [storageclass] fndecl
+    (* EXTERN parses differently so it cant go in storageclass *)
     | EXTERN ident ":" type 
-    | EXTERN fn-proto (* EXTERN indicates theres no body past the prototype *)
+    | EXTERN fn-proto 
 
 fnproto = FN ["(" type ")"] ident "(" list<param> ")" [":" expr]
-fndecl = fn-proto {stmt} END
+fndecl = fnproto {stmt} END
 typedecl = 
     | STRUCT [PACKED] ident list<field> END
     | UNION ident list<field> END
-    | ENUM ident : type list<variant> END
-    | TYPE ident : type
+    | ENUM ident ":" type list<variant> END
+    | TYPE ident ":" type
     | FNPTR ident "(" list<param> ")" [":" type]
 
 param = (IN | OUT) field | "..." (* fn and fnptr *)
-field = ident : type (* structs and unions *)
+field = ident ":" type (* structs and unions *)
 variant = ident | ident "=" expr (* enums *)
 
 assignop = 
