@@ -60,7 +60,7 @@ stmt =
 
 
 else = 
-    | ELSEIF expr THEN {STMT} else
+    | ELSEIF expr THEN {stmt} else
     | ELSE {stmt} END
 
 
