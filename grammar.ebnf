@@ -43,6 +43,7 @@ assignop =
     | "&=" | "|=" | "$=" | "<<=" | ">>="
 
 stmt = 
+    | expr
     | expr assignop expr
     | decl
     | typedecl
@@ -63,21 +64,20 @@ else =
     | ELSEIF expr THEN {stmt} else
     | ELSE {stmt} END
 
-
 binop =
     | "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "~" | "|" | "&" | "$"
     | "!=" | "==" | "<" | ">" | "<=" | ">=" | AND | OR
 
 expr = 
-    | CAST expr TO type
-    | CONTAINEROF expr TO type "." field
     | expr binop expr         (* no precedence for now its ok *)
     | unary
 
 unop =
-    | "&" | "-" | NOT | SIZEOFVALUE
+    | "&" | "-" | "~" | NOT | SIZEOFVALUE
 
 unary = 
+    | CONTAINEROF expr TO type "." ident
+    | CAST expr TO type
     | unop unary
     | atomic
 
