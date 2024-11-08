@@ -1,8 +1,5 @@
 (* JACKAL formal grammar by spsandwichman 
 
-    TODO: I'm not sure if i interpreted PROBE correctly? 
-          verify that with hyenasky or other JACKAL users
-    
     all words in UPPERCASE are jackal keywords. 
     {} indicates repetition (0 or more)
     [] indicates optionals (0 or 1)
