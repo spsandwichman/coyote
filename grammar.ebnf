@@ -46,19 +46,21 @@ assignop =
     | "&=" | "|=" | "$=" | "<<=" | ">>="
 
 stmt = 
-    | [PROBE] expr assignop expr
+    | expr assignop expr
     | decl
     | typedecl
+    | PROBE           (* wack-ass shit *)
     | BARRIER
     | BREAK
     | CONTINUE
     | LEAVE
     | RETURN expr
-    | IF expr THEN {stmt} (END | else)
-    | WHILE expr DO {stmt} END
     | "@" ident       (* label *)
     | GOTO ident
     | NOTHING         (* blank statement *)
+    | IF expr THEN {stmt} (END | else)
+    | WHILE expr DO {stmt} END
+
 
 else = 
     | ELSEIF expr THEN {STMT} else
