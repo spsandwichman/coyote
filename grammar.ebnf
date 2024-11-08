@@ -24,7 +24,7 @@ decl =
     | [storageclass] ident ":" type ["=" expr]
     | [storageclass] ident ":" "=" expr
     | [storageclass] fndecl
-    | EXTERN ident ":" type 
+    | EXTERN ident ":" type     (* EXTERN parses differently so it cant go in storageclass *)
     | EXTERN fn-proto 
 
 fnproto = FN ["(" type ")"] ident "(" list<param> ")" [":" expr]
@@ -36,9 +36,9 @@ typedecl =
     | TYPE ident ":" type
     | FNPTR ident "(" list<param> ")" [":" type]
 
-param = (IN | OUT) field | "..." (* fn and fnptr *)
-field = ident ":" type (* structs and unions *)
-variant = ident | ident "=" expr (* enums *)
+param = (IN | OUT) field | "..."     (* fn and fnptr *)
+field = ident ":" type               (* structs and unions *)
+variant = ident | ident "=" expr     (* enums *)
 
 assignop = 
     | "=" 
