@@ -75,7 +75,7 @@ expr =
     | unary
 
 unop =
-    | "&" | NOT | SIZEOF | SIZEOFVALUE
+    | "&" | NOT | SIZEOFVALUE
 
 unary = 
     | unop unary
@@ -85,6 +85,7 @@ atomic =
     | ident | literal | TRUE | FALSE | NULLPTR
     | "(" expr ")"
     | OFFSETOF type "." ident
+    | SIZEOF type
     | atomic "[" expr "]"
     | atomic "^"
     | atomic "." ident
