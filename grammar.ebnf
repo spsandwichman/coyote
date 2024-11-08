@@ -75,7 +75,7 @@ expr =
     | unary
 
 unop =
-    | "&" | NOT | SIZEOFVALUE
+    | "&" | "-" | NOT | SIZEOFVALUE
 
 unary = 
     | unop unary
