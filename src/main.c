@@ -36,6 +36,6 @@ int main(int argc, char** argv) {
     TokenBuf tb = lex_tokenize(&src);
 
     for_range(i, 0, tb.len) {
-        // printf("%d\n", i);
+        printf("% 2d    %.*s\n", tb.at[i].len, tb.at[i].len, tb.at[i].raw);
     }
 }

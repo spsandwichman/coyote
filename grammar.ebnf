@@ -65,7 +65,7 @@ else =
     | ELSE {stmt} END
 
 binop =
-    | "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "~" | "|" | "&" | "$"
+    | "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "|" | "&" | "$"
     | "!=" | "==" | "<" | ">" | "<=" | ">=" | AND | OR
 
 expr = 
@@ -81,8 +81,11 @@ unary =
     | unop unary
     | atomic
 
+item = expr | "[" expr "]" "=" expr
+
 atomic = 
     | ident | literal | TRUE | FALSE | NULLPTR
+    | "{" list<item> "}"
     | "(" expr ")"
     | OFFSETOF type "." ident
     | SIZEOF type

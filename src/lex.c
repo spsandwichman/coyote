@@ -70,7 +70,7 @@ bool lex_can_ident(char c) {
 }
 
 u64 lex_scan_ident(Lexer* l) {
-    u64 len = 0;
+    u64 len = 1;
     while (lex_can_ident(lex_peek(l, len))) {
         len++;
     }
@@ -274,7 +274,7 @@ static void tokenize(Lexer* l) {
         }
 
         if (lex_can_begin_ident(l->current)) {
-            u64 len = lex_scan_ident(l) + 1;
+            u64 len = lex_scan_ident(l);
             u8 kind = lex_categorize_keyword(&l->text.raw[l->cursor], len);
             lex_add_token(l, len, kind);
             lex_advance_n(l, len);

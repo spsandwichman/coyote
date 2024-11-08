@@ -1,4 +1,4 @@
-#INCLUDE "test.hjk"
+// #INCLUDE "test.hjk"
 
 FN add_ints (IN x: INT, IN y: INT) : INT
     RETURN x + y

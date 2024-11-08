@@ -71,7 +71,7 @@ typedef struct Lexer {
 
 
 enum {
-    TOK__INVALID,
+    _TOK_INVALID,
     TOK_EOF,
 
     TOK_OPEN_PAREN,     // (
@@ -127,6 +127,8 @@ enum {
     #define T(ident) TOK_KEYWORD_##ident
         _LEX_KEYWORDS_
     #undef T
+
+    _TOK_COUNT
 };
 
 TokenBuf lex_tokenize(SourceFile* src);
@@ -136,3 +138,149 @@ void lex_advance_n(Lexer* l, int n);
 void lex_skip_whitespace(Lexer* l);
 
 void preproc_dispatch(Lexer* l);
+
+enum {
+    PN_INVALID = 0,
+
+    _PN_BINOP_BEGIN,
+        PN_EXPR_ADD,
+        PN_EXPR_SUB,
+        PN_EXPR_MUL,
+        PN_EXPR_DIV,
+        PN_EXPR_MOD,
+        PN_EXPR_LSHIFT,
+        PN_EXPR_RSHIFT,
+        PN_EXPR_BIT_OR,
+        PN_EXPR_BIT_AND,
+        PN_EXPR_BIT_XOR,
+        PN_EXPR_NOT_EQ,
+        PN_EXPR_EQ,
+        PN_EXPR_LESS,
+        PN_EXPR_GREATER,
+        PN_EXPR_LESS_EQ,
+        PN_EXPR_GREATER_EQ,
+        PN_EXPR_BOOL_AND,
+        PN_EXPR_BOOL_OR,
+    _PN_BINOP_END,
+
+    _PN_UNOP_BEGIN,
+        PN_EXPR_DEREF,
+        PN_EXPR_NEGATE,
+        PN_EXPR_BIT_NOT,
+        PN_EXPR_BOOL_NOT,
+        PN_EXPR_SIZEOFVALUE,
+    _PN_UNOP_END,
+
+    // bin
+    PN_EXPR_OFFSETOF,
+    PN_EXPR_SELECTOR,
+    PN_EXPR_CAST,
+
+    // bin: CONTAINEROF lhs TO rhs
+    // rhs must be a selector
+    PN_EXPR_CONTAINEROF,
+
+    _PN_TYPE_SIMPLE_BEGIN,
+        PN_TYPE_QUAD,
+        PN_TYPE_UQUAD,
+        PN_TYPE_LONG,
+        PN_TYPE_ULONG,
+        PN_TYPE_INT,
+        PN_TYPE_UINT,
+        PN_TYPE_BYTE,
+        PN_TYPE_UBYTE,
+        PN_TYPE_VOID,
+    _PN_TYPE_SIMPLE_END,
+
+    PN_TYPE_POINTER, // un
+    PN_TYPE_ARRAY,   // bin
+
+    PN_EXPR_INT,
+    PN_EXPR_FLOAT,
+    PN_EXPR_STRING,
+    PN_EXPR_BOOL_TRUE,
+    PN_EXPR_BOOL_FALSE,
+    PN_EXPR_NULLPTR,
+
+    PN_EXPR_IDENT,
+
+    _PN_STMT_ASSIGN_BEGIN, // bin
+        PN_STMT_ASSIGN,
+        PN_STMT_ASSIGN_ADD,
+        PN_STMT_ASSIGN_SUB,
+        PN_STMT_ASSIGN_MUL,
+        PN_STMT_ASSIGN_DIV,
+        PN_STMT_ASSIGN_MOD,
+        PN_STMT_ASSIGN_AND,
+        PN_STMT_ASSIGN_OR,
+        PN_STMT_ASSIGN_XOR,
+        PN_STMT_ASSIGN_LSHIFT,
+        PN_STMT_ASSIGN_RSHIFT,
+    _PN_STMT_ASSIGN_END, // bin
+
+    PN_STMT_BLOCK,  // list
+    PN_STMT_IF,     // bin
+    PN_STMT_WHILE,  // bin
+    PN_STMT_GOTO,   // un
+    PN_STMT_PROBE,
+    PN_STMT_BARRIER,
+    PN_STMT_BREAK,
+    PN_STMT_CONTINUE,
+    PN_STMT_LEAVE,
+    PN_STMT_RETURN,     // un
+    PN_STMT_LABEL,      // un
+    PN_STMT_TYPEDECL,   // bin
+
+    PN_STMT_IF,     // bin
+    PN_STMT_IFELSE, // un, .sub = condition
+    PN_STMT_WHILE,  // bin
+
+};
+
+typedef u32 ParseNodeIndex;
+typedef u32 ParseExtraIndex;
+#define PN_NULL (ParseNodeIndex)0
+
+typedef struct PNExtraIfStmt {
+    ParseNodeIndex block;
+    ParseNodeIndex else_branch;
+} PNExtraIfStmt;
+
+typedef struct ParseTree {
+
+    ParseNodeIndex head;
+
+    struct {
+        u8* kinds; // parallel array of parse-node kinds
+        ParseNode* at;
+        u32 len;
+        u32 cap;
+    } nodes;
+
+    struct {
+        ParseNodeIndex* at;
+        u32 len;
+        u32 cap;
+    } extra;
+} ParseTree;
+
+typedef struct ParseNode {
+    u32 main_token;
+
+    union {
+        struct {
+            ParseNodeIndex lhs;
+            ParseNodeIndex rhs;
+        } bin;
+
+        struct {
+            ParseNodeIndex sub;
+            ParseExtraIndex extra;
+        } un;
+
+        struct {
+            ParseExtraIndex items;
+            u32 len;
+        } list;
+    };
+} ParseNode;
