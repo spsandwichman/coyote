@@ -13,7 +13,7 @@
 (* comma-separated list with optional trailing comma *)
 list<X> = [X {"," X} [","]]
 
-file = {globaldecl}
+file = {decl}
 
 storageclass = PUBLIC | PRIVATE | EXPORT
 
