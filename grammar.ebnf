@@ -56,9 +56,9 @@ stmt =
     | RETURN expr
     | IF expr THEN {stmt} (END | else)
     | WHILE expr DO {stmt} END
-    | "@" ident  (* label *)
+    | "@" ident       (* label *)
     | GOTO ident
-    | NOTHING (* blank statement *)
+    | NOTHING         (* blank statement *)
 
 else = 
     | ELSEIF expr THEN {STMT} else
@@ -72,7 +72,7 @@ binop =
 expr = 
     | CAST expr TO type
     | CONTAINEROF expr TO type "." field
-    | expr binop expr (* no precedence for now its ok *)
+    | expr binop expr         (* no precedence for now its ok *)
     | unary
 
 unop =
