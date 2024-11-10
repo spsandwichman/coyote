@@ -134,6 +134,7 @@ u64 lex_scan_numeric(Lexer* l) {
     if (lex_is_numeric(l->current)) {
         return lex_scan_integer_base(l, 10, 1);
     }
+    return 0;
 }
 
 #define push_simple_token(kind) do { lex_add_token(l, 1, kind); lex_advance(l); goto next_token;} while (0)
@@ -168,6 +169,9 @@ static void tokenize(Lexer* l) {
         case '^':  push_simple_token(TOK_CARET);
         case '@':  push_simple_token(TOK_AT);
         case '.':
+            if (lex_peek(l, 1) == '.' && lex_peek(l, 2) == '.') {
+                push_token(TOK_VARARG, 3);
+            }
             push_simple_token(TOK_DOT);
         case '&':
             if (lex_peek(l, 1) == '&') 

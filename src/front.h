@@ -230,8 +230,8 @@ enum {
     PN_STMT_BREAK,
     PN_STMT_CONTINUE,
     PN_STMT_LEAVE,
-    PN_STMT_GOTO,       // ident = main_token + 1
-    PN_STMT_LABEL,      // ident = main_token + 1
+    PN_STMT_GOTO,       // lhs = ident (token index)
+    PN_STMT_LABEL,      // lhs = ident (token index)
     PN_STMT_RETURN,     // lhs = expr
 
     PN_STMT_WHILE,  // lhs = cond, rhs = PNExtraList
@@ -260,6 +260,7 @@ enum {
 
     PN_IN_PARAM,  // lhs = ident (token index), rhs = type
     PN_OUT_PARAM, // lhs = ident (token index), rhs = type
+    PN_VAR_PARAM, // lhs = argv (token index), rhs = argc (token index)
 };
 
 typedef u32 Index;
@@ -328,6 +329,7 @@ ParseTree parse_file(TokenBuf tb);
 Index parse_type();
 Index parse_base_type();
 Index parse_expr();
+Index parse_binary(isize precedence);
 
 Index parse_stmt();
 Index parse_decl();

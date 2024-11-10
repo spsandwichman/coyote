@@ -1,5 +1,5 @@
 // #INCLUDE "test.hjk"
 
-FN add_ints (IN x: ^INT, IN y: INT) : INT
-    RETURN x^ + y
+FN add_ints (IN x: INT, IN y: INT, ... argv argc) : INT
+    RETURN x
 END

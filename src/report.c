@@ -32,6 +32,8 @@ static string find_line(string source, char* location, usize* line, usize* col) 
 
         ++*col;
     }
+
+    return NULL_STR;
 }
 
 void emit_report(bool error, string source, string path, string highlight, char* message, va_list varargs) {
@@ -49,7 +51,7 @@ void emit_report(bool error, string source, string path, string highlight, char*
 
     string line = find_line(source, highlight.raw, &line_num, &col_num);
 
-    printf(" "str_fmt":%d:%d ", str_arg(path), line_num, col_num);
+    printf(" ["str_fmt":%d:%d] ", str_arg(path), line_num, col_num);
     vprintf(message, varargs);
 
     // trim the highlight if necessary

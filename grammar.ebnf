@@ -34,9 +34,9 @@ typedecl =
     | TYPE ident ":" type
     | FNPTR fnproto
 
-param = (IN | OUT) field | "..."     (* fn and fnptr *)
-field = ident ":" type               (* structs and unions *)
-variant = ident | ident "=" expr     (* enums *)
+param = (IN | OUT) field | "..." ident ident (* fn and fnptr *)
+field = ident ":" type                       (* structs and unions *)
+variant = ident | ident "=" expr             (* enums *)
 
 assignop = 
     | "=" 

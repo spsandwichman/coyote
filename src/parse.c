@@ -29,7 +29,7 @@ static void restore_dynbuf(u32 save) {
 
 // BEWARE: this may invalidate any active ParseNode*
 Index new_node(u8 kind) {
-    if (p.tree.nodes.cap == p.tree.nodes.cap) {
+    if (p.tree.nodes.len == p.tree.nodes.cap) {
         p.tree.nodes.cap *= 2;
         p.tree.nodes.at = realloc(p.tree.nodes.at, p.tree.nodes.cap);
         p.tree.nodes.kinds = realloc(p.tree.nodes.kinds, p.tree.nodes.cap);
@@ -44,7 +44,7 @@ Index new_node(u8 kind) {
 }
 
 Index new_extra_slots(usize slots) {
-    if (p.tree.extra.cap == p.tree.extra.cap) {
+    if (p.tree.extra.len == p.tree.extra.cap) {
         p.tree.extra.cap *= 2;
         p.tree.extra.at = realloc(p.tree.extra.at, p.tree.extra.cap);
     }
@@ -136,12 +136,30 @@ Index parse_fn_prototype() {
     expect(TOK_OPEN_PAREN);
     advance();
     while (current()->kind != TOK_CLOSE_PAREN) {
+        // ... argv argc,
+        if (current()->kind == TOK_VARARG) {
+            Index vararg = new_node(PN_VAR_PARAM);
+            advance();
+            expect(TOK_IDENTIFIER);
+            node(vararg)->bin.lhs = p.cursor; // argv
+            advance();
+            expect(TOK_IDENTIFIER);
+            node(vararg)->bin.rhs = p.cursor; // argc
+            advance();
+
+            if (current()->kind == TOK_COMMA) {
+                advance();
+            }
+            da_append(&dynbuf, vararg);
+            break;
+        }
+
         // (IN | OUT) ident : type,
-        u8 pkind;
+        u8 pkind = 0;
         if (current()->kind == TOK_KEYWORD_IN) {
-            pkind == PN_IN_PARAM;
+            pkind = PN_IN_PARAM;
         } else if (current()->kind == TOK_KEYWORD_OUT) {
-            pkind == PN_OUT_PARAM;
+            pkind = PN_OUT_PARAM;
         } else {
             report_token(true, p.cursor, "expected IN or OUT");
         }
@@ -182,8 +200,8 @@ Index parse_fn_prototype() {
         advance();
         as_extra(PNExtraFnProto, proto_index)->return_type = parse_type();
     }
-
     restore_dynbuf(dbsave);
+    return proto_index;
 }
 
 static u8 decl_node_kind(u8 storage, bool fn) {
@@ -243,8 +261,8 @@ Index parse_decl() {
         decl_kind = decl_node_kind(current()->kind, peek(1)->kind == TOK_KEYWORD_FN);
         advance();
     }
-    
-    Index decl_index;
+
+    Index decl_index = 0;
     if (current()->kind == TOK_KEYWORD_FN) {
         decl_index = parse_fn_decl();
     } else if (current()->kind == TOK_IDENTIFIER) {
@@ -265,10 +283,13 @@ Index parse_fn_decl() {
     // use the dynbuf to parse params
     u32 sp = save_dynbuf();
 
+
     while (current()->kind != TOK_KEYWORD_END) {
         Index stmt = parse_stmt();
         da_append(&dynbuf, stmt);
     }
+
+    advance();
 
     Index stmt_list = new_extra_with(PNExtraList, dynbuf.len - dynbuf.start);
     as_extra(PNExtraList, stmt_list)->len = dynbuf.len - dynbuf.start;
@@ -326,6 +347,7 @@ Index parse_stmt() {
         Index jump_stmt = new_node(current()->kind == TOK_AT ? PN_STMT_LABEL : PN_STMT_GOTO);
         advance();
         expect(TOK_IDENTIFIER);
+        node(jump_stmt)->bin.lhs = p.cursor;
         advance();
         return jump_stmt;
     case TOK_KEYWORD_PUBLIC:
@@ -345,6 +367,7 @@ Index parse_stmt() {
     default:
         report_token(true, p.cursor, "expected a statement");
     }
+    return 0;
 }
 
 Index parse_type() {
@@ -386,23 +409,51 @@ Index parse_base_type() {
         Index simple_index = new_node(simple_kind);
         advance();
         return simple_index;
+    case TOK_IDENTIFIER:
+        Index ident = new_node(PN_EXPR_IDENT);
+        advance();
+        return ident;
     default:
         report_token(true, p.cursor, "expected a type");
         break;
     }
+    return 0;
 }
 
-Index parse_selector_sequence() {
+Index parse_selector_sequence(Index lhs) {
     TODO("");
 }
 
 Index parse_atomic_terminal() {
-    TODO("");
-    
+    switch (current()->kind) {
+    case TOK_IDENTIFIER:
+        Index ident = new_node(PN_EXPR_IDENT);
+        advance();
+        return ident;
+    case TOK_NUMERIC:
+        Index numeric = new_node(PN_EXPR_INT);
+        advance();
+        return numeric;
+    }
+    report_token(true, p.cursor, "expected an expression");
+    return 0;
 }
 
 Index parse_atomic() {
     Index expr = parse_atomic_terminal();
+    while (true) {
+        switch (current()->kind) {
+        case TOK_CARET:
+            Index deref = new_node(PN_EXPR_DEREF);
+            node(deref)->bin.lhs = expr;
+            expr = deref;
+            advance();
+            break;
+        default:
+            return expr;
+        }
+    }
+    return 0;
 }
 
 Index parse_unary() {
@@ -466,15 +517,42 @@ static isize bin_precedence(u8 kind) {
     return -1;
 }
 
-Index parse_binary_recurse(Index lhs, isize precedence) {
-
+static u8 bin_kind(u8 token_kind) {
+    switch (token_kind) {
+        case TOK_MUL: return PN_EXPR_MUL;
+        case TOK_DIV: return PN_EXPR_DIV;
+        case TOK_MOD: return PN_EXPR_MOD;
+        case TOK_PLUS: return PN_EXPR_ADD;
+        case TOK_MINUS: return PN_EXPR_SUB;
+        case TOK_LSHIFT: return PN_EXPR_LSHIFT;
+        case TOK_RSHIFT: return PN_EXPR_RSHIFT;
+        case TOK_AND: return PN_EXPR_BIT_AND;
+        case TOK_DOLLAR: return PN_EXPR_BIT_XOR;
+        case TOK_OR: return PN_EXPR_BIT_OR;
+        case TOK_LESS: return PN_EXPR_LESS;
+        case TOK_LESS_EQ: return PN_EXPR_LESS_EQ;
+        case TOK_GREATER: return PN_EXPR_GREATER;
+        case TOK_GREATER_EQ:  return PN_EXPR_GREATER_EQ;
+        case TOK_EQ: return PN_EXPR_EQ;
+        case TOK_NOT_EQ: return PN_EXPR_NOT_EQ;
+        case TOK_KEYWORD_AND: return PN_EXPR_BOOL_AND;
+        case TOK_KEYWORD_OR: return PN_EXPR_BOOL_OR;
+    }
+    return 0;
 }
 
 Index parse_binary(isize precedence) {
     Index lhs = parse_unary();
 
-    // while (precedence < bin-prec)
-    TODO("");
+    while (precedence < bin_precedence(current()->kind)) {
+        u8 n_prec = bin_precedence(current()->kind);
+        Index n = new_node(bin_kind(current()->kind));
+        node(n)->bin.lhs = lhs;
+        advance();
+        node(n)->bin.rhs = parse_binary(n_prec);
+        lhs = n;
+    }
+    return lhs;
 }
 
 Index parse_expr() {
@@ -503,7 +581,10 @@ ParseTree parse_file(TokenBuf tb) {
         CRASH("null node is not at index 0");
     }
 
+
     while (current()->kind != TOK_EOF) {
         Index decl = parse_decl();
     }
+
+    return p.tree;
 }
