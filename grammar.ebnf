@@ -22,18 +22,19 @@ decl =
     | [storageclass] ident ":" "=" expr
     | [storageclass] fndecl
     | EXTERN ident ":" type     (* EXTERN parses differently so it cant go in storageclass *)
-    | EXTERN fn-proto 
+    | EXTERN FN fn-proto 
+    | typedecl
 
-fnproto = FN ["(" type ")"] ident "(" list<param> ")" [":" expr]
-fndecl = fnproto {stmt} END
+fnproto = ["(" type ")"] ident "(" list<param> ")" [":" expr]
+fndecl = FN fnproto {stmt} END
 typedecl = 
     | STRUCT [PACKED] ident list<field> END
     | UNION ident list<field> END
     | ENUM ident ":" type list<variant> END
     | TYPE ident ":" type
-    | FNPTR ident "(" list<param> ")" [":" type]
+    | FNPTR fnproto
 
-param = (IN | OUT) field | "..."     (* fn and fnptr *)
+param = (IN | OUT) field             (* fn and fnptr *)
 field = ident ":" type               (* structs and unions *)
 variant = ident | ident "=" expr     (* enums *)
 
@@ -46,7 +47,6 @@ stmt =
     | expr
     | expr assignop expr
     | decl
-    | typedecl
     | PROBE           (* wack-ass shit *)
     | BARRIER
     | BREAK
@@ -76,16 +76,17 @@ unop =
     | "&" | "-" | "~" | NOT | SIZEOFVALUE
 
 unary = 
-    | CONTAINEROF expr TO type "." ident
+    | CONTAINEROF expr TO type "." ident {"." ident}
     | CAST expr TO type
     | unop unary
     | atomic
 
-item = expr | "[" expr "]" "=" expr
+item = "[" expr "]" "=" expr
 
 atomic = 
     | ident | literal | TRUE | FALSE | NULLPTR
     | "{" list<item> "}"
+    | "{" list<expr> "}"
     | "(" expr ")"
     | OFFSETOF type "." ident
     | SIZEOF type

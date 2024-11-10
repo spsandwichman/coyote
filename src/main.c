@@ -10,7 +10,6 @@ SourceFile get_source(string path) {
     fs_get(path, &f);
     
     string text = string_alloc(f.size);
-    printf("f.size %d\n", f.size);
     fs_open(&f, "rb");
     fs_read_entire(&f, text.raw);
     fs_close(&f);
@@ -28,14 +27,14 @@ void add_source_to_ctx(SourceFile src) {
 }
 
 int main(int argc, char** argv) {
-    printf("hello world!\n");
 
     SourceFile src = get_source(str("./test.jkl"));
-    printf("src %d\n", src.text.len);
     add_source_to_ctx(src);
     TokenBuf tb = lex_tokenize(&src);
 
-    for_range(i, 0, tb.len) {
-        printf("% 2d    %.*s\n", tb.at[i].len, tb.at[i].len, tb.at[i].raw);
-    }
+    // for_range(i, 0, tb.len) {
+    //     printf("% 2d | %.*s\n", tb.at[i].len, tb.at[i].len, tb.at[i].raw);
+    // }
+
+    ParseTree pt = parse_file(tb);
 }

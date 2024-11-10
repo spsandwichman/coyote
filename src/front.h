@@ -14,6 +14,7 @@ typedef da(Token) TokenBuf;
 typedef struct Lexer {
     TokenBuf* tb;
     string text;
+    string path;
     u32 cursor;
     char current;
 } Lexer;
@@ -131,6 +132,8 @@ enum {
     _TOK_COUNT
 };
 
+extern const char* token_kind[_TOK_COUNT];
+
 TokenBuf lex_tokenize(SourceFile* src);
 
 void lex_advance(Lexer* l);
@@ -141,6 +144,17 @@ void preproc_dispatch(Lexer* l);
 
 enum {
     PN_INVALID = 0,
+
+    PN_EXPR_INT,
+    PN_EXPR_STRING,
+    PN_EXPR_BOOL_TRUE,
+    PN_EXPR_BOOL_FALSE,
+    PN_EXPR_NULLPTR,
+
+    PN_EXPR_IDENT,
+
+    PN_EXPR_COMPOUND, // list
+    PN_COMPOUND_ITEM, // bin
 
     _PN_BINOP_BEGIN,
         PN_EXPR_ADD,
@@ -165,9 +179,11 @@ enum {
 
     _PN_UNOP_BEGIN,
         PN_EXPR_DEREF,
+        PN_EXPR_ADDRESS,
         PN_EXPR_NEGATE,
         PN_EXPR_BIT_NOT,
         PN_EXPR_BOOL_NOT,
+        PN_EXPR_SIZEOF,
         PN_EXPR_SIZEOFVALUE,
     _PN_UNOP_END,
 
@@ -192,17 +208,8 @@ enum {
         PN_TYPE_VOID,
     _PN_TYPE_SIMPLE_END,
 
-    PN_TYPE_POINTER, // un
-    PN_TYPE_ARRAY,   // bin
-
-    PN_EXPR_INT,
-    PN_EXPR_FLOAT,
-    PN_EXPR_STRING,
-    PN_EXPR_BOOL_TRUE,
-    PN_EXPR_BOOL_FALSE,
-    PN_EXPR_NULLPTR,
-
-    PN_EXPR_IDENT,
+    PN_TYPE_POINTER, // bin: lhs
+    PN_TYPE_ARRAY,   // bin: lhs = type, rhs = len
 
     _PN_STMT_ASSIGN_BEGIN, // bin
         PN_STMT_ASSIGN,
@@ -218,47 +225,57 @@ enum {
         PN_STMT_ASSIGN_RSHIFT,
     _PN_STMT_ASSIGN_END, // bin
 
-    PN_STMT_BLOCK,  // list
-    PN_STMT_IF,     // bin
-    PN_STMT_WHILE,  // bin
-    PN_STMT_GOTO,   // un
     PN_STMT_PROBE,
     PN_STMT_BARRIER,
     PN_STMT_BREAK,
     PN_STMT_CONTINUE,
     PN_STMT_LEAVE,
-    PN_STMT_RETURN,     // un
-    PN_STMT_LABEL,      // un
-    PN_STMT_TYPEDECL,   // bin
+    PN_STMT_GOTO,       // ident = main_token + 1
+    PN_STMT_LABEL,      // ident = main_token + 1
+    PN_STMT_RETURN,     // lhs = expr
 
-    PN_STMT_IF,     // bin
-    PN_STMT_IFELSE, // un, .sub = condition
-    PN_STMT_WHILE,  // bin
+    PN_STMT_WHILE,  // lhs = cond, rhs = PNExtraList
+    PN_STMT_IF,     // lhs = cond, rhs = PNExtraList
+    PN_STMT_IFELSE, // lhs = cond, rhs = PNExtraIfElseStmt
 
+    // identifiers can be derived from this
+    PN_STMT_DECL,        // lhs = type, rhs = value
+    PN_STMT_PRIVATE_DECL,// lhs = type, rhs = value
+    PN_STMT_EXTERN_DECL, // lhs = type, rhs = value
+    PN_STMT_PUBLIC_DECL, // lhs = type, rhs = value
+    PN_STMT_EXPORT_DECL, // lhs = type, rhs = value
+
+    PN_STMT_FN_DECL,         // lhs = PNExtraFnProto, rhs = PNExtraList
+    PN_STMT_PUBLIC_FN_DECL,  // lhs = PNExtraFnProto, rhs = PNExtraList
+    PN_STMT_PRIVATE_FN_DECL, // lhs = PNExtraFnProto, rhs = PNExtraList
+    PN_STMT_EXPORT_FN_DECL,  // lhs = PNExtraFnProto, rhs = PNExtraList
+    PN_STMT_EXTERN_FN,       // lhs = PNExtraFnProto
+
+    PN_STMT_TYPE_DECL,          // lhs = ident (token index), rhs = PNExtraList
+    PN_STMT_STRUCT_DECL,        // lhs = ident (token index), rhs = PNExtraList
+    PN_STMT_STRUCT_PACKED_DECL, // lhs = ident (token index), rhs = PNExtraList
+    PN_STMT_UNION_DECL,         // lhs = ident (token index), rhs = PNExtraList
+    PN_STMT_ENUM_DECL,          // lhs = type, rhs = PNExtraList
+    PN_STMT_FNPTR_DECL,         // lhs = PNExtraFnProto
+
+    PN_IN_PARAM,  // lhs = ident (token index), rhs = type
+    PN_OUT_PARAM, // lhs = ident (token index), rhs = type
 };
 
-typedef u32 ParseNodeIndex;
-typedef u32 ParseExtraIndex;
-#define PN_NULL (ParseNodeIndex)0
+typedef u32 Index;
+#define NULL_INDEX (Index)0
 
-typedef struct PNExtraIfStmt {
-    ParseNodeIndex block;
-    ParseNodeIndex else_branch;
-} PNExtraIfStmt;
-
+typedef struct ParseNode ParseNode;
 typedef struct ParseTree {
-
-    ParseNodeIndex head;
-
+    Index head;
     struct {
         u8* kinds; // parallel array of parse-node kinds
         ParseNode* at;
         u32 len;
         u32 cap;
     } nodes;
-
     struct {
-        ParseNodeIndex* at;
+        Index* at;
         u32 len;
         u32 cap;
     } extra;
@@ -266,21 +283,54 @@ typedef struct ParseTree {
 
 typedef struct ParseNode {
     u32 main_token;
-
     union {
         struct {
-            ParseNodeIndex lhs;
-            ParseNodeIndex rhs;
+            Index lhs;
+            Index rhs;
         } bin;
-
         struct {
-            ParseNodeIndex sub;
-            ParseExtraIndex extra;
-        } un;
-
-        struct {
-            ParseExtraIndex items;
+            Index items; // into extra array
             u32 len;
         } list;
     };
 } ParseNode;
+
+#define verify_extra(T) static_assert(sizeof(T) % sizeof(Index) == 0)
+
+typedef struct PNExtraList {
+    u32 len;
+    Index items[];
+} PNExtraList;
+verify_extra(PNExtraList);
+
+typedef struct PNExtraFnProto {
+    Index fnptr_type; // (T)
+    Index identifier; // token index
+    Index return_type; // : T
+
+    u32 params_len;
+    Index params[]; // list of PN_IN_PARAM / PN_OUT_PARAM
+} PNExtraFnProto;
+verify_extra(PNExtraFnProto);
+
+typedef struct PNExtraIfElseStmt {
+    Index block;
+    Index else_branch;
+} PNExtraIfElseStmt;
+verify_extra(PNExtraIfElseStmt);
+
+#undef verify_extra
+
+void emit_report(bool error, string source, string path, string highlight, char* message, va_list varargs);
+
+ParseTree parse_file(TokenBuf tb);
+
+Index parse_type();
+Index parse_base_type();
+Index parse_expr();
+
+Index parse_stmt();
+Index parse_decl();
+Index parse_fn_decl();
+Index parse_var_decl(bool is_extern);
+Index parse_type_decl();

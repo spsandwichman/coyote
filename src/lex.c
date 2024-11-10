@@ -2,6 +2,12 @@
 
 static u8 lex_categorize_keyword(char* s, size_t len);
 
+void lexer_error(Lexer* l, isize n, char* fmt, ...) {
+    va_list varargs;
+    va_start(varargs, fmt);
+    emit_report(true, l->text, l->path, (string){l->text.raw + l->cursor + n, 1}, fmt, varargs);
+}
+
 void lex_advance(Lexer* l) {
     l->cursor++;
     if (l->cursor > l->text.len) {
@@ -119,14 +125,15 @@ u64 lex_scan_numeric(Lexer* l) {
         default:
             if (lex_is_numeric(lex_peek(l, 1))) {
                 return lex_scan_integer_base(l, 10, 2);
+            } else if (lex_can_ident(lex_peek(l, 1))) {
+                lexer_error(l, 1, "invalid digit or base signifier");
             }
-            break;
+            return 1;
         }
     }
     if (lex_is_numeric(l->current)) {
         return lex_scan_integer_base(l, 10, 1);
     }
-    CRASH("what?");
 }
 
 #define push_simple_token(kind) do { lex_add_token(l, 1, kind); lex_advance(l); goto next_token;} while (0)
@@ -134,14 +141,14 @@ u64 lex_scan_numeric(Lexer* l) {
 
 static void tokenize(Lexer* l) {
     if (lex_cursor_eof(l)) {
-        lex_add_token(l, 1, TOK_EOF);
+        lex_add_token(l, 0, TOK_EOF);
         return;
     }
     
     while (!lex_cursor_eof(l)) {
         lex_skip_whitespace(l);
         if (lex_cursor_eof(l)) {
-            lex_add_token(l, 1, TOK_EOF);
+            lex_add_token(l, 0, TOK_EOF);
             return;
         }
 
@@ -161,9 +168,6 @@ static void tokenize(Lexer* l) {
         case '^':  push_simple_token(TOK_CARET);
         case '@':  push_simple_token(TOK_AT);
         case '.':
-            if (lex_is_numeric(lex_peek(l, 1))) {
-                TODO("numbers!");
-            }
             push_simple_token(TOK_DOT);
         case '&':
             if (lex_peek(l, 1) == '&') 
@@ -305,10 +309,13 @@ TokenBuf lex_tokenize(SourceFile* src) {
         .cursor = 0,
         .tb = &tb,
         .text = src->text,
+        .path = src->path,
         .current = src->text.len == 0 ? '\0' : src->text.raw[0],
     };
 
     tokenize(&l);
+
+    lex_add_token(&l, 0, TOK_EOF);
     
     return tb;
 }
@@ -385,3 +392,63 @@ u8 lex_categorize_keyword(char* s, size_t len) {
     }
     return TOK_IDENTIFIER;
 }
+
+const char* token_kind[_TOK_COUNT] = {
+
+    [_TOK_INVALID] = "[invalid]",
+    [TOK_EOF] = "EOF",
+
+    [TOK_OPEN_PAREN] =    "(",
+    [TOK_CLOSE_PAREN] =   ")",
+    [TOK_OPEN_BRACE] =    "{",
+    [TOK_CLOSE_BRACE] =   "}",
+    [TOK_OPEN_BRACKET] =  "[",
+    [TOK_CLOSE_BRACKET] = "]",
+
+    [TOK_COLON] =      ":",
+    [TOK_COMMA] =      ",",
+    [TOK_EQ_EQ] =      "==",
+    [TOK_NOT_EQ] =     "!=",
+    [TOK_AND] =        "&=",
+    [TOK_OR] =         "|",
+    [TOK_LESS] =       "<",
+    [TOK_GREATER] =    ">",
+    [TOK_LESS_EQ] =    "<=",
+    [TOK_GREATER_EQ] = ">=",
+    [TOK_PLUS] =       "+",
+    [TOK_MINUS] =      "-",
+    [TOK_MUL] =        "*",
+    [TOK_DIV] =        "/",
+    [TOK_MOD] =        "%",
+    [TOK_DOT] =        ".",
+    [TOK_AT] =         "@",
+    [TOK_DOLLAR] =     "$",
+    [TOK_LSHIFT] =     "<<",
+    [TOK_RSHIFT] =     ">>",
+    [TOK_TILDE] =      "~",
+    [TOK_VARARG] =     "...",
+    [TOK_CARET] =      "^",
+
+    [TOK_EQ] =        "=",
+    [TOK_PLUS_EQ] =   "+=",
+    [TOK_MINUS_EQ] =  "-=",
+    [TOK_MUL_EQ] =    "*=",
+    [TOK_DIV_EQ] =    "/=",
+    [TOK_MOD_EQ] =    "%=",
+    [TOK_AND_EQ] =    "&=",
+    [TOK_OR_EQ] =     "|=",
+    [TOK_DOLLAR_EQ] = "$=",
+    [TOK_LSHIFT_EQ] = "<<=",
+    [TOK_RSHIFT_EQ] = ">>=",
+
+    [TOK_IDENTIFIER] = "identifier",
+
+    [TOK_CHAR] = "char",
+    [TOK_STRING] = "string",
+
+    [TOK_NUMERIC] = "numeric",
+
+    #define T(kw) [TOK_KEYWORD_##kw] = #kw
+        _LEX_KEYWORDS_
+    #undef T
+};
