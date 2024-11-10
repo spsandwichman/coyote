@@ -25,7 +25,7 @@ decl =
     | EXTERN FN fn-proto 
     | typedecl
 
-fnproto = ["(" type ")"] ident "(" list<param> ")" [":" expr]
+fnproto = ["(" type ")"] ident "(" list<param> ")" [":" type]
 fndecl = FN fnproto {stmt} END
 typedecl = 
     | STRUCT [PACKED] ident list<field> END

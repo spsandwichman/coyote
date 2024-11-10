@@ -49,7 +49,8 @@ Index new_extra_slots(usize slots) {
         p.tree.extra.at = realloc(p.tree.extra.at, p.tree.extra.cap);
     }
 
-    Index index = p.tree.extra.len += slots;
+    Index index = p.tree.extra.len;
+    p.tree.extra.len += slots;
     memset(&p.tree.extra.at[index], 0, slots * sizeof(p.tree.extra.at[0]));
 
     return index;
