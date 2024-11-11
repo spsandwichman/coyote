@@ -21,7 +21,7 @@ INCLUDEPATHS = -Isrc/
 DEBUGFLAGS = -lm -pg -g
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
 CFLAGS = -Wno-format -MD -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
-OPT = -O0
+OPT = -O1
 
 FILE_NUM = 0
 
@@ -34,7 +34,7 @@ build: $(OBJECTS)
 	@$(LD) $(OBJECTS) -o $(EXECUTABLE_NAME) $(CFLAGS)
 
 debug: CFLAGS += $(DEBUGFLAGS)
-debug: OPT = -O0
+debug: OPT = -Og
 debug: build
 
 clean:

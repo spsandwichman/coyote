@@ -27,6 +27,9 @@ void add_source_to_ctx(SourceFile src) {
 }
 
 int main(int argc, char** argv) {
+#ifndef _WIN32
+    init_signal_handler();
+#endif
 
     SourceFile src = get_source(str("./test.jkl"));
     add_source_to_ctx(src);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "jacc.h"
+#include "crash.h"
 
 typedef struct Token {
     char* raw;

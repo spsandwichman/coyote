@@ -1,4 +1,4 @@
-#define NO_COLOR
+// #define NO_COLOR
 
 #include "front.h"
 #include "report.h"

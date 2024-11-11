@@ -10,7 +10,7 @@ void lexer_error(Lexer* l, isize n, char* fmt, ...) {
 
 void lex_advance(Lexer* l) {
     l->cursor++;
-    if (l->cursor > l->text.len) {
+    if (l->cursor >= l->text.len) {
         l->cursor = l->text.len;
         l->current = '\0';
     } else {
@@ -20,7 +20,7 @@ void lex_advance(Lexer* l) {
 
 void lex_advance_n(Lexer* l, int n) {
     l->cursor += n;
-    if (l->cursor > l->text.len) {
+    if (l->cursor >= l->text.len) {
         l->cursor = l->text.len;
         l->current = '\0';
     } else {
