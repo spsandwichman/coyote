@@ -110,7 +110,8 @@ enum {
 
     TOK_NUMERIC,
     
-    // this must be the same order as the parse nodes
+    // DO NOT REARRANGE THESE - important for parser trick
+    // this must be the same order as their parse nodes
     TOK_PLUS,       // +
     TOK_MINUS,      // -
     TOK_MUL,        // *
@@ -239,7 +240,7 @@ enum {
     PN_STMT_IF,     // lhs = cond, rhs = PNExtraList
     PN_STMT_IFELSE, // lhs = cond, rhs = PNExtraIfElseStmt
 
-    // DO NOT REARRANGE THESE
+    // DO NOT REARRANGE THESE - important for parser trick
     // {
     PN_STMT_DECL,        // lhs = type, rhs = value
     PN_STMT_PRIVATE_DECL,// lhs = type, rhs = value
@@ -260,6 +261,9 @@ enum {
     PN_STMT_UNION_DECL,         // lhs = ident (token index), rhs = PNExtraList
     PN_STMT_ENUM_DECL,          // lhs = type, rhs = PNExtraList
     PN_STMT_FNPTR_DECL,         // lhs = PNExtraFnProto
+
+    PN_FIELD,   // lhs = ident (token index), rhs = type
+    PN_VARIANT, // lhs = ident (token index), rhs = value
 
     PN_IN_PARAM,  // lhs = ident (token index), rhs = type
     PN_OUT_PARAM, // lhs = ident (token index), rhs = type

@@ -202,7 +202,7 @@ Index parse_fn_prototype(bool is_fnptr) {
     as_extra(PNExtraFnProto, proto_index)->identifier = ident;
     as_extra(PNExtraFnProto, proto_index)->params_len = dynbuf.len;
     for_range(i, dynbuf.start, dynbuf.len) {
-        as_extra(PNExtraFnProto, proto_index)->params[i] = dynbuf.at[i];
+        as_extra(PNExtraFnProto, proto_index)->params[i - dynbuf.start] = dynbuf.at[i];
     }
 
     if (current()->kind == TOK_COLON) {
@@ -215,7 +215,6 @@ Index parse_fn_prototype(bool is_fnptr) {
 }
 
 Index parse_var_decl(bool is_extern) {
-    // TODO("");
     Index decl = new_node(PN_STMT_DECL);
     expect(TOK_IDENTIFIER);
     advance();
@@ -243,7 +242,7 @@ Index parse_var_decl(bool is_extern) {
     return decl;
 }
 
-// this function is fucked lmao, redo this
+// this function is kinda fucked lmao, its good enough
 Index parse_decl() {
     if (current()->kind == TOK_KEYWORD_EXTERN) {
         advance();
@@ -255,11 +254,7 @@ Index parse_decl() {
             return extern_fn_index;
         }
 
-        // else, EXTERN ident : type
-        if (current()->kind != TOK_IDENTIFIER) {
-            report_token(true, p.cursor, "expected FN or identifier");
-        }
-
+        // EXTERN ident : type
         Index decl_index = parse_var_decl(true);
         set_kind(decl_index, PN_STMT_EXTERN_DECL);
         return decl_index;
@@ -316,19 +311,94 @@ Index parse_fn_decl() {
 }
 
 Index parse_structure_decl(bool is_struct) {
-    Index decl_index = new_node(is_struct ? PN_STMT_STRUCT_DECL : PN_STMT_UNION_DECL);
-    node(decl_index)->main_token = p.cursor;
+    Index decl = new_node(is_struct ? PN_STMT_STRUCT_DECL : PN_STMT_UNION_DECL);
+    node(decl)->main_token = p.cursor;
     advance();
     if (!is_struct && current()->kind == TOK_KEYWORD_PACKED) {
-        p.tree.nodes.kinds[decl_index] = PN_STMT_STRUCT_PACKED_DECL;
+        set_kind(decl, PN_STMT_STRUCT_PACKED_DECL);
         advance();
     }
     expect(TOK_IDENTIFIER);
-    TODO("");
+    advance();
+
+    u32 sp = save_dynbuf();
+
+    while (current()->kind != TOK_KEYWORD_END) {
+        expect(TOK_IDENTIFIER);
+        Index field = new_node(PN_FIELD);
+        node(field)->lhs = p.cursor;
+        advance();
+        expect(TOK_COLON);
+        advance();
+        Index type = parse_type();
+        node(field)->rhs = type;
+        da_append(&dynbuf, field);
+
+        if (current()->kind == TOK_COMMA) {
+            advance();
+        } else {
+            break;
+        }
+    }
+    expect(TOK_KEYWORD_END);
+    advance();
+
+    // copy into hard buffer
+    Index list = new_extra_with(PNExtraList, dynbuf.len - dynbuf.start);
+    as_extra(PNExtraList, list)->len = dynbuf.len - dynbuf.start;
+    for_range(i, dynbuf.start, dynbuf.len) {
+        as_extra(PNExtraList, list)->items[i - dynbuf.start] = dynbuf.at[i];
+    }
+
+    node(decl)->rhs = list;
+
+    restore_dynbuf(sp);
+    return decl;
 }
 
 Index parse_enum_decl() {
-    TODO("");
+    Index decl = new_node(PN_STMT_ENUM_DECL);
+    advance();
+    expect(TOK_IDENTIFIER);
+    advance();
+    expect(TOK_COLON);
+    advance();
+    Index type = parse_type();
+    node(decl)->lhs = type;
+
+    u32 sp = save_dynbuf();
+
+    while (current()->kind != TOK_KEYWORD_END) {
+        expect(TOK_IDENTIFIER);
+        Index variant = new_node(PN_VARIANT);
+        node(variant)->lhs = p.cursor;
+        advance();
+        if (current()->kind == TOK_EQ) {
+            advance();
+            Index value = parse_expr();
+            node(variant)->rhs = value;
+        }
+        da_append(&dynbuf, variant);
+
+        if (current()->kind == TOK_COMMA) {
+            advance();
+        } else {
+            break;
+        }
+    }
+    expect(TOK_KEYWORD_END);
+    advance();
+
+    // copy into hard buffer
+    Index list = new_extra_with(PNExtraList, dynbuf.len - dynbuf.start);
+    as_extra(PNExtraList, list)->len = dynbuf.len - dynbuf.start;
+    for_range(i, dynbuf.start, dynbuf.len) {
+        as_extra(PNExtraList, list)->items[i - dynbuf.start] = dynbuf.at[i];
+    }
+    node(decl)->rhs = list;
+
+    restore_dynbuf(sp);
+    return decl;
 }
 
 Index parse_type_decl() {

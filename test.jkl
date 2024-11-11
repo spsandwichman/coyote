@@ -1,6 +1,8 @@
 // #INCLUDE "test.hjk"
 
-TYPE x: ^FNPTR
+STRUCT Foo
+    one : INT,
+END
 
 PUBLIC FN add(IN x: WORD, IN y: WORD) : WORD
     RETURN x + y + 1

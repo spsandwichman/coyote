@@ -22,7 +22,7 @@ decl =
     | [storageclass] ident ":" "=" (expr | compoundexpr)
     | [storageclass] fndecl
     | EXTERN ident ":" type     (* EXTERN parses differently so it cant go in storageclass *)
-    | EXTERN FN fn-proto 
+    | EXTERN FN fnproto 
     | typedecl
 
 fnproto = ["(" type ")"] ident "(" list<param> ")" [":" type]
@@ -58,7 +58,6 @@ stmt =
     | NOTHING         (* blank statement *)
     | IF expr THEN {stmt} (END | else)
     | WHILE expr DO {stmt} END
-
 
 else = 
     | ELSEIF expr THEN {stmt} else
