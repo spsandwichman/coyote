@@ -22,6 +22,7 @@ typedef struct Lexer {
 
 #define _LEX_KEYWORDS_ \
     T(AND), \
+    T(OR), \
     T(BREAK), \
     T(BYTE), \
     T(CAST), \
@@ -44,7 +45,6 @@ typedef struct Lexer {
     T(LONG), \
     T(NOT), \
     T(NULLPTR), \
-    T(OR), \
     T(OUT), \
     T(PACKED), \
     T(PUBLIC), \
@@ -65,7 +65,6 @@ typedef struct Lexer {
     T(WHILE), \
     T(BARRIER), \
     T(NOTHING), \
-    T(PROBE), \
     T(EXPORT), \
     T(PRIVATE), \
     T(UQUAD), \
@@ -85,28 +84,13 @@ enum {
 
     TOK_COLON,      // :
     TOK_COMMA,      // ,
-    TOK_EQ_EQ,      // ==
-    TOK_NOT_EQ,     // !=
-    TOK_AND,        // &=
-    TOK_OR,         // |
-    TOK_LESS,       // <
-    TOK_GREATER,    // >
-    TOK_LESS_EQ,    // <=
-    TOK_GREATER_EQ, // >=
-    TOK_PLUS,       // +
-    TOK_MINUS,      // -
-    TOK_MUL,        // *
-    TOK_DIV,        // /
-    TOK_MOD,        // %
     TOK_DOT,        // .
     TOK_AT,         // @
-    TOK_DOLLAR,     // $
-    TOK_LSHIFT,     // <<
-    TOK_RSHIFT,     // >>
     TOK_TILDE,      // ~
     TOK_VARARG,     // ...
     TOK_CARET,      // ^
 
+    // this must be the same order as the parse nodes
     TOK_EQ,         // =
     TOK_PLUS_EQ,    // +=
     TOK_MINUS_EQ,   // -=
@@ -125,6 +109,24 @@ enum {
     TOK_STRING,
 
     TOK_NUMERIC,
+    
+    // this must be the same order as the parse nodes
+    TOK_PLUS,       // +
+    TOK_MINUS,      // -
+    TOK_MUL,        // *
+    TOK_DIV,        // /
+    TOK_MOD,        // %
+    TOK_LSHIFT,     // <<
+    TOK_RSHIFT,     // >>
+    TOK_OR,         // |
+    TOK_AND,        // &
+    TOK_DOLLAR,     // $
+    TOK_NOT_EQ,     // !=
+    TOK_EQ_EQ,      // ==
+    TOK_LESS,       // <
+    TOK_GREATER,    // >
+    TOK_LESS_EQ,    // <=
+    TOK_GREATER_EQ, // >=
 
     #define T(ident) TOK_KEYWORD_##ident
         _LEX_KEYWORDS_
@@ -154,7 +156,6 @@ enum {
 
     PN_EXPR_IDENT,
 
-    PN_EXPR_COMPOUND, // list
     PN_COMPOUND_ITEM, // bin
 
     _PN_BINOP_BEGIN,
@@ -226,7 +227,6 @@ enum {
         PN_STMT_ASSIGN_RSHIFT,
     _PN_STMT_ASSIGN_END, // bin
 
-    PN_STMT_PROBE,
     PN_STMT_BARRIER,
     PN_STMT_BREAK,
     PN_STMT_CONTINUE,
@@ -239,18 +239,20 @@ enum {
     PN_STMT_IF,     // lhs = cond, rhs = PNExtraList
     PN_STMT_IFELSE, // lhs = cond, rhs = PNExtraIfElseStmt
 
-    // identifiers can be derived from this
+    // DO NOT REARRANGE THESE
+    // {
     PN_STMT_DECL,        // lhs = type, rhs = value
     PN_STMT_PRIVATE_DECL,// lhs = type, rhs = value
-    PN_STMT_EXTERN_DECL, // lhs = type, rhs = value
     PN_STMT_PUBLIC_DECL, // lhs = type, rhs = value
     PN_STMT_EXPORT_DECL, // lhs = type, rhs = value
+    PN_STMT_EXTERN_DECL, // lhs = type
 
     PN_STMT_FN_DECL,         // lhs = PNExtraFnProto, rhs = PNExtraList
-    PN_STMT_PUBLIC_FN_DECL,  // lhs = PNExtraFnProto, rhs = PNExtraList
     PN_STMT_PRIVATE_FN_DECL, // lhs = PNExtraFnProto, rhs = PNExtraList
+    PN_STMT_PUBLIC_FN_DECL,  // lhs = PNExtraFnProto, rhs = PNExtraList
     PN_STMT_EXPORT_FN_DECL,  // lhs = PNExtraFnProto, rhs = PNExtraList
     PN_STMT_EXTERN_FN,       // lhs = PNExtraFnProto
+    // }
 
     PN_STMT_TYPE_DECL,          // lhs = ident (token index), rhs = PNExtraList
     PN_STMT_STRUCT_DECL,        // lhs = ident (token index), rhs = PNExtraList
@@ -285,16 +287,8 @@ typedef struct ParseTree {
 
 typedef struct ParseNode {
     u32 main_token;
-    union {
-        struct {
-            Index lhs;
-            Index rhs;
-        } bin;
-        struct {
-            Index items; // into extra array
-            u32 len;
-        } list;
-    };
+    Index lhs;
+    Index rhs;
 } ParseNode;
 
 #define verify_extra(T) static_assert(sizeof(T) % sizeof(Index) == 0)
@@ -327,9 +321,10 @@ void emit_report(bool error, string source, string path, string highlight, char*
 
 ParseTree parse_file(TokenBuf tb);
 
+#define parse_expr() parse_binary(0)
+
 Index parse_type();
 Index parse_base_type();
-Index parse_expr();
 Index parse_binary(isize precedence);
 
 Index parse_stmt();

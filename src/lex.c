@@ -327,6 +327,10 @@ TokenBuf lex_tokenize(SourceFile* src) {
 #define return_if_eq(kind) if (!strncmp(s, #kind, sizeof(#kind)-1)) return TOK_KEYWORD_##kind
 
 u8 lex_categorize_keyword(char* s, size_t len) {
+    // if not uppercase, we can skip the whole categorization process
+    if (!('A' <= s[0] && s[0] <= 'Z')) return TOK_IDENTIFIER;
+    // do second one quick if length allows
+    if (len >= 2 && !('A' <= s[1] && s[1] <= 'Z')) return TOK_IDENTIFIER;
     switch (len) {
     case 2:
         return_if_eq(DO);
@@ -366,7 +370,6 @@ u8 lex_categorize_keyword(char* s, size_t len) {
         return_if_eq(ULONG);
         return_if_eq(UNION);
         return_if_eq(WHILE);
-        return_if_eq(PROBE);
         return_if_eq(UQUAD);
         break;
     case 6:

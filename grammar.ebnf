@@ -18,8 +18,8 @@ file = {decl}
 storageclass = PUBLIC | PRIVATE | EXPORT
 
 decl =
-    | [storageclass] ident ":" type ["=" expr]
-    | [storageclass] ident ":" "=" expr
+    | [storageclass] ident ":" type ["=" (expr | compoundexpr)]
+    | [storageclass] ident ":" "=" (expr | compoundexpr)
     | [storageclass] fndecl
     | EXTERN ident ":" type     (* EXTERN parses differently so it cant go in storageclass *)
     | EXTERN FN fn-proto 
@@ -68,6 +68,10 @@ binop =
     | "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "|" | "&" | "$"
     | "!=" | "==" | "<" | ">" | "<=" | ">=" | AND | OR
 
+compoundexpr = 
+    | "{" list<item> "}"
+    | "{" list<expr> "}"
+
 expr = 
     | expr binop expr         (* no precedence for now its ok *)
     | unary
@@ -85,8 +89,6 @@ item = "[" expr "]" "=" expr
 
 atomic = 
     | ident | literal | TRUE | FALSE | NULLPTR
-    | "{" list<item> "}"
-    | "{" list<expr> "}"
     | "(" expr ")"
     | OFFSETOF type "." ident
     | SIZEOF type

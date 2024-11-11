@@ -1,10 +1,5 @@
 // #INCLUDE "test.hjk"
 
-FN add(IN x: WORD, IN y: WORD) : WORD
-
-    PUBLIC FN mul(IN x: WORD, IN y: WORD) : WORD
-        RETURN x * y
-    END
-
+PUBLIC FN add(IN x: WORD, IN y: WORD) : WORD
     RETURN x + y + 1
 END

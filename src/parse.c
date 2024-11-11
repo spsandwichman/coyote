@@ -149,10 +149,10 @@ Index parse_fn_prototype(bool is_fnptr) {
             Index vararg = new_node(PN_VAR_PARAM);
             advance();
             expect(TOK_IDENTIFIER);
-            node(vararg)->bin.lhs = p.cursor; // argv
+            node(vararg)->lhs = p.cursor; // argv
             advance();
             expect(TOK_IDENTIFIER);
-            node(vararg)->bin.rhs = p.cursor; // argc
+            node(vararg)->rhs = p.cursor; // argc
             advance();
 
             if (current()->kind == TOK_COMMA) {
@@ -175,7 +175,7 @@ Index parse_fn_prototype(bool is_fnptr) {
 
         Index param = new_node(pkind);
         expect(TOK_IDENTIFIER);
-        node(param)->bin.lhs = p.cursor; // mark identifier index
+        node(param)->lhs = p.cursor; // mark identifier index
         advance();
 
         expect(TOK_COLON); // :
@@ -183,7 +183,7 @@ Index parse_fn_prototype(bool is_fnptr) {
 
         // type
         Index type = parse_type();
-        node(param)->bin.rhs = type;
+        node(param)->rhs = type;
 
         da_append(&dynbuf, param);
 
@@ -214,35 +214,33 @@ Index parse_fn_prototype(bool is_fnptr) {
     return proto_index;
 }
 
-static u8 decl_node_kind(u8 storage, bool fn) {
-    if (fn) {
-        switch (storage) {
-        case TOK_KEYWORD_PRIVATE: return PN_STMT_PRIVATE_FN_DECL;
-        case TOK_KEYWORD_PUBLIC: return PN_STMT_PUBLIC_FN_DECL;
-        case TOK_KEYWORD_EXPORT: return PN_STMT_EXPORT_FN_DECL;
-        }
-    } else {
-        switch (storage) {
-        case TOK_KEYWORD_PRIVATE: return PN_STMT_PRIVATE_DECL;
-        case TOK_KEYWORD_PUBLIC: return PN_STMT_PUBLIC_DECL;
-        case TOK_KEYWORD_EXPORT: return PN_STMT_EXPORT_DECL;
-        }
-    }
-    return 0;
-}
-
 Index parse_var_decl(bool is_extern) {
-    TODO("");
-}
-
-static bool is_storage_class(u8 kind) {
-    switch (kind) {
-    case TOK_KEYWORD_PRIVATE:
-    case TOK_KEYWORD_PUBLIC:
-    case TOK_KEYWORD_EXPORT:
-        return true;
+    // TODO("");
+    Index decl = new_node(PN_STMT_DECL);
+    expect(TOK_IDENTIFIER);
+    advance();
+    expect(TOK_COLON);
+    advance();
+    if (current()->kind != TOK_EQ) {
+        Index type = parse_type();
+        node(decl)->lhs = type;
+    } else if (is_extern) {
+        report_token(true, p.cursor, "EXTERN decls must have a type");
     }
-    return false;
+
+    if (current()->kind == TOK_EQ) {
+        if (is_extern) {
+            report_token(true, p.cursor, "EXTERN decls cannot have a value");
+        }
+        advance();
+        if (current()->kind == TOK_OPEN_BRACE) {
+            TODO("compound initializers");
+        } else {
+            Index val = parse_expr();
+            node(decl)->rhs = val;
+        }
+    }
+    return decl;
 }
 
 // this function is fucked lmao, redo this
@@ -253,7 +251,7 @@ Index parse_decl() {
             Index extern_fn_index = new_node(PN_STMT_EXTERN_FN);
             advance();
             Index prototype = parse_fn_prototype(false);
-            node(extern_fn_index)->bin.lhs = prototype;
+            node(extern_fn_index)->lhs = prototype;
             return extern_fn_index;
         }
 
@@ -268,22 +266,23 @@ Index parse_decl() {
     }
     
     u8 decl_kind = 0;
-    if (is_storage_class(current()->kind)) {
-        decl_kind = decl_node_kind(current()->kind, peek(1)->kind == TOK_KEYWORD_FN);
-        advance();
+    switch (current()->kind) {
+    case TOK_KEYWORD_PUBLIC: advance(); decl_kind = PN_STMT_PUBLIC_DECL; break;
+    case TOK_KEYWORD_EXPORT: advance(); decl_kind = PN_STMT_EXPORT_DECL; break;
+    case TOK_KEYWORD_PRIVATE: advance(); decl_kind = PN_STMT_PRIVATE_DECL; break;
+    case TOK_IDENTIFIER: decl_kind = PN_STMT_DECL; break;
     }
 
-    Index decl_index = 0;
     if (current()->kind == TOK_KEYWORD_FN) {
-        decl_index = parse_fn_decl();
-    } else if (current()->kind == TOK_IDENTIFIER) {
-        decl_index = parse_var_decl(false);
-    } else {
-        report_token(true, p.cursor, "expected a declaration");
+        if (decl_kind != 0) decl_kind += PN_STMT_FN_DECL - PN_STMT_DECL;
+        Index fn = parse_fn_decl();
+        set_kind(fn, decl_kind);
+        return fn;
     }
-    if (decl_kind) set_kind(decl_index, decl_kind);
 
-    return decl_index;
+    Index decl = parse_var_decl(false);
+    if (decl_kind) set_kind(decl, decl_kind);
+    return decl;
 }
 
 Index parse_fn_decl() {
@@ -291,7 +290,7 @@ Index parse_fn_decl() {
     Index fn_decl = new_node(PN_STMT_FN_DECL);
     advance();
     Index prototype = parse_fn_prototype(false);
-    node(fn_decl)->bin.lhs = prototype;
+    node(fn_decl)->lhs = prototype;
 
     // use the dynbuf to parse params
     u32 sp = save_dynbuf();
@@ -309,7 +308,7 @@ Index parse_fn_decl() {
     for_range(i, dynbuf.start, dynbuf.len) {
         as_extra(PNExtraList, stmt_list)->items[i - dynbuf.start] = dynbuf.at[i];
     }
-    node(fn_decl)->bin.rhs = stmt_list;
+    node(fn_decl)->rhs = stmt_list;
 
     restore_dynbuf(sp);
 
@@ -340,8 +339,15 @@ Index parse_fnptr_decl() {
     Index i = new_node(PN_STMT_FNPTR_DECL);
     advance();
     Index proto = parse_fn_prototype(true);
-    node(i)->bin.lhs = proto;
+    node(i)->lhs = proto;
     return i;
+}
+
+u8 assignop(u8 token_kind) {
+    if (TOK_EQ <= token_kind && token_kind <= TOK_RSHIFT_EQ) {
+        return token_kind - TOK_EQ + PN_STMT_ASSIGN;
+    }
+    return 0;
 }
 
 Index parse_stmt() {
@@ -349,11 +355,10 @@ Index parse_stmt() {
     case TOK_KEYWORD_NOTHING:
         advance();
         return parse_stmt();
-    case TOK_KEYWORD_PROBE: u8 simple_kind = PN_STMT_PROBE; goto simple;
-    case TOK_KEYWORD_BARRIER:  simple_kind = PN_STMT_BARRIER; goto simple;
-    case TOK_KEYWORD_BREAK:    simple_kind = PN_STMT_BREAK; goto simple;
-    case TOK_KEYWORD_CONTINUE: simple_kind = PN_STMT_CONTINUE; goto simple;
-    case TOK_KEYWORD_LEAVE:    simple_kind = PN_STMT_LEAVE;
+    case TOK_KEYWORD_BARRIER:u8 simple_kind = PN_STMT_BARRIER; goto simple;
+    case TOK_KEYWORD_BREAK:     simple_kind = PN_STMT_BREAK; goto simple;
+    case TOK_KEYWORD_CONTINUE:  simple_kind = PN_STMT_CONTINUE; goto simple;
+    case TOK_KEYWORD_LEAVE:     simple_kind = PN_STMT_LEAVE;
         simple:
         Index simple_index = new_node(simple_kind);
         advance();
@@ -362,16 +367,34 @@ Index parse_stmt() {
         Index ret_stmt = new_node(PN_STMT_RETURN);
         advance();
         Index ret_expr = parse_expr();
-        node(ret_stmt)->bin.lhs = ret_expr;
+        node(ret_stmt)->lhs = ret_expr;
         return ret_stmt;
     case TOK_KEYWORD_GOTO:
     case TOK_AT:
         Index jump_stmt = new_node(current()->kind == TOK_AT ? PN_STMT_LABEL : PN_STMT_GOTO);
         advance();
         expect(TOK_IDENTIFIER);
-        node(jump_stmt)->bin.lhs = p.cursor;
+        node(jump_stmt)->lhs = p.cursor;
         advance();
         return jump_stmt;
+    case TOK_IDENTIFIER:
+        if (peek(1)->kind == TOK_COLON) {
+            return parse_var_decl(false);
+        } else {
+            Index lhs = parse_expr();
+            // this could be an assignment, or just a plain expr
+            u8 assign_kind = assignop(current()->kind);
+            if (assign_kind) {
+                Index assign = new_node(assign_kind);
+                advance();
+                node(assign)->lhs = lhs;
+                Index rhs = parse_expr();
+                node(assign)->rhs = rhs;
+                return assign;
+            } else {
+                return lhs;
+            }
+        }
     case TOK_KEYWORD_PUBLIC:
     case TOK_KEYWORD_PRIVATE:
     case TOK_KEYWORD_EXPORT:
@@ -380,8 +403,9 @@ Index parse_stmt() {
     case TOK_KEYWORD_FN:
         return parse_fn_decl();
     case TOK_KEYWORD_STRUCT: 
+        return parse_structure_decl(false);
     case TOK_KEYWORD_UNION:
-        return parse_structure_decl(current()->kind == TOK_KEYWORD_STRUCT);
+        return parse_structure_decl(true);
     case TOK_KEYWORD_ENUM:
         return parse_enum_decl();
     case TOK_KEYWORD_TYPE:
@@ -399,9 +423,9 @@ Index parse_type() {
     while (current()->kind == TOK_OPEN_BRACKET) {
         Index new = new_node(PN_TYPE_ARRAY);
         advance();
-        node(new)->bin.lhs = t;
+        node(new)->lhs = t;
         Index expr = parse_expr();
-        node(new)->bin.rhs = expr;
+        node(new)->rhs = expr;
         expect(TOK_CLOSE_BRACKET);
         t = new;
     }
@@ -414,7 +438,7 @@ Index parse_base_type() {
         advance();
         Index ptr = new_node(PN_TYPE_POINTER);
         Index base_type = parse_base_type();
-        node(ptr)->bin.lhs = base_type;
+        node(ptr)->lhs = base_type;
         return ptr;
     case TOK_OPEN_PAREN:
         advance();
@@ -471,8 +495,14 @@ Index parse_atomic() {
         switch (current()->kind) {
         case TOK_CARET:
             Index deref = new_node(PN_EXPR_DEREF);
-            node(deref)->bin.lhs = expr;
+            node(deref)->lhs = expr;
             expr = deref;
+            advance();
+            break;
+        case TOK_OPEN_PAREN:
+            advance();
+            expr = parse_expr();
+            expect(TOK_CLOSE_PAREN);
             advance();
             break;
         default:
@@ -488,11 +518,11 @@ Index parse_unary() {
         Index cast = new_node(PN_EXPR_CAST);
         advance();
         Index expr = parse_expr();
-        node(cast)->bin.lhs = expr;
+        node(cast)->lhs = expr;
         expect(TOK_KEYWORD_TO);
         advance();
         Index type = parse_type();
-        node(cast)->bin.rhs = type;
+        node(cast)->rhs = type;
         return cast;
     case TOK_KEYWORD_CONTAINEROF:
         TODO("containerof");
@@ -505,7 +535,7 @@ Index parse_unary() {
         Index simple_index = new_node(simple_kind);
         advance();
         Index unary = parse_unary();
-        node(simple_index)->bin.lhs = unary;
+        node(simple_index)->lhs = unary;
         return simple_index;
     default:
         return parse_atomic();
@@ -547,25 +577,8 @@ static isize bin_precedence(u8 kind) {
 }
 
 static u8 bin_kind(u8 token_kind) {
-    switch (token_kind) {
-        case TOK_MUL: return PN_EXPR_MUL;
-        case TOK_DIV: return PN_EXPR_DIV;
-        case TOK_MOD: return PN_EXPR_MOD;
-        case TOK_PLUS: return PN_EXPR_ADD;
-        case TOK_MINUS: return PN_EXPR_SUB;
-        case TOK_LSHIFT: return PN_EXPR_LSHIFT;
-        case TOK_RSHIFT: return PN_EXPR_RSHIFT;
-        case TOK_AND: return PN_EXPR_BIT_AND;
-        case TOK_DOLLAR: return PN_EXPR_BIT_XOR;
-        case TOK_OR: return PN_EXPR_BIT_OR;
-        case TOK_LESS: return PN_EXPR_LESS;
-        case TOK_LESS_EQ: return PN_EXPR_LESS_EQ;
-        case TOK_GREATER: return PN_EXPR_GREATER;
-        case TOK_GREATER_EQ:  return PN_EXPR_GREATER_EQ;
-        case TOK_EQ: return PN_EXPR_EQ;
-        case TOK_NOT_EQ: return PN_EXPR_NOT_EQ;
-        case TOK_KEYWORD_AND: return PN_EXPR_BOOL_AND;
-        case TOK_KEYWORD_OR: return PN_EXPR_BOOL_OR;
+    if (TOK_PLUS <= token_kind && token_kind <= TOK_KEYWORD_OR) {
+        return token_kind - TOK_PLUS + PN_EXPR_ADD;
     }
     return 0;
 }
@@ -577,17 +590,13 @@ Index parse_binary(isize precedence) {
     while (precedence < bin_precedence(current()->kind)) {
         u8 n_prec = bin_precedence(current()->kind);
         Index n = new_node(bin_kind(current()->kind));
-        node(n)->bin.lhs = lhs;
+        node(n)->lhs = lhs;
         advance();
         Index bin = parse_binary(n_prec);
-        node(n)->bin.rhs = bin;
+        node(n)->rhs = bin;
         lhs = n;
     }
     return lhs;
-}
-
-Index parse_expr() {
-    return parse_binary(0);
 }
 
 ParseTree parse_file(TokenBuf tb) {
