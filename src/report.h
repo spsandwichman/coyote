@@ -1,5 +1,35 @@
 #pragma once
 
+#ifdef NO_COLOR
+
+#define Reset ""
+#define Bold ""
+#define Dim ""
+#define Italic ""
+#define Underline ""
+
+#define Black ""
+#define Red ""
+#define Green ""
+#define Yellow ""
+#define Blue ""
+#define Magenta ""
+#define Cyan ""
+#define White ""
+#define Default ""
+
+#define BG_Black ""
+#define BG_Red ""
+#define BG_Green ""
+#define BG_Yellow ""
+#define BG_Blue ""
+#define BG_Magenta ""
+#define BG_Cyan ""
+#define BG_White ""
+#define BG_Default ""
+
+#else
+
 #define Reset "\x1b[0m"
 #define Bold "\x1b[1m"
 #define Dim "\x1b[2m"
@@ -25,3 +55,5 @@
 #define BG_Cyan "\x1b[46m"
 #define BG_White "\x1b[47m"
 #define BG_Default "\x1b[49m"
+
+#endif

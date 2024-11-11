@@ -16,6 +16,23 @@ static struct {
     u32 start;
 } dynbuf;
 
+static void report_token(bool error, u32 token_index, char* message, ...) {
+    va_list varargs;
+    va_start(varargs, message);
+    Token t = p.tb.at[token_index];
+    string t_text = {t.raw, t.len};
+    bool found = false;
+    for_range(i, 0, ctx.sources.len) {
+        SourceFile srcfile = ctx.sources.at[i];
+        if (is_within(srcfile.text, t_text)) {
+            emit_report(error, srcfile.text, srcfile.path, t_text, message, varargs);
+            found = true;
+        }
+    }
+
+    if (!found) CRASH("unable to locate source file of token");
+}
+
 static u32 save_dynbuf() {
     da_append(&dynbuf, dynbuf.start);
     dynbuf.start = dynbuf.len;
@@ -31,8 +48,10 @@ static void restore_dynbuf(u32 save) {
 Index new_node(u8 kind) {
     if (p.tree.nodes.len == p.tree.nodes.cap) {
         p.tree.nodes.cap *= 2;
-        p.tree.nodes.at = realloc(p.tree.nodes.at, p.tree.nodes.cap);
-        p.tree.nodes.kinds = realloc(p.tree.nodes.kinds, p.tree.nodes.cap);
+        p.tree.nodes.at = realloc(p.tree.nodes.at, sizeof(p.tree.nodes.at[0]) * p.tree.nodes.cap);
+        p.tree.nodes.kinds = realloc(p.tree.nodes.kinds, sizeof(p.tree.nodes.kinds[0]) * p.tree.nodes.cap);
+        assert(p.tree.nodes.at != NULL);
+        assert(p.tree.nodes.kinds != NULL);
     }
 
     Index index = p.tree.nodes.len++;
@@ -44,9 +63,11 @@ Index new_node(u8 kind) {
 }
 
 Index new_extra_slots(usize slots) {
-    if (p.tree.extra.len == p.tree.extra.cap) {
+    if ((p.tree.extra.len + slots) >= p.tree.extra.cap) {
         p.tree.extra.cap *= 2;
-        p.tree.extra.at = realloc(p.tree.extra.at, p.tree.extra.cap);
+        p.tree.extra.cap += slots;
+        p.tree.extra.at = realloc(p.tree.extra.at, sizeof(p.tree.extra.at[0]) * p.tree.extra.cap);
+        assert(p.tree.extra.at);
     }
 
     Index index = p.tree.extra.len;
@@ -82,23 +103,6 @@ static inline Token* current() {
 
 static inline void advance() {
     p.cursor++;
-}
-
-static void report_token(bool error, u32 token_index, char* message, ...) {
-    va_list varargs;
-    va_start(varargs, message);
-    Token t = p.tb.at[token_index];
-    string t_text = {t.raw, t.len};
-    bool found = false;
-    for_range(i, 0, ctx.sources.len) {
-        SourceFile srcfile = ctx.sources.at[i];
-        if (is_within(srcfile.text, t_text)) {
-            emit_report(error, srcfile.text, srcfile.path, t_text, message, varargs);
-            found = true;
-        }
-    }
-
-    if (!found) CRASH("unable to locate source file of token");
 }
 
 static void expect(u8 kind) {
@@ -272,6 +276,7 @@ Index parse_decl() {
         report_token(true, p.cursor, "expected a declaration");
     }
     if (decl_kind) set_kind(decl_index, decl_kind);
+
     return decl_index;
 }
 
@@ -544,6 +549,7 @@ static u8 bin_kind(u8 token_kind) {
 
 Index parse_binary(isize precedence) {
     Index lhs = parse_unary();
+    
 
     while (precedence < bin_precedence(current()->kind)) {
         u8 n_prec = bin_precedence(current()->kind);
@@ -569,13 +575,14 @@ ParseTree parse_file(TokenBuf tb) {
     p.tree.nodes.len = 0;
     p.tree.nodes.cap = 128;
     p.tree.nodes.at = malloc(sizeof(p.tree.nodes.at[0]) * p.tree.nodes.cap);
+    p.tree.nodes.kinds = malloc(sizeof(p.tree.nodes.kinds[0]) * p.tree.nodes.cap);
 
     p.tree.extra.len = 0;
     p.tree.extra.cap = 128;
     p.tree.extra.at = malloc(sizeof(p.tree.extra.at[0]) * p.tree.extra.cap);
 
     // initialize dynbuf
-    da_init(&dynbuf, 32);
+    da_init(&dynbuf, 128);
 
     // occupy null node
     if (new_node(0) != 0) {
@@ -584,6 +591,9 @@ ParseTree parse_file(TokenBuf tb) {
 
 
     while (current()->kind != TOK_EOF) {
+        // printf("parsing %d %d\n", p.tree.nodes.len, p.tree.nodes.cap);
+        // report_token(false, p.cursor, "parsing %d %d", 
+        //     p.tree.nodes.len, p.tree.nodes.cap);
         Index decl = parse_decl();
     }
 
