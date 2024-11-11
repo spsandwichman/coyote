@@ -332,7 +332,15 @@ Index parse_enum_decl() {
 }
 
 Index parse_type_decl() {
-    TODO("");
+    Index decl = new_node(PN_STMT_TYPE_DECL);
+    advance();
+    expect(TOK_IDENTIFIER);
+    node(decl)->lhs = p.cursor;
+    advance();
+    expect(TOK_COLON);
+    advance();
+    Index type = parse_type();
+    node(decl)->rhs = type;
 }
 
 Index parse_fnptr_decl() {

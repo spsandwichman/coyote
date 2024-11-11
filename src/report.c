@@ -89,7 +89,6 @@ void emit_report(bool error, string source, string path, string highlight, char*
         }
     }
     printf(Reset"\n");
-
-
+    
     if (error) exit(-1);
 }
