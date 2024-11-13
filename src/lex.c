@@ -296,8 +296,10 @@ static void tokenize(Lexer* l) {
             goto next_token;
         }
 
-        printf("unrecognized '%c' %d\n", l->current, l->cursor);
-        CRASH("unrecognized");
+        // printf("unrecognized '%c' %d\n", l->current, l->cursor);
+        // CRASH("unrecognized");
+        l->cursor--;
+        lexer_error(l, 1, "unknown character");
         return;
         
         next_token:

@@ -71,6 +71,9 @@ compoundexpr =
     | "{" list<item> "}"
     | "{" list<expr> "}"
 
+item = "[" expr "]" "=" expr
+
+
 expr = 
     | expr binop expr         (* no precedence for now its ok *)
     | unary
@@ -83,8 +86,6 @@ unary =
     | CAST expr TO type
     | unop unary
     | atomic
-
-item = "[" expr "]" "=" expr
 
 atomic = 
     | ident | literal | TRUE | FALSE | NULLPTR

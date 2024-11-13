@@ -214,6 +214,53 @@ Index parse_fn_prototype(bool is_fnptr) {
     return proto_index;
 }
 
+Index parse_compound_expr() {
+    Index compound = new_node(PN_COMPOUND_EXPR);
+    advance();
+
+    u32 sp = save_dynbuf();
+
+    while (current()->kind != TOK_CLOSE_BRACE) {
+        if (current()->kind == TOK_OPEN_BRACKET) {
+            // [expr] = expr,
+            Index item = new_node(PN_COMPOUND_ITEM);
+            advance();
+            Index indexer = parse_expr();
+            node(item)->lhs = indexer;
+            expect(TOK_CLOSE_BRACKET);
+            advance();
+            expect(TOK_EQ);
+            advance();
+            Index value = parse_expr();
+            node(item)->rhs = value;
+            da_append(&dynbuf, item);
+        } else {
+            // expr,
+            Index item = parse_expr();
+            da_append(&dynbuf, item);
+        }
+
+        if (current()->kind == TOK_COMMA) {
+            advance();
+        } else {
+            break;
+        }
+    }
+    expect(TOK_CLOSE_BRACE);
+    advance();
+
+    Index list = new_extra_with(PNExtraList, dynbuf.len - dynbuf.start);
+    as_extra(PNExtraList, list)->len = dynbuf.len - dynbuf.start;
+    for_range(i, dynbuf.start, dynbuf.len) {
+        as_extra(PNExtraList, list)->items[i - dynbuf.start] = dynbuf.at[i];
+    }
+    node(compound)->lhs = list;
+
+    restore_dynbuf(sp);
+
+    return compound;
+}
+
 Index parse_var_decl(bool is_extern) {
     Index decl = new_node(PN_STMT_DECL);
     expect(TOK_IDENTIFIER);
@@ -233,7 +280,8 @@ Index parse_var_decl(bool is_extern) {
         }
         advance();
         if (current()->kind == TOK_OPEN_BRACE) {
-            TODO("compound initializers");
+            Index val = parse_compound_expr();
+            node(decl)->rhs = val;
         } else {
             Index val = parse_expr();
             node(decl)->rhs = val;
@@ -247,7 +295,7 @@ Index parse_decl() {
     if (current()->kind == TOK_KEYWORD_EXTERN) {
         advance();
         if (current()->kind == TOK_KEYWORD_FN) {
-            Index extern_fn_index = new_node(PN_STMT_EXTERN_FN);
+            Index extern_fn_index = new_node(PN_STMT_EXTERN_FN_DECL);
             advance();
             Index prototype = parse_fn_prototype(false);
             node(extern_fn_index)->lhs = prototype;
@@ -280,33 +328,34 @@ Index parse_decl() {
     return decl;
 }
 
+Index parse_stmt_list(bool if_stmt) {
+    u32 sp = save_dynbuf();
+    for (u8 k = current()->kind; k != TOK_KEYWORD_END; k = current()->kind) {
+        if (if_stmt && (k == TOK_KEYWORD_ELSE || k == TOK_KEYWORD_ELSEIF)) {
+            p.cursor--;
+            break;
+        }
+        Index stmt = parse_stmt();
+        da_append(&dynbuf, stmt);
+    }
+    advance();
+    Index stmt_list = new_extra_with(PNExtraList, dynbuf.len - dynbuf.start);
+    as_extra(PNExtraList, stmt_list)->len = dynbuf.len - dynbuf.start;
+    for_range(i, dynbuf.start, dynbuf.len) {
+        as_extra(PNExtraList, stmt_list)->items[i - dynbuf.start] = dynbuf.at[i];
+    }
+    restore_dynbuf(sp);
+    return stmt_list;
+}
+
 Index parse_fn_decl() {
     expect(TOK_KEYWORD_FN);
     Index fn_decl = new_node(PN_STMT_FN_DECL);
     advance();
     Index prototype = parse_fn_prototype(false);
     node(fn_decl)->lhs = prototype;
-
-    // use the dynbuf to parse params
-    u32 sp = save_dynbuf();
-
-
-    while (current()->kind != TOK_KEYWORD_END) {
-        Index stmt = parse_stmt();
-        da_append(&dynbuf, stmt);
-    }
-
-    advance();
-
-    Index stmt_list = new_extra_with(PNExtraList, dynbuf.len - dynbuf.start);
-    as_extra(PNExtraList, stmt_list)->len = dynbuf.len - dynbuf.start;
-    for_range(i, dynbuf.start, dynbuf.len) {
-        as_extra(PNExtraList, stmt_list)->items[i - dynbuf.start] = dynbuf.at[i];
-    }
+    Index stmt_list = parse_stmt_list(false);
     node(fn_decl)->rhs = stmt_list;
-
-    restore_dynbuf(sp);
-
     return fn_decl;
 }
 
@@ -428,6 +477,30 @@ u8 assignop(u8 token_kind) {
     return 0;
 }
 
+Index parse_if_stmt() {
+    Index if_stmt = new_node(PN_STMT_IF);
+    advance();
+    Index cond = parse_expr();
+    node(if_stmt)->lhs = cond;
+    Index true_branch = parse_stmt_list(true);
+    if (current()->kind == TOK_KEYWORD_ELSE) {
+        advance();
+        Index else_extra = new_extra(PNExtraIfElseStmt);
+        Index false_branch = parse_stmt_list(true);
+        as_extra(PNExtraIfElseStmt, else_extra)->block = true_branch;
+        as_extra(PNExtraIfElseStmt, else_extra)->else_branch = false_branch;
+        node(if_stmt)->rhs = else_extra;
+    } else if (current()->kind == TOK_KEYWORD_ELSEIF) {
+        Index else_extra = new_extra(PNExtraIfElseStmt);
+        as_extra(PNExtraIfElseStmt, else_extra)->block = true_branch;
+        Index elseif = parse_if_stmt();
+        as_extra(PNExtraIfElseStmt, else_extra)->else_branch = elseif;
+    } else {
+        node(if_stmt)->rhs = true_branch;
+    }
+    return if_stmt;
+}
+
 Index parse_stmt() {
     switch (current()->kind) {
     case TOK_KEYWORD_NOTHING:
@@ -473,6 +546,17 @@ Index parse_stmt() {
                 return lhs;
             }
         }
+    case TOK_KEYWORD_WHILE:
+        Index while_stmt = new_node(PN_STMT_WHILE);
+        advance();
+        Index cond = parse_expr();
+        node(while_stmt)->lhs = cond;
+        Index stmt_list = parse_stmt_list(false);
+        node(while_stmt)->rhs = stmt_list;
+        return while_stmt;
+    case TOK_KEYWORD_IF:
+        
+        return parse_if_stmt();
     case TOK_KEYWORD_PUBLIC:
     case TOK_KEYWORD_PRIVATE:
     case TOK_KEYWORD_EXPORT:
@@ -548,12 +632,22 @@ Index parse_base_type() {
     return 0;
 }
 
-Index parse_selector_sequence(Index lhs) {
-    TODO("");
-}
-
 Index parse_atomic_terminal() {
     switch (current()->kind) {
+    case TOK_KEYWORD_TRUE:
+        Index bool_true = new_node(PN_EXPR_BOOL_TRUE);
+        advance();
+        return bool_true;
+    case TOK_KEYWORD_FALSE:
+        Index bool_false = new_node(PN_EXPR_BOOL_FALSE);
+        advance();
+        return bool_false;
+    case TOK_OPEN_PAREN:
+        advance();
+        Index subexpr = parse_expr();
+        expect(TOK_CLOSE_PAREN);
+        advance();
+        return subexpr;
     case TOK_IDENTIFIER:
         Index ident = new_node(PN_EXPR_IDENT);
         advance();
@@ -571,16 +665,70 @@ Index parse_atomic() {
     Index expr = parse_atomic_terminal();
     while (true) {
         switch (current()->kind) {
+        case TOK_OPEN_PAREN: {
+            Index call = new_node(PN_EXPR_CALL);
+            node(call)->lhs = expr;
+            advance();
+            
+            u32 sp = save_dynbuf();
+
+            while (current()->kind != TOK_CLOSE_PAREN) {
+                Index arg;
+                if (current()->kind == TOK_KEYWORD_OUT) {
+                    arg = new_node(PN_OUT_ARGUMENT);
+                    advance();
+                    Index value = parse_expr();
+                    node(arg)->lhs = value;
+                } else {
+                    arg = parse_expr();
+                }
+
+                da_append(&dynbuf, arg);
+
+                if (current()->kind == TOK_COMMA) {
+                    advance();
+                } else {
+                    break;
+                }
+            }
+            expect(TOK_CLOSE_PAREN);
+            advance();
+
+            // copy into hard buffer
+            Index list = new_extra_with(PNExtraList, dynbuf.len - dynbuf.start);
+            as_extra(PNExtraList, list)->len = dynbuf.len - dynbuf.start;
+            for_range(i, dynbuf.start, dynbuf.len) {
+                as_extra(PNExtraList, list)->items[i - dynbuf.start] = dynbuf.at[i];
+            }
+            node(call)->rhs = list;
+            restore_dynbuf(sp);
+
+            expr = call;
+            break;
+        }
+        case TOK_OPEN_BRACKET:
+            Index array_access = new_node(PN_EXPR_INDEX);
+            node(array_access)->lhs = expr;
+            advance();
+            Index indexer = parse_expr();
+            expect(TOK_CLOSE_BRACKET);
+            advance();
+            node(array_access)->rhs = indexer;
+            expr = array_access;
+            break;
+        case TOK_DOT:
+            Index selector = new_node(PN_EXPR_SELECTOR);
+            node(selector)->lhs = expr;
+            advance();
+            expect(TOK_IDENTIFIER);
+            node(selector)->rhs = p.cursor;
+            advance();
+            expr = selector;
+            break;
         case TOK_CARET:
             Index deref = new_node(PN_EXPR_DEREF);
             node(deref)->lhs = expr;
             expr = deref;
-            advance();
-            break;
-        case TOK_OPEN_PAREN:
-            advance();
-            expr = parse_expr();
-            expect(TOK_CLOSE_PAREN);
             advance();
             break;
         default:
@@ -592,7 +740,7 @@ Index parse_atomic() {
 
 Index parse_unary() {
     switch (current()->kind){
-    case TOK_KEYWORD_CAST:
+    case TOK_KEYWORD_CAST: {
         Index cast = new_node(PN_EXPR_CAST);
         advance();
         Index expr = parse_expr();
@@ -602,8 +750,18 @@ Index parse_unary() {
         Index type = parse_type();
         node(cast)->rhs = type;
         return cast;
-    case TOK_KEYWORD_CONTAINEROF:
-        TODO("containerof");
+    }
+    case TOK_KEYWORD_CONTAINEROF: {
+        Index containerof = new_node(PN_EXPR_CONTAINEROF);
+        advance();
+        Index expr = parse_expr();
+        node(containerof)->lhs = expr;
+        expect(TOK_KEYWORD_TO);
+        advance();
+        Index selector = parse_atomic();
+        node(containerof)->rhs = selector;
+        return containerof;
+    }
     case TOK_AND: u8 simple_kind = PN_EXPR_ADDRESS; goto simple_op;
     case TOK_MINUS: simple_kind = PN_EXPR_NEGATE; goto simple_op;
     case TOK_TILDE: simple_kind = PN_EXPR_BIT_NOT; goto simple_op;
@@ -615,6 +773,18 @@ Index parse_unary() {
         Index unary = parse_unary();
         node(simple_index)->lhs = unary;
         return simple_index;
+    case TOK_KEYWORD_SIZEOF:
+        Index size_of = new_node(PN_EXPR_SIZEOF);
+        advance();
+        Index type = parse_type();
+        node(size_of)->lhs = type;
+        return size_of;
+    case TOK_KEYWORD_OFFSETOF:
+        Index offset_of = new_node(PN_EXPR_OFFSETOF);
+        advance();
+        Index selector = parse_atomic();
+        node(offset_of)->lhs = selector;
+        return offset_of;
     default:
         return parse_atomic();
     }
@@ -643,7 +813,7 @@ static isize bin_precedence(u8 kind) {
         case TOK_GREATER:
         case TOK_GREATER_EQ:
             return 4;
-        case TOK_EQ:
+        case TOK_EQ_EQ:
         case TOK_NOT_EQ:
             return 3;
         case TOK_KEYWORD_AND:
@@ -701,9 +871,6 @@ ParseTree parse_file(TokenBuf tb) {
     }
 
     while (current()->kind != TOK_EOF) {
-        // report_token(false, p.cursor, "parsing %d %d", 
-            // p.tree.nodes.len, p.tree.nodes.cap);
-        // fflush(stdout);
         Index decl = parse_stmt();
     }
 

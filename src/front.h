@@ -157,7 +157,8 @@ enum {
 
     PN_EXPR_IDENT,
 
-    PN_COMPOUND_ITEM, // bin
+    PN_COMPOUND_EXPR, // lhs = PNExtraList
+    PN_COMPOUND_ITEM, // rhs = indexer, lhs = value
 
     _PN_BINOP_BEGIN,
         PN_EXPR_ADD,
@@ -190,10 +191,14 @@ enum {
         PN_EXPR_SIZEOFVALUE,
     _PN_UNOP_END,
 
-    // bin
+    PN_OUT_ARGUMENT, // lhs = value
+    PN_EXPR_CALL, // lhs = callee, rhs = PNExtraList
+
     PN_EXPR_OFFSETOF,
-    PN_EXPR_SELECTOR,
     PN_EXPR_CAST,
+
+    PN_EXPR_SELECTOR, // lhs = subexpr, rhs = ident (token index)
+    PN_EXPR_INDEX,    // lhs = subexpr, rhs = index expr
 
     // bin: CONTAINEROF lhs TO rhs
     // rhs must be a selector
@@ -236,9 +241,12 @@ enum {
     PN_STMT_LABEL,      // lhs = ident (token index)
     PN_STMT_RETURN,     // lhs = expr
 
-    PN_STMT_WHILE,  // lhs = cond, rhs = PNExtraList
-    PN_STMT_IF,     // lhs = cond, rhs = PNExtraList
-    PN_STMT_IFELSE, // lhs = cond, rhs = PNExtraIfElseStmt
+    PN_STMT_WHILE,    // lhs = cond, rhs = PNExtraList
+    PN_STMT_IF,       // lhs = cond, rhs = PNExtraList
+    PN_STMT_IFELSE,   // lhs = cond, rhs = PNExtraIfElseStmt
+    PN_STMT_IFELSEIF, // lhs = cond, rhs = PNExtraIfElseStmt
+    // ^ this is the same thing as PN_STMT_IFELSE, except that .else_branch
+    // in PNExtraIfElseStmt points to a ParseNode instead of a PNExtraList
 
     // DO NOT REARRANGE THESE - important for parser trick
     // {
@@ -252,7 +260,7 @@ enum {
     PN_STMT_PRIVATE_FN_DECL, // lhs = PNExtraFnProto, rhs = PNExtraList
     PN_STMT_PUBLIC_FN_DECL,  // lhs = PNExtraFnProto, rhs = PNExtraList
     PN_STMT_EXPORT_FN_DECL,  // lhs = PNExtraFnProto, rhs = PNExtraList
-    PN_STMT_EXTERN_FN,       // lhs = PNExtraFnProto
+    PN_STMT_EXTERN_FN_DECL,  // lhs = PNExtraFnProto
     // }
 
     PN_STMT_TYPE_DECL,          // lhs = ident (token index), rhs = PNExtraList
@@ -309,7 +317,7 @@ typedef struct PNExtraFnProto {
     Index return_type; // : T
 
     u32 params_len;
-    Index params[]; // list of PN_IN_PARAM / PN_OUT_PARAM
+    Index params[]; // list of PN_IN_PARAM / PN_OUT_PARAM / PN_VAR_PARAM
 } PNExtraFnProto;
 verify_extra(PNExtraFnProto);
 

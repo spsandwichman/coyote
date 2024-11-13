@@ -1,9 +1,7 @@
 // #INCLUDE "test.hjk"
 
-STRUCT Foo
-    one : INT,
-END
+EXTERN FN mul(IN x: WORD, IN y: WORD) : WORD
 
-PUBLIC FN add(IN x: WORD, IN y: WORD) : WORD
-    RETURN x + y + 1
+FN muladd(IN x: WORD, IN y: WORD, IN z: WORD) : WORD
+    RETURN mul(x, y) + z
 END

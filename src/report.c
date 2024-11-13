@@ -79,7 +79,7 @@ void emit_report(bool error, string source, string path, string highlight, char*
         printf(" ");
     }
     printf("  |"Bold"%s", color);
-    for_range(i, 0, line.len) {
+    for_range(i, 0, line.len + 1) {
         if (line.raw + i <= highlight.raw) {
             printf(" ");
         } else if (line.raw + i <= highlight.raw + highlight.len) {

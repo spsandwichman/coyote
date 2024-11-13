@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
     init_signal_handler();
 #endif
 
-    SourceFile src = get_source(str("./test.jkl"));
+    SourceFile src = get_source(str(argv[1]));
     add_source_to_ctx(src);
     TokenBuf tb = lex_tokenize(&src);
 
