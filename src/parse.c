@@ -77,7 +77,7 @@ Index new_extra_slots(usize slots) {
     return index;
 }
 
-// this pointer becomes invalid
+// this pointer should never be saved and re-used
 static inline ParseNode* node(Index i) {
     return &p.tree.nodes.at[i];
 }
@@ -608,7 +608,9 @@ Index parse_base_type() {
         expect(TOK_CLOSE_PAREN);
         advance();
         return i;
-    case TOK_KEYWORD_QUAD: u8 simple_kind = PN_TYPE_QUAD; goto simple_type;
+    case TOK_KEYWORD_WORD: u8 simple_kind = PN_TYPE_WORD; goto simple_type;
+    case TOK_KEYWORD_UWORD:   simple_kind = PN_TYPE_UWORD; goto simple_type;
+    case TOK_KEYWORD_QUAD:    simple_kind = PN_TYPE_QUAD; goto simple_type;
     case TOK_KEYWORD_UQUAD:   simple_kind = PN_TYPE_UQUAD; goto simple_type;
     case TOK_KEYWORD_LONG:    simple_kind = PN_TYPE_LONG; goto simple_type;
     case TOK_KEYWORD_ULONG:   simple_kind = PN_TYPE_ULONG; goto simple_type;

@@ -362,6 +362,7 @@ u8 lex_categorize_keyword(char* s, size_t len) {
         return_if_eq(UINT);
         return_if_eq(VOID);
         return_if_eq(QUAD);
+        return_if_eq(WORD);
         break;
     case 5:
         return_if_eq(BREAK);
@@ -373,6 +374,7 @@ u8 lex_categorize_keyword(char* s, size_t len) {
         return_if_eq(UNION);
         return_if_eq(WHILE);
         return_if_eq(UQUAD);
+        return_if_eq(UWORD);
         break;
     case 6:
         return_if_eq(ELSEIF);

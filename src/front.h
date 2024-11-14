@@ -69,7 +69,8 @@ typedef struct Lexer {
     T(PRIVATE), \
     T(UQUAD), \
     T(QUAD), \
-
+    T(UWORD), \
+    T(WORD), \
 
 enum {
     _TOK_INVALID,
@@ -205,6 +206,8 @@ enum {
     PN_EXPR_CONTAINEROF,
 
     _PN_TYPE_SIMPLE_BEGIN,
+        PN_TYPE_WORD,
+        PN_TYPE_UWORD,
         PN_TYPE_QUAD,
         PN_TYPE_UQUAD,
         PN_TYPE_LONG,
@@ -346,3 +349,57 @@ Index parse_decl();
 Index parse_fn_decl();
 Index parse_var_decl(bool is_extern);
 Index parse_type_decl();
+
+// typedef u32 TypeHandle;
+
+// enum {
+//     TYPE_VOID = 0,
+//     TYPE_I8,
+//     TYPE_U8,
+//     TYPE_I16,
+//     TYPE_U16,
+//     TYPE_I32,
+//     TYPE_U32,
+//     TYPE_I64,
+//     TYPE_U64,
+
+//     _TYPE_SIMPLE_END, // any types after this are indices into the TypeStructure array
+
+//     TYPE_STRUCT, // use len1 and items
+//     TYPE_UNION,
+//     TYPE_FUNCTION,
+//     TYPE_ENUM,
+//     TYPE_ARRAY,
+// };
+
+// #define _TYPE_NODE_BASE \
+//     char* name; \
+//     u8 kind;
+
+// typedef struct TypeNode {
+//     _TYPE_NODE_BASE
+// } TypeNode;
+
+// typedef struct TypeNodePointer {
+//     _TYPE_NODE_BASE
+//     TypeHandle subtype;
+// } TypeNodePointer;
+
+// typedef struct TypeNodeRecord {
+//     _TYPE_NODE_BASE
+//     u16 len;
+//     u32 size;
+//     u32 align;
+//     TypeHandle fields[];
+// } TypeNodePointer;
+
+// typedef struct TypeGraph {
+//     usize* nodes; // this is kind of an arena
+//     usize len;
+//     usize cap;
+// } TypeGraph;
+
+// typedef struct SemaNode {
+//     Index parse_node; // corresponding parse node - used for error handling
+    
+// } SemaNode;
