@@ -47,7 +47,6 @@ stmt =
     | expr
     | expr assignop expr
     | decl
-    | PROBE           (* wack-ass shit *)
     | BARRIER
     | BREAK
     | CONTINUE

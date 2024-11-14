@@ -1,7 +1,4 @@
-// #INCLUDE "test.hjk"
-
 EXTERN FN mul(IN x: WORD, IN y: WORD) : WORD
-
 FN muladd(IN x: WORD, IN y: WORD, IN z: WORD) : WORD
-    RETURN mul(x, y) + z
+    return mul(x, y) + z
 END

@@ -283,7 +283,9 @@ typedef u32 Index;
 
 typedef struct ParseNode ParseNode;
 typedef struct ParseTree {
-    Index head;
+    Index* decls;
+    u32 len;
+
     struct {
         u8* kinds; // parallel array of parse-node kinds
         ParseNode* at;
