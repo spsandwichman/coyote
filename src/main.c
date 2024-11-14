@@ -31,18 +31,17 @@ int main(int argc, char** argv) {
     init_signal_handler();
 #endif
 
+    lex_init_keyword_table();
+
     SourceFile src = get_source(str(argv[1]));
     add_source_to_ctx(src);
     TokenBuf tb = lex_tokenize(&src);
 
     // for_range(i, 0, tb.len) {
-    //     printf("% 2d | %.*s\n", tb.at[i].len, tb.at[i].len, tb.at[i].raw);
+    //     printf("%s | %.*s\n", token_kind[tb.at[i].kind], tb.at[i].len, tb.at[i].raw);
     // }
 
     ParseTree pt = parse_file(tb);
-}
 
-
-void try_keyword_map() {
     
 }

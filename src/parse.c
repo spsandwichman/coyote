@@ -644,6 +644,10 @@ Index parse_atomic_terminal() {
         Index bool_false = new_node(PN_EXPR_BOOL_FALSE);
         advance();
         return bool_false;
+    case TOK_KEYWORD_NULLPTR:
+        Index nullptr = new_node(PN_EXPR_NULLPTR);
+        advance();
+        return nullptr;
     case TOK_OPEN_PAREN:
         advance();
         Index subexpr = parse_expr();

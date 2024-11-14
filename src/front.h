@@ -21,56 +21,56 @@ typedef struct Lexer {
 } Lexer;
 
 #define _LEX_KEYWORDS_ \
-    T(AND), \
-    T(OR), \
-    T(BREAK), \
-    T(BYTE), \
-    T(CAST), \
-    T(CONTAINEROF), \
-    T(CONTINUE), \
-    T(DO), \
-    T(ELSE), \
-    T(ELSEIF), \
-    T(END), \
-    T(ENUM), \
-    T(EXTERN), \
-    T(FALSE), \
-    T(FN), \
-    T(FNPTR), \
-    T(GOTO), \
-    T(IF), \
-    T(IN), \
-    T(INT), \
-    T(LEAVE), \
-    T(LONG), \
-    T(NOT), \
-    T(NULLPTR), \
-    T(OUT), \
-    T(PACKED), \
-    T(PUBLIC), \
-    T(RETURN), \
-    T(SIZEOF), \
-    T(OFFSETOF), \
-    T(SIZEOFVALUE), \
-    T(STRUCT), \
-    T(THEN), \
-    T(TO), \
-    T(TRUE), \
-    T(TYPE), \
-    T(UBYTE), \
-    T(UINT), \
-    T(ULONG), \
-    T(UNION), \
-    T(VOID), \
-    T(WHILE), \
-    T(BARRIER), \
-    T(NOTHING), \
-    T(EXPORT), \
-    T(PRIVATE), \
-    T(UQUAD), \
-    T(QUAD), \
-    T(UWORD), \
-    T(WORD), \
+    T(AND) \
+    T(OR) \
+    T(BREAK) \
+    T(BYTE) \
+    T(CAST) \
+    T(CONTAINEROF) \
+    T(CONTINUE) \
+    T(DO) \
+    T(ELSE) \
+    T(ELSEIF) \
+    T(END) \
+    T(ENUM) \
+    T(EXTERN) \
+    T(FALSE) \
+    T(FN) \
+    T(FNPTR) \
+    T(GOTO) \
+    T(IF) \
+    T(IN) \
+    T(INT) \
+    T(LEAVE) \
+    T(LONG) \
+    T(NOT) \
+    T(NULLPTR) \
+    T(OUT) \
+    T(PACKED) \
+    T(PUBLIC) \
+    T(RETURN) \
+    T(SIZEOF) \
+    T(OFFSETOF) \
+    T(SIZEOFVALUE) \
+    T(STRUCT) \
+    T(THEN) \
+    T(TO) \
+    T(TRUE) \
+    T(TYPE) \
+    T(UBYTE) \
+    T(UINT) \
+    T(ULONG) \
+    T(UNION) \
+    T(VOID) \
+    T(WHILE) \
+    T(BARRIER) \
+    T(NOTHING) \
+    T(EXPORT) \
+    T(PRIVATE) \
+    T(UQUAD) \
+    T(QUAD) \
+    T(UWORD) \
+    T(WORD) \
 
 enum {
     _TOK_INVALID,
@@ -130,15 +130,20 @@ enum {
     TOK_LESS_EQ,    // <=
     TOK_GREATER_EQ, // >=
 
-    #define T(ident) TOK_KEYWORD_##ident
+    _TOK_KEYWORDS_BEGIN,
+
+    #define T(ident) TOK_KEYWORD_##ident,
         _LEX_KEYWORDS_
     #undef T
+
+    _TOK_KEYWORDS_END,
 
     _TOK_COUNT
 };
 
 extern const char* token_kind[_TOK_COUNT];
 
+void lex_init_keyword_table();
 TokenBuf lex_tokenize(SourceFile* src);
 
 void lex_advance(Lexer* l);

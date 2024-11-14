@@ -328,80 +328,42 @@ TokenBuf lex_tokenize(SourceFile* src) {
 
 #define return_if_eq(kind) if (!strncmp(s, #kind, sizeof(#kind)-1)) return TOK_KEYWORD_##kind
 
-u8 lex_categorize_keyword(char* s, size_t len) {
-    // if not uppercase, we can skip the whole categorization process
-    if (!('A' <= s[0] && s[0] <= 'Z')) return TOK_IDENTIFIER;
-    // do second one quick if length allows
-    if (len >= 2 && !('A' <= s[1] && s[1] <= 'Z')) return TOK_IDENTIFIER;
-    switch (len) {
-    case 2:
-        return_if_eq(DO);
-        return_if_eq(FN);
-        return_if_eq(IF);
-        return_if_eq(IN);
-        return_if_eq(OR);
-        return_if_eq(TO);
-        break;
-    case 3:
-        return_if_eq(AND);
-        return_if_eq(END);
-        return_if_eq(INT);
-        return_if_eq(NOT);
-        return_if_eq(OUT);
-        break;
-    case 4:
-        return_if_eq(BYTE);
-        return_if_eq(CAST);
-        return_if_eq(ELSE);
-        return_if_eq(ENUM);
-        return_if_eq(GOTO);
-        return_if_eq(LONG);
-        return_if_eq(THEN);
-        return_if_eq(TRUE);
-        return_if_eq(TYPE);
-        return_if_eq(UINT);
-        return_if_eq(VOID);
-        return_if_eq(QUAD);
-        return_if_eq(WORD);
-        break;
-    case 5:
-        return_if_eq(BREAK);
-        return_if_eq(FALSE);
-        return_if_eq(FNPTR);
-        return_if_eq(LEAVE);
-        return_if_eq(UBYTE);
-        return_if_eq(ULONG);
-        return_if_eq(UNION);
-        return_if_eq(WHILE);
-        return_if_eq(UQUAD);
-        return_if_eq(UWORD);
-        break;
-    case 6:
-        return_if_eq(ELSEIF);
-        return_if_eq(EXTERN);
-        return_if_eq(PACKED);
-        return_if_eq(PUBLIC);
-        return_if_eq(RETURN);
-        return_if_eq(SIZEOF);
-        return_if_eq(STRUCT);
-        return_if_eq(EXPORT);
-        break;
-    case 7:
-        return_if_eq(NULLPTR);
-        return_if_eq(BARRIER);
-        return_if_eq(NOTHING);
-        return_if_eq(PRIVATE);
-        break;
-    case 8:
-        return_if_eq(CONTINUE);
-        return_if_eq(OFFSETOF);
-        break;
-    case 11:
-        return_if_eq(CONTAINEROF);
-        return_if_eq(SIZEOFVALUE);
-        break;
+// hash function found through search
+// THIS HAS TO BE REMADE EVERY TIME A KEYWORD IS ADDED
+static u8 hashfunc(char* raw, u32 len) {
+    u8 hash = 134;
+
+    for_range(i, 0, len) {
+        hash ^= raw[i];
+        hash *= 19;
     }
-    return TOK_IDENTIFIER;
+    return hash % 126;
+}
+
+static const char* keyword_table[126];
+static u8 keyword_len_table[126];
+static u8 keyword_code_table[126];
+
+void lex_init_keyword_table() {
+    for_range(i, _TOK_KEYWORDS_BEGIN + 1, _TOK_KEYWORDS_END) {
+        const char* keyword = token_kind[i];
+        u8 hash = hashfunc(keyword, strlen(keyword));
+        if (keyword_table[hash]) {
+            CRASH("keyword table hash collision");
+        }
+        keyword_table[hash] = keyword;
+        keyword_len_table[hash] = strlen(keyword);
+        keyword_code_table[hash] = i;
+    }
+}
+
+u8 lex_categorize_keyword(char* s, size_t len) {
+    u8 index = hashfunc(s, len);
+
+    if (keyword_len_table[index] != len) return TOK_IDENTIFIER;
+    if (strncmp(keyword_table[index], s, len) != 0) return TOK_IDENTIFIER;
+
+    return keyword_code_table[index];
 }
 
 const char* token_kind[_TOK_COUNT] = {
@@ -459,7 +421,7 @@ const char* token_kind[_TOK_COUNT] = {
 
     [TOK_NUMERIC] = "numeric",
 
-    #define T(kw) [TOK_KEYWORD_##kw] = #kw
+    #define T(kw) [TOK_KEYWORD_##kw] = #kw,
         _LEX_KEYWORDS_
     #undef T
 };
