@@ -1,5 +1,8 @@
 #include "front.h"
 
+// TODO - turn copying from the dynbuf into memcpy calls
+//        or into its own function
+
 typedef struct Parser {
     ParseTree tree;
 
