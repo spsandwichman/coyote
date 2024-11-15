@@ -29,7 +29,7 @@ void lex_advance_n(Lexer* l, int n) {
 }
 
 char lex_peek(Lexer* l, i64 n) {
-    if (l->cursor + n >= l->text.len) return '\0';
+    // if (l->cursor + n >= l->text.len) return '\0';
     return l->text.raw[l->cursor + n];
 }
 
