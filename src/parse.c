@@ -78,13 +78,15 @@ Index new_extra_slots(usize slots) {
 }
 
 // this pointer should never be saved and re-used
-static inline ParseNode* node(Index i) {
+ParseNode* parse_node(Index i) {
     return &p.tree.nodes.at[i];
 }
 
-static inline u8 kind(Index i) {
+u8 parse_node_kind(Index i) {
     return p.tree.nodes.kinds[i];
 }
+#define node(x) parse_node(x)
+#define kind(x) parse_node_kind(x)
 
 static inline void set_kind(Index i, u8 kind) {
    p.tree.nodes.kinds[i] = kind;

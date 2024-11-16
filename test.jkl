@@ -1,7 +1,5 @@
 EXTERN FN mul(IN x: WORD, IN y: WORD) : WORD
 
 FN muladd(IN x: WORD, IN y: WORD, IN z: WORD) : WORD
-
-
-    RETURN mul(x, y) + z
+    RETURN x * y + z
 END 

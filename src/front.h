@@ -355,6 +355,10 @@ Index parse_fn_decl();
 Index parse_var_decl(bool is_extern);
 Index parse_type_decl();
 
+ParseNode* parse_node(Index i);
+
+u8 parse_node_kind(Index i);
+
 typedef u32 TypeHandle;
 
 enum {
@@ -368,19 +372,31 @@ enum {
     TYPE_I64,
     TYPE_U64,
 
-    _TYPE_SIMPLE_END = TYPE_U64, // any types after this are indices into the TypeStructure array
+    _TYPE_SIMPLE_END, // any types after this are indices into the TypeStructure array
+
+    TYPE_POINTER,
+    TYPE_ARRAY,
 
     TYPE_STRUCT,
     TYPE_UNION,
+
     TYPE_ENUM,
-    TYPE_ARRAY,
+    // enum with the capacity for 64 bit values
+    // same as TYPE_ENUM, but has more efficent storage for small values
+    TYPE_ENUM64,
+    
     TYPE_FN,
     TYPE_FNPTR,
+    // same as above types, except it has varargs.
+    TYPE_VARARG_FN,
+    TYPE_VARARG_FNPTR,
 
     TYPE_TYPE, // entity is a type itself
 };
 
 typedef u32 TypeHandle;
+
+#define verify_type(T) static_assert(sizeof(T) % sizeof(u32) == 0)
 
 #define _TYPE_NODE_BASE \
     alignas(4) u8 kind;
@@ -388,22 +404,89 @@ typedef u32 TypeHandle;
 typedef struct TypeNode {
     _TYPE_NODE_BASE
 } TypeNode;
+static_assert(sizeof(TypeNode) == sizeof(u32));
 
 typedef struct TypeNodePointer {
     _TYPE_NODE_BASE
     TypeHandle subtype;
 } TypeNodePointer;
+verify_type(TypeNodePointer);
 
-typedef struct TypeNodeRecord {
+typedef struct TypeNodeArray {
+    _TYPE_NODE_BASE
+    TypeHandle subtype;
+    u64 len;
+} TypeNodeArray;
+verify_type(TypeNodeArray);
+
+typedef struct TypeNodeStruct TypeNodeUnion;
+typedef struct TypeNodeStruct {
     _TYPE_NODE_BASE
     u16 len;
     u32 size;
     u32 align;
-    TypeHandle fields[];
-} TypeNodeRecord;
+
+    // since pointers to structs are VERY common,
+    // cache the pointer handle inside the struct
+    TypeHandle pointer_cache;
+    struct {
+        Index name_token; // token index
+        TypeHandle type;
+    } fields[];
+} TypeNodeStruct;
+verify_type(TypeNodeStruct);
+
+typedef struct TypeNodeEnum {
+    _TYPE_NODE_BASE
+    u16 len;
+    TypeHandle underlying;
+    struct {
+        Index name_token; // token index
+        u32 value;
+    } variants[];
+} TypeNodeEnum;
+verify_type(TypeNodeEnum);
+
+// encoding 64-bit capacity enums with different, less efficient value storage
+typedef struct TypeNodeEnum64 {
+    _TYPE_NODE_BASE
+    u16 len;
+    TypeHandle underlying;
+    struct {
+        Index name_token; // token index
+        u64 value;
+    } variants[];
+} TypeNodeEnum64;
+verify_type(TypeNodeEnum64);
+
+typedef struct TypeNodeFunction {
+    _TYPE_NODE_BASE
+    u16 len;
+    TypeHandle return_type;
+    struct {
+        Index name_token; // token index
+        TypeHandle type;
+    } params[];
+} TypeNodeFunction;
+verify_type(TypeNodeFunction);
+
+typedef struct TypeNodeVarargFunction {
+    _TYPE_NODE_BASE
+    u16 len;
+    TypeHandle return_type;
+    Index argv_token; // argv is ^^VOID
+    Index argc_token; // argc is UWORD
+    struct {
+        Index name_token; // token index
+        TypeHandle type;
+    } params[];
+} TypeNodeVarargFunction;
+verify_type(TypeNodeVarargFunction);
+
+#undef verify_type
 
 typedef struct TypeGraph {
-    u32* nodes; // this is kind of an arena? lmao
+    TypeNode* nodes; // this is kind of an arena? lmao
     usize len;
     usize cap;
 } TypeGraph;
