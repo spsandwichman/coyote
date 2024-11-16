@@ -43,8 +43,6 @@ int main(int argc, char** argv) {
 
     ParseTree pt = parse_file(tb);
 
-    
-    printf("nodes %d\n", pt.nodes.len);
-    printf("extra %d\n", pt.extra.len);
-    
+    type_init();
+
 }

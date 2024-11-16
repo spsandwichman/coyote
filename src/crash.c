@@ -1,7 +1,7 @@
 #include "crash.h"
 #include "orbit.h"
 
-void crash(char* error, ...) {
+noreturn void crash(char* error, ...) {
     printf("INTERNAL COMPILER ERROR: ");
     va_list args;
     va_start(args, error);

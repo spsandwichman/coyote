@@ -362,7 +362,7 @@ u8 parse_node_kind(Index i);
 typedef u32 TypeHandle;
 
 enum {
-    TYPE_VOID = 0,
+    TYPE_VOID = 0, // simple type kinds double as their TypeHandles
     TYPE_I8,
     TYPE_U8,
     TYPE_I16,
@@ -388,13 +388,12 @@ enum {
     TYPE_FN,
     TYPE_FNPTR,
     // same as above types, except it has varargs.
-    TYPE_VARARG_FN,
-    TYPE_VARARG_FNPTR,
-
-    TYPE_TYPE, // entity is a type itself
+    TYPE_VARIADIC_FN,
+    TYPE_VARIADIC_FNPTR,
 };
 
 typedef u32 TypeHandle;
+#define TYPE_MAX ((1ull << 31) - 1)
 
 #define verify_type(T) static_assert(sizeof(T) % sizeof(u32) == 0)
 
@@ -419,8 +418,7 @@ typedef struct TypeNodeArray {
 } TypeNodeArray;
 verify_type(TypeNodeArray);
 
-typedef struct TypeNodeStruct TypeNodeUnion;
-typedef struct TypeNodeStruct {
+typedef struct TypeNodeRecord {
     _TYPE_NODE_BASE
     u16 len;
     u32 size;
@@ -433,8 +431,8 @@ typedef struct TypeNodeStruct {
         Index name_token; // token index
         TypeHandle type;
     } fields[];
-} TypeNodeStruct;
-verify_type(TypeNodeStruct);
+} TypeNodeRecord;
+verify_type(TypeNodeRecord);
 
 typedef struct TypeNodeEnum {
     _TYPE_NODE_BASE
@@ -465,12 +463,19 @@ typedef struct TypeNodeFunction {
     TypeHandle return_type;
     struct {
         Index name_token; // token index
-        TypeHandle type;
+        TypeHandle type : 31;
+        // this is really a bool, but its u32 because it needs to be 
+        // compatible with TypeHandle for bit field to work
+        // fuck you C
+        u32 out : 1;
     } params[];
 } TypeNodeFunction;
 verify_type(TypeNodeFunction);
 
-typedef struct TypeNodeVarargFunction {
+// variadic functions need to store 8 more bytes of information by default
+// BUT they're much rarer than regular functions, so its worth it to store them differently
+// the shit i do for memory/cache efficiency bruh
+typedef struct TypeNodeVariadicFunction {
     _TYPE_NODE_BASE
     u16 len;
     TypeHandle return_type;
@@ -478,10 +483,11 @@ typedef struct TypeNodeVarargFunction {
     Index argc_token; // argc is UWORD
     struct {
         Index name_token; // token index
-        TypeHandle type;
+        TypeHandle type : 31;
+        u32 out : 1;
     } params[];
-} TypeNodeVarargFunction;
-verify_type(TypeNodeVarargFunction);
+} TypeNodeVariadicFunction;
+verify_type(TypeNodeVariadicFunction);
 
 #undef verify_type
 
@@ -490,3 +496,10 @@ typedef struct TypeGraph {
     usize len;
     usize cap;
 } TypeGraph;
+
+void type_init();
+
+// a named thing.
+typedef struct Entity {
+
+} Entity;

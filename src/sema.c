@@ -1,28 +1,27 @@
 #include "front.h"
 
-#define TG_INITIAL_SIZE 128
-
 TypeGraph tg;
 
+#define type_node(t) (&tg.nodes[t])
+#define slotsof(T) (sizeof(T) / sizeof(tg.nodes[0]))
+#define as_type(T, x) ((T*)type_node(x))
 
-TypeHandle type_alloc_slots(isize n) {
+TypeHandle type_alloc_slots(usize n) {
     if (tg.len + n >= tg.cap) {
         tg.cap *= 2;
         tg.cap += n;
         tg.nodes = realloc(tg.nodes, tg.cap);
     }
     TypeHandle t = tg.len;
+    if (tg.len + n > TYPE_MAX) {
+        // TODO turn this into a user error instead of an ICE
+        crash("type node graph exceeded %d slots", TYPE_MAX);
+    }
     tg.len += n;
-    
+
     memset(&tg.nodes[t], 0, n * sizeof(tg.nodes[0]));
     return t;
 }
-
-TypeNode* type_node(TypeHandle t) {
-    return &tg.nodes[t];
-}
-
-#define slotsof(T) (sizeof(T) / sizeof(tg.nodes[0]))
 
 static TypeHandle create_pointer(TypeHandle to) {
     TypeHandle ptr = type_alloc_slots(slotsof(TypeNodePointer));
@@ -31,32 +30,84 @@ static TypeHandle create_pointer(TypeHandle to) {
     return ptr;
 }
 
-TypeHandle type_pointer(TypeHandle to) {
+TypeHandle type_new_pointer(TypeHandle to) {
+    // try to avoid creating a new type if possible
     if (to < _TYPE_SIMPLE_END) {
-        return to + _TYPE_SIMPLE_END; // simple type pointer cache
+        return to * slotsof(TypeNodePointer) + _TYPE_SIMPLE_END;
     }
-    if (type_node(to)->kind == TYPE_STRUCT) {
-        TypeNodeStruct* ts = (TypeNodeStruct*)type_node(to);
-        return ts->pointer_cache;
-
-        // if (ts->pointer_cache == 0) {
-        //     TypeHandle ptr = create_pointer(to);
-        //     // update ts pointer, cause it might be invalid after create_pointer
-        //     ts = (TypeNodeStruct*)type_node(to);
-        //     ts->pointer_cache = ptr;
-        // }
-        // return ts->pointer_cache;
+    u8 to_kind = type_node(to)->kind;
+    if (to_kind == TYPE_STRUCT || to_kind == TYPE_UNION) {
+        return as_type(TypeNodeRecord, to)->pointer_cache;
     }
+    // pointer isn't cached at all, force its creation
     return create_pointer(to);
 }
 
-TypeHandle type_array(TypeHandle to, u64 len) {
+TypeHandle type_new_array(TypeHandle to, u64 len) {
     TypeHandle array = type_alloc_slots(slotsof(TypeNodeArray));
+    as_type(TypeNodeArray, array)->kind = TYPE_ARRAY;
+    as_type(TypeNodeArray, array)->subtype = to;
+    as_type(TypeNodeArray, array)->len = len;
+    return array;
+}
+
+TypeHandle type_new_record(u8 kind, u16 num_fields) {
+    TypeHandle record = type_alloc_slots(
+        slotsof(TypeNodeRecord) + // base node
+        slotsof(((TypeNodeRecord*)0)->fields[0]) * num_fields // fields
+    );
+    as_type(TypeNodeRecord, record)->kind = kind;
+    as_type(TypeNodeRecord, record)->len = num_fields;
+    TypeHandle ptr = create_pointer(record);
+    as_type(TypeNodeRecord, record)->pointer_cache = ptr;
+    return record;
+}
+
+TypeHandle type_new_function(u8 kind, u16 num_params) {
+    bool variadic = kind == TYPE_VARIADIC_FN || kind == TYPE_VARIADIC_FNPTR;
+    TypeHandle record;
+    if (variadic) {
+        record = type_alloc_slots(
+            slotsof(TypeNodeFunction) + // base node
+            slotsof(((TypeNodeFunction*)0)->params[0]) * num_params // params
+        );
+        as_type(TypeNodeFunction, record)->kind = kind;
+        as_type(TypeNodeFunction, record)->len = num_params;
+    } else {
+        record = type_alloc_slots(
+            slotsof(TypeNodeVariadicFunction) + // base node
+            slotsof(((TypeNodeVariadicFunction*)0)->params[0]) * num_params // params
+        );
+        as_type(TypeNodeVariadicFunction, record)->kind = kind;
+        as_type(TypeNodeVariadicFunction, record)->len = num_params;
+    }
+    return record;
+}
+
+TypeHandle type_new_enum(u8 kind, u16 num_variants) {
+    bool is_64 = kind == TYPE_ENUM64;
+
+    TypeHandle e;
+    if (is_64) {
+        e = type_alloc_slots(
+            slotsof(TypeNodeEnum64) +
+            slotsof(((TypeNodeEnum64*)0)->variants[0]) * num_variants
+        );
+        as_type(TypeNodeEnum64, e)->kind = TYPE_ENUM64;
+        as_type(TypeNodeEnum64, e)->len = num_variants;
+    } else {
+        e = type_alloc_slots(
+            slotsof(TypeNodeEnum) +
+            slotsof(((TypeNodeEnum*)0)->variants[0]) * num_variants
+        );
+        as_type(TypeNodeEnum, e)->kind = TYPE_ENUM64;
+        as_type(TypeNodeEnum, e)->len = num_variants;
+    }
 }
 
 void type_init() {
-    tg.nodes = malloc(sizeof(tg.nodes[0]) * TG_INITIAL_SIZE);
-    tg.cap = TG_INITIAL_SIZE;
+    tg.cap = 128;
+    tg.nodes = malloc(sizeof(tg.nodes[0]) * tg.cap);
     tg.len = 0;
 
     for_range(i, 0, _TYPE_SIMPLE_END) {
@@ -65,5 +116,28 @@ void type_init() {
 
     for_range(i, 0, _TYPE_SIMPLE_END) {
         TypeHandle ptr = create_pointer(i);
+        assert(type_new_pointer(i) == ptr);
     }
+}
+
+static u32 base_sizes[] = {
+    [TYPE_VOID] = 0,
+    [TYPE_I8] = 1,
+    [TYPE_U8] = 1,
+    [TYPE_I16] = 2,
+    [TYPE_U16] = 2,
+    [TYPE_I32] = 4,
+    [TYPE_U32] = 4,
+    [TYPE_I64] = 8,
+    [TYPE_U64] = 8,
+};
+
+u32 type_size(TypeHandle t) {
+    if (t < _TYPE_SIMPLE_END) {
+        return base_sizes[t];
+    }
+
+    u8 kind = type_node(t)->kind;
+    crash("todo");
+    return 0;
 }
