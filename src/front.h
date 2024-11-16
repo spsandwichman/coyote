@@ -355,56 +355,43 @@ Index parse_fn_decl();
 Index parse_var_decl(bool is_extern);
 Index parse_type_decl();
 
-// typedef u32 TypeHandle;
+typedef u32 TypeHandle;
 
-// enum {
-//     TYPE_VOID = 0,
-//     TYPE_I8,
-//     TYPE_U8,
-//     TYPE_I16,
-//     TYPE_U16,
-//     TYPE_I32,
-//     TYPE_U32,
-//     TYPE_I64,
-//     TYPE_U64,
+enum {
+    TYPE_VOID = 0,
+    TYPE_I8,
+    TYPE_U8,
+    TYPE_I16,
+    TYPE_U16,
+    TYPE_I32,
+    TYPE_U32,
+    TYPE_I64,
+    TYPE_U64,
+    _TYPE_SIMPLE_END = TYPE_U64, // any types after this are indices into the TypeStructure array
 
-//     _TYPE_SIMPLE_END, // any types after this are indices into the TypeStructure array
+    TYPE_STRUCT,
+    TYPE_UNION,
+    TYPE_ENUM,
+    TYPE_ARRAY,
+    TYPE_FN,
+    TYPE_FNPTR,
 
-//     TYPE_STRUCT, // use len1 and items
-//     TYPE_UNION,
-//     TYPE_FUNCTION,
-//     TYPE_ENUM,
-//     TYPE_ARRAY,
-// };
+    TYPE_TYPE, // entity is a type itself
+};
 
-// #define _TYPE_NODE_BASE \
-//     char* name; \
-//     u8 kind;
+// entities are named items in the program
+typedef struct Entity {
+    Index name_index; // index to EntityTable's char buffer, null terminated
+    Index sema_decl; // SemaNode where it was declared
+} Entity;
 
-// typedef struct TypeNode {
-//     _TYPE_NODE_BASE
-// } TypeNode;
-
-// typedef struct TypeNodePointer {
-//     _TYPE_NODE_BASE
-//     TypeHandle subtype;
-// } TypeNodePointer;
-
-// typedef struct TypeNodeRecord {
-//     _TYPE_NODE_BASE
-//     u16 len;
-//     u32 size;
-//     u32 align;
-//     TypeHandle fields[];
-// } TypeNodePointer;
-
-// typedef struct TypeGraph {
-//     usize* nodes; // this is kind of an arena
-//     usize len;
-//     usize cap;
-// } TypeGraph;
-
-// typedef struct SemaNode {
-//     Index parse_node; // corresponding parse node - used for error handling
+typedef struct SemaNode {
+    TypeHandle type; // for statements, this is VOID
+    Index parse_node; // corresponding parse node - used for error handling
     
-// } SemaNode;
+    Index lhs;
+    Index rhs;
+
+    bool addressable : 1;
+    bool assignable  : 1;
+} SemaNode;
