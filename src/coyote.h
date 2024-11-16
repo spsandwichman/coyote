@@ -8,8 +8,8 @@ typedef struct SourceFile {
 } SourceFile;
 da_typedef(SourceFile);
 
-typedef struct JaccContext {
+typedef struct CoyoteContext {
     da(SourceFile) sources;
-} JaccContext;
+} CoyoteContext;
 
-extern JaccContext ctx;
+extern CoyoteContext ctx;

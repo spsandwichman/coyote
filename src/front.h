@@ -1,6 +1,6 @@
 #pragma once
 
-#include "jacc.h"
+#include "coyote.h"
 #include "crash.h"
 
 typedef struct Token {
@@ -367,6 +367,7 @@ enum {
     TYPE_U32,
     TYPE_I64,
     TYPE_U64,
+
     _TYPE_SIMPLE_END = TYPE_U64, // any types after this are indices into the TypeStructure array
 
     TYPE_STRUCT,
@@ -379,19 +380,30 @@ enum {
     TYPE_TYPE, // entity is a type itself
 };
 
-// entities are named items in the program
-typedef struct Entity {
-    Index name_index; // index to EntityTable's char buffer, null terminated
-    Index sema_decl; // SemaNode where it was declared
-} Entity;
+typedef u32 TypeHandle;
 
-typedef struct SemaNode {
-    TypeHandle type; // for statements, this is VOID
-    Index parse_node; // corresponding parse node - used for error handling
-    
-    Index lhs;
-    Index rhs;
+#define _TYPE_NODE_BASE \
+    alignas(4) u8 kind;
 
-    bool addressable : 1;
-    bool assignable  : 1;
-} SemaNode;
+typedef struct TypeNode {
+    _TYPE_NODE_BASE
+} TypeNode;
+
+typedef struct TypeNodePointer {
+    _TYPE_NODE_BASE
+    TypeHandle subtype;
+} TypeNodePointer;
+
+typedef struct TypeNodeRecord {
+    _TYPE_NODE_BASE
+    u16 len;
+    u32 size;
+    u32 align;
+    TypeHandle fields[];
+} TypeNodeRecord;
+
+typedef struct TypeGraph {
+    u32* nodes; // this is kind of an arena? lmao
+    usize len;
+    usize cap;
+} TypeGraph;

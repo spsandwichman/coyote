@@ -1,4 +1,4 @@
-#include "jacc.h"
+#include "coyote.h"
 #include "front.h"
 
 #define MACRO_MAX_DEPTH 64

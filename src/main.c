@@ -1,9 +1,9 @@
 #define ORBIT_IMPLEMENTATION
 
-#include "jacc.h"
+#include "coyote.h"
 #include "front.h"
 
-JaccContext ctx;
+CoyoteContext ctx;
 
 SourceFile get_source(string path) {
     fs_file f;
@@ -43,5 +43,8 @@ int main(int argc, char** argv) {
 
     ParseTree pt = parse_file(tb);
 
+    
+    printf("nodes %d\n", pt.nodes.len);
+    printf("extra %d\n", pt.extra.len);
     
 }

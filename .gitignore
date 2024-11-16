@@ -1,6 +1,6 @@
 *.o
 *.d
-jacc.exe
-jacc
+*.exe
+coyote
 .vscode
 gmon.out

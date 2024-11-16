@@ -6,7 +6,7 @@
 static string find_line(string source, char* location, usize* line, usize* col) {
     
     // out of source range
-    if (!(source.raw <= location && source.raw + source.len > location)) {
+    if (!(source.raw <= location && location <= (source.raw + source.len))) {
         CRASH("out of source range");
     }
 

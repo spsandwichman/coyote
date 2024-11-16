@@ -29,7 +29,7 @@ void lex_advance_n(Lexer* l, int n) {
 }
 
 char lex_peek(Lexer* l, i64 n) {
-    // if (l->cursor + n >= l->text.len) return '\0';
+    if (l->cursor + n >= l->text.len) return '\0';
     return l->text.raw[l->cursor + n];
 }
 
@@ -142,14 +142,16 @@ u64 lex_scan_numeric(Lexer* l) {
 
 static void tokenize(Lexer* l) {
     if (lex_cursor_eof(l)) {
-        lex_add_token(l, 0, TOK_EOF);
+        l->cursor--;
+        lex_add_token(l, 1, TOK_EOF);
         return;
     }
     
     while (!lex_cursor_eof(l)) {
         lex_skip_whitespace(l);
         if (lex_cursor_eof(l)) {
-            lex_add_token(l, 0, TOK_EOF);
+            l->cursor--;
+            lex_add_token(l, 1, TOK_EOF);
             return;
         }
 
