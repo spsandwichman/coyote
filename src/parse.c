@@ -586,11 +586,15 @@ Index parse_type() {
     Index t = parse_base_type();
     while (current()->kind == TOK_OPEN_BRACKET) {
         Index new = new_node(PN_TYPE_ARRAY);
-        advance();
         node(new)->lhs = t;
-        Index expr = parse_expr();
-        node(new)->rhs = expr;
-        expect(TOK_CLOSE_BRACKET);
+        advance();
+        // account for sizeless arrays
+        if (current()->kind != TOK_CLOSE_BRACKET) {
+            Index expr = parse_expr();
+            node(new)->rhs = expr;
+            expect(TOK_CLOSE_BRACKET);
+        }
+        advance();
         t = new;
     }
     return t;

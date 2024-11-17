@@ -39,7 +39,7 @@ TypeHandle type_new_pointer(TypeHandle to) {
     if (to_kind == TYPE_STRUCT || to_kind == TYPE_UNION) {
         return as_type(TypeNodeRecord, to)->pointer_cache;
     }
-    // pointer isn't cached at all, force its creation
+    // pointer isn't cached, force its creation
     return create_pointer(to);
 }
 
@@ -64,7 +64,7 @@ TypeHandle type_new_record(u8 kind, u16 num_fields) {
 }
 
 TypeHandle type_new_function(u8 kind, u16 num_params) {
-    bool variadic = kind == TYPE_VARIADIC_FN || kind == TYPE_VARIADIC_FNPTR;
+    bool variadic = kind == TYPE_VARIADIC_FNPTR;
     TypeHandle record;
     if (variadic) {
         record = type_alloc_slots(

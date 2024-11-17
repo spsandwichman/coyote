@@ -45,4 +45,5 @@ int main(int argc, char** argv) {
 
     type_init();
 
+    printf("type max %d bytes\n", TYPE_MAX*sizeof(u32));
 }

@@ -385,15 +385,13 @@ enum {
     // same as TYPE_ENUM, but has more efficent storage for small values
     TYPE_ENUM64,
     
-    TYPE_FN,
     TYPE_FNPTR,
-    // same as above types, except it has varargs.
-    TYPE_VARIADIC_FN,
+    // same as above, except it has varargs.
     TYPE_VARIADIC_FNPTR,
 };
 
 typedef u32 TypeHandle;
-#define TYPE_MAX ((1ull << 31) - 1)
+#define TYPE_MAX ((1ull << 25) - 1)
 
 #define verify_type(T) static_assert(sizeof(T) % sizeof(u32) == 0)
 
@@ -411,18 +409,19 @@ typedef struct TypeNodePointer {
 } TypeNodePointer;
 verify_type(TypeNodePointer);
 
+#define TYPE_ARRAY_UNKNOWN_LEN ((u32)len)
 typedef struct TypeNodeArray {
     _TYPE_NODE_BASE
     TypeHandle subtype;
-    u64 len;
+    u32 len;
 } TypeNodeArray;
 verify_type(TypeNodeArray);
 
 typedef struct TypeNodeRecord {
     _TYPE_NODE_BASE
     u16 len;
+    u16 align;
     u32 size;
-    u32 align;
 
     // since pointers to structs are VERY common,
     // cache the pointer handle inside the struct
@@ -499,7 +498,54 @@ typedef struct TypeGraph {
 
 void type_init();
 
+enum {
+    ENTITY_VAR,
+    ENTITY_FN,
+    ENTITY_TYPENAME,
+};
+
+enum {
+    STORAGE_LOCAL,   // local variable
+    STORAGE_PUBLIC,  // static export
+    STORAGE_EXPORT,  // dynamic global
+    STORAGE_PRIVATE, //
+    STORAGE_EXTERN,  // not given a value here but 
+
+    STORAGE_TYPE_UNDEF, // type has not been declared yet
+};
+
 // a named thing.
 typedef struct Entity {
-
+    TypeHandle type;
+    Index decl_index; // SemaStmt
+    u8 kind;
+    u8 storage;
 } Entity;
+
+// a scope.
+typedef struct EntityTable {
+    struct EntityTable* parent; // parent scope
+
+    Index* name_tokens;
+    Entity* entities;
+    u32 cap;
+} EntityTable;
+
+typedef struct SemaExpr {
+    Index parse_node;
+    TypeHandle type : 25;
+    u32 kind : 7;
+} SemaExpr;
+static_assert(sizeof(SemaExpr) == 8);
+
+enum {
+    SE_IDENT
+};
+
+typedef struct Analyzer {
+    struct {
+        u32* items;
+        u32 len;
+        u32 cap;
+    } exprs;
+} Analyzer;
