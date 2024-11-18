@@ -522,8 +522,6 @@ typedef struct Entity {
     u8 storage;
 } Entity;
 
-typedef u32 EntityIndex;
-
 // a scope.
 typedef struct EntityTable EntityTable;
 typedef struct EntityTable {
@@ -535,7 +533,7 @@ typedef struct EntityTable {
     EntityTable* next; // next lexical scope at this level
 
     Index* name_tokens;
-    EntityIndex* entities;
+    Index* entities;
     u32 cap;
 } EntityTable;
 
@@ -548,7 +546,7 @@ static_assert(sizeof(SemaExpr) == 8);
 
 typedef struct SemaExprEntity {
     SemaExpr base;
-    EntityIndex entity;
+    Index entity_index;
 } SemaExprEntity;
 
 typedef struct SemaExprInteger {
@@ -566,6 +564,14 @@ typedef struct SemaExprUnop {
     SemaExpr base;
     Index sub;
 } SemaExprUnop;
+
+typedef struct SemaExprCall {
+    SemaExpr base;
+    Index callee;
+    u32 len;
+    Index params[];
+} SemaExprCall;
+
 enum {
     SE_ENTITY,
     SE_INTEGER,
@@ -602,6 +608,17 @@ enum {
 
     // lmfao
     SE_PASS_OUT,
+
+    SE_CALL,
+};
+
+typedef struct SemaStmt {
+    Index parse_node;
+    u8 kind;
+} SemaStmt;
+
+enum {
+    SS_DECL,
 };
 
 typedef struct Analyzer {
@@ -619,8 +636,7 @@ typedef struct Analyzer {
 
     struct {
         TypeNode* nodes; // this is kind of an arena? lmao
-        usize len;
-        usize cap;
+        u32 len;
+        u32 cap;
     } types;
-
 } Analyzer;
