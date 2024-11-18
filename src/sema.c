@@ -7,13 +7,13 @@ Analyzer an;
 #define as_type(T, x) ((T*)type_node(x))
 
 TypeHandle type_alloc_slots(usize n, bool align_64) {
+    if (align_64 && (an.types.len & 1)) {
+        an.types.len++; // 
+    }
     if (an.types.len + n >= an.types.cap) {
         an.types.cap *= 2;
         an.types.cap += n;
         an.types.nodes = realloc(an.types.nodes, an.types.cap);
-    }
-    if (align_64 && (an.types.len & 1)) {
-        an.types.len++; // 
     }
     TypeHandle t = an.types.len;
     if (an.types.len + n > TYPE_MAX) {
@@ -49,7 +49,7 @@ TypeHandle type_new_pointer(TypeHandle to) {
 }
 
 TypeHandle type_new_array(TypeHandle to, u64 len) {
-    TypeHandle array = type_alloc_slots(slotsof(TypeNodeArray));
+    TypeHandle array = type_alloc_slots(slotsof(TypeNodeArray), is_align64(TypeNodeArray));
     as_type(TypeNodeArray, array)->kind = TYPE_ARRAY;
     as_type(TypeNodeArray, array)->subtype = to;
     as_type(TypeNodeArray, array)->len = len;
@@ -59,7 +59,8 @@ TypeHandle type_new_array(TypeHandle to, u64 len) {
 TypeHandle type_new_record(u8 kind, u16 num_fields) {
     TypeHandle record = type_alloc_slots(
         slotsof(TypeNodeRecord) + // base node
-        slotsof(((TypeNodeRecord*)0)->fields[0]) * num_fields // fields
+        slotsof(((TypeNodeRecord*)0)->fields[0]) * num_fields, // fields
+        is_align64(TypeNodeRecord)
     );
     as_type(TypeNodeRecord, record)->kind = kind;
     as_type(TypeNodeRecord, record)->len = num_fields;
@@ -74,14 +75,16 @@ TypeHandle type_new_function(u8 kind, u16 num_params) {
     if (variadic) {
         record = type_alloc_slots(
             slotsof(TypeNodeFunction) + // base node
-            slotsof(((TypeNodeFunction*)0)->params[0]) * num_params // params
+            slotsof(((TypeNodeFunction*)0)->params[0]) * num_params, // params
+            is_align64(TypeNodeFunction)
         );
         as_type(TypeNodeFunction, record)->kind = kind;
         as_type(TypeNodeFunction, record)->len = num_params;
     } else {
         record = type_alloc_slots(
             slotsof(TypeNodeVariadicFunction) + // base node
-            slotsof(((TypeNodeVariadicFunction*)0)->params[0]) * num_params // params
+            slotsof(((TypeNodeVariadicFunction*)0)->params[0]) * num_params, // params
+            is_align64(TypeNodeFunction)
         );
         as_type(TypeNodeVariadicFunction, record)->kind = kind;
         as_type(TypeNodeVariadicFunction, record)->len = num_params;
@@ -96,14 +99,16 @@ TypeHandle type_new_enum(u8 kind, u16 num_variants) {
     if (is_64) {
         e = type_alloc_slots(
             slotsof(TypeNodeEnum64) +
-            slotsof(((TypeNodeEnum64*)0)->variants[0]) * num_variants
+            slotsof(((TypeNodeEnum64*)0)->variants[0]) * num_variants,
+            is_align64(TypeNodeEnum64)
         );
         as_type(TypeNodeEnum64, e)->kind = TYPE_ENUM64;
         as_type(TypeNodeEnum64, e)->len = num_variants;
     } else {
         e = type_alloc_slots(
             slotsof(TypeNodeEnum) +
-            slotsof(((TypeNodeEnum*)0)->variants[0]) * num_variants
+            slotsof(((TypeNodeEnum*)0)->variants[0]) * num_variants,
+            is_align64(TypeNodeEnum)
         );
         as_type(TypeNodeEnum, e)->kind = TYPE_ENUM64;
         as_type(TypeNodeEnum, e)->len = num_variants;

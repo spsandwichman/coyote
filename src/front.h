@@ -501,11 +501,16 @@ enum {
 
 enum {
     STORAGE_LOCAL,   // local variable
+    STORAGE_OUT,     // out parameter
+
+    STORAGE_EXTERN,  // not given a value here but 
+
+    // globals
     STORAGE_PUBLIC,  // static export
     STORAGE_EXPORT,  // dynamic global
     STORAGE_PRIVATE, //
-    STORAGE_EXTERN,  // not given a value here but 
 
+    // types
     STORAGE_TYPE_UNDEF, // type has not been declared yet
 };
 
@@ -551,9 +556,52 @@ typedef struct SemaExprInteger {
     u64 value;
 } SemaExprInteger;
 
+typedef struct SemaExprBinop {
+    SemaExpr base;
+    Index lhs;
+    Index rhs;
+} SemaExprBinop;
+
+typedef struct SemaExprUnop {
+    SemaExpr base;
+    Index sub;
+} SemaExprUnop;
 enum {
     SE_ENTITY,
     SE_INTEGER,
+
+    // SemaExprBinop
+    SE_CAST,
+    SE_ADD,
+    SE_SUB,
+    SE_MUL,
+    SE_DIV,
+    SE_MOD,
+    SE_LSH,
+    SE_RSH,
+    SE_BIT_OR,
+    SE_BIT_AND,
+    SE_BIT_XOR,
+    SE_NEQ,
+    SE_EQ,
+    SE_LESS,
+    SE_GREATER,
+    SE_LESS_EQ,
+    SE_GREATER_EQ,
+    SE_INDEX,
+    SE_SELECTOR,
+    SE_BOOL_OR,
+    SE_BOOL_AND,
+
+    // SemaExprUnop
+    SE_BOOL_NOT,
+    SE_DEREF, // address dereference
+    SE_ADDRESS, // take address
+    SE_NEG,
+    SE_BIT_NOT,
+
+    // lmfao
+    SE_PASS_OUT,
 };
 
 typedef struct Analyzer {
