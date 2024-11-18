@@ -1,30 +1,35 @@
 #include "front.h"
 
-TypeGraph tg;
+Analyzer an;
 
-#define type_node(t) (&tg.nodes[t])
-#define slotsof(T) (sizeof(T) / sizeof(tg.nodes[0]))
+#define type_node(t) (&an.types.nodes[t])
+#define slotsof(T) (sizeof(T) / sizeof(an.types.nodes[0]))
 #define as_type(T, x) ((T*)type_node(x))
 
-TypeHandle type_alloc_slots(usize n) {
-    if (tg.len + n >= tg.cap) {
-        tg.cap *= 2;
-        tg.cap += n;
-        tg.nodes = realloc(tg.nodes, tg.cap);
+TypeHandle type_alloc_slots(usize n, bool align_64) {
+    if (an.types.len + n >= an.types.cap) {
+        an.types.cap *= 2;
+        an.types.cap += n;
+        an.types.nodes = realloc(an.types.nodes, an.types.cap);
     }
-    TypeHandle t = tg.len;
-    if (tg.len + n > TYPE_MAX) {
+    if (align_64 && (an.types.len & 1)) {
+        an.types.len++; // 
+    }
+    TypeHandle t = an.types.len;
+    if (an.types.len + n > TYPE_MAX) {
         // TODO turn this into a user error instead of an ICE
         crash("type node graph exceeded %d slots", TYPE_MAX);
     }
-    tg.len += n;
+    an.types.len += n;
 
-    memset(&tg.nodes[t], 0, n * sizeof(tg.nodes[0]));
+    memset(&an.types.nodes[t], 0, n * sizeof(an.types.nodes[0]));
     return t;
 }
 
+#define is_align64(T) (alignof(T) == 8)
+
 static TypeHandle create_pointer(TypeHandle to) {
-    TypeHandle ptr = type_alloc_slots(slotsof(TypeNodePointer));
+    TypeHandle ptr = type_alloc_slots(slotsof(TypeNodePointer), is_align64(TypeNodePointer));
     type_node(ptr)->kind = TYPE_POINTER;
     ((TypeNodePointer*)type_node(ptr))->subtype = to;
     return ptr;
@@ -106,12 +111,12 @@ TypeHandle type_new_enum(u8 kind, u16 num_variants) {
 }
 
 void type_init() {
-    tg.cap = 128;
-    tg.nodes = malloc(sizeof(tg.nodes[0]) * tg.cap);
-    tg.len = 0;
+    an.types.cap = 128;
+    an.types.nodes = malloc(sizeof(an.types.nodes[0]) * an.types.cap);
+    an.types.len = 0;
 
     for_range(i, 0, _TYPE_SIMPLE_END) {
-        tg.nodes[tg.len++].kind = i;
+        an.types.nodes[an.types.len++].kind = i;
     }
 
     for_range(i, 0, _TYPE_SIMPLE_END) {

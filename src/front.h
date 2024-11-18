@@ -393,7 +393,7 @@ enum {
 typedef u32 TypeHandle;
 #define TYPE_MAX ((1ull << 25) - 1)
 
-#define verify_type(T) static_assert(sizeof(T) % sizeof(u32) == 0)
+#define verify_type(T) static_assert(sizeof(T) % sizeof(TypeNode) == 0)
 
 #define _TYPE_NODE_BASE \
     alignas(4) u8 kind;
@@ -419,8 +419,8 @@ verify_type(TypeNodeArray);
 
 typedef struct TypeNodeRecord {
     _TYPE_NODE_BASE
+    u8 align;
     u16 len;
-    u16 align;
     u32 size;
 
     // since pointers to structs are VERY common,
@@ -463,6 +463,7 @@ typedef struct TypeNodeFunction {
     struct {
         Index name_token; // token index
         TypeHandle type : 31;
+
         // this is really a bool, but its u32 because it needs to be 
         // compatible with TypeHandle for bit field to work
         // fuck you C
@@ -490,12 +491,6 @@ verify_type(TypeNodeVariadicFunction);
 
 #undef verify_type
 
-typedef struct TypeGraph {
-    TypeNode* nodes; // this is kind of an arena? lmao
-    usize len;
-    usize cap;
-} TypeGraph;
-
 void type_init();
 
 enum {
@@ -522,12 +517,20 @@ typedef struct Entity {
     u8 storage;
 } Entity;
 
+typedef u32 EntityIndex;
+
 // a scope.
+typedef struct EntityTable EntityTable;
 typedef struct EntityTable {
-    struct EntityTable* parent; // parent scope
+    EntityTable* parent; // parent scope
+
+    EntityTable* first_child; // first child scope
+    EntityTable* last_child; // last child scope
+
+    EntityTable* next; // next lexical scope at this level
 
     Index* name_tokens;
-    Entity* entities;
+    EntityIndex* entities;
     u32 cap;
 } EntityTable;
 
@@ -538,14 +541,38 @@ typedef struct SemaExpr {
 } SemaExpr;
 static_assert(sizeof(SemaExpr) == 8);
 
+typedef struct SemaExprEntity {
+    SemaExpr base;
+    EntityIndex entity;
+} SemaExprEntity;
+
+typedef struct SemaExprInteger {
+    SemaExpr base;
+    u64 value;
+} SemaExprInteger;
+
 enum {
-    SE_IDENT
+    SE_ENTITY,
+    SE_INTEGER,
 };
 
 typedef struct Analyzer {
     struct {
-        u32* items;
+        u64* items; // allocates in 64 bit blocks
         u32 len;
         u32 cap;
     } exprs;
+
+    struct {
+        Entity* items;
+        u32 len;
+        u32 cap;
+    } entities;
+
+    struct {
+        TypeNode* nodes; // this is kind of an arena? lmao
+        usize len;
+        usize cap;
+    } types;
+
 } Analyzer;
