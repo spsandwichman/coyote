@@ -151,3 +151,143 @@ u32 type_size(TypeHandle t) {
     crash("todo");
     return 0;
 }
+
+static usize  FNV_1a(char* raw, usize len) {
+    const usize FNV_OFFSET = 14695981039346656037ull;
+    const usize FNV_PRIME = 1099511628211ull;
+
+    usize hash = FNV_OFFSET;
+    for_urange(i, 0, len) {
+        hash ^= (usize)(u8)(raw[i]);
+        hash *= FNV_PRIME;
+    }
+    return hash;
+}
+
+static bool strpool_eq(Index s, char* key, usize key_len) {
+    char* str = &an.strings.chars[s];
+    // this is probably going to make valgrind mad
+    // too bad!
+    return strncmp(str, key, key_len) == 0 && str[key_len] == '\0';
+}
+
+static Index strpool_alloc(char* raw, usize len) {
+    if (an.strings.len + len >= an.strings.cap) {
+        an.strings.cap *= 2;
+        an.strings.cap += len + 1;
+        an.strings.chars = realloc(an.strings.chars, an.strings.cap);
+    }
+
+    Index str = an.strings.len;
+    memcpy(&an.strings.len, raw, len);
+    an.strings.chars[an.strings.len + len] = '\0'; // NUL terminated
+    an.strings.len += len + 1;
+
+    return str;
+}
+
+
+// this parameter may be invalidated by additions to the entity buffer
+Entity* entity_get(EntityHandle e) {
+    return &an.entities.items[e];
+}
+
+#define ENTITY_TABLE_MAX_SEARCH 5
+
+EntityHandle etable_search(EntityTable* tbl, char* raw, usize len) {
+    if (tbl == NULL) return 0; // not found
+
+    usize hash = FNV_1a(raw, len);
+    for_range(i, 0, ENTITY_TABLE_MAX_SEARCH) {
+        usize index = (hash + i) % tbl->cap;
+        if (tbl->entities[index] == 0) {
+            break; // this slot is empty, so nothing is after this
+        }
+        if (strpool_eq(tbl->name_strings[index], raw, len)) {
+            return tbl->entities[index];
+        }
+    }
+
+    return etable_search(tbl->parent, raw, len);
+}
+
+static inline bool _etbl_put(EntityHandle* entities, Index* name_strings, u32 cap, EntityHandle e, Index name_str, char* raw, usize len) {
+    usize hash = FNV_1a(raw, len);
+    for_range(i, 0, ENTITY_TABLE_MAX_SEARCH) {
+        usize index = (hash + i) % cap;
+        if (entities[index] == 0) {
+            entities[index] = e;
+            name_strings[index] = name_str;
+            return true;
+        }
+    }
+    return false;
+}
+
+// allocates a name in the strin
+void etable_put(EntityTable* tbl, EntityHandle entity, char* raw, usize len) {
+
+    Index name_str = strpool_alloc(raw, len);
+
+    if (_etbl_put(tbl->entities, tbl->name_strings, tbl->cap, entity, name_str, raw, len)) {
+        return;
+    }
+
+    u32 new_cap = tbl->cap;
+
+    restart: // restart reallocation process
+
+    // if a slot is not found, resize the table
+    new_cap *= 2;
+    EntityHandle* new_entities = malloc(sizeof(tbl->entities[0]) * new_cap);
+    memset(new_entities, 0, sizeof(tbl->entities[0]) * new_cap);
+    Index* new_name_strings = malloc(sizeof(tbl->name_strings[0]) * new_cap);
+    memset(new_name_strings, 0, sizeof(tbl->name_strings[0]) * new_cap);
+
+    for_range(i, 0, tbl->cap) {
+        if (tbl->entities[i] == 0) continue;
+
+        char* str = &an.strings.chars[i];
+        usize str_len = strlen(str);
+
+        bool put = _etbl_put(
+            new_entities, new_name_strings, new_cap, 
+            tbl->entities[i], tbl->name_strings[i],
+            str, str_len
+        );
+        if (!put) {
+            free(new_entities);
+            free(new_name_strings);
+            goto restart;
+        }
+    }
+
+    tbl->cap = new_cap;
+    tbl->entities = new_entities;
+    tbl->name_strings = new_name_strings;
+
+    // try putting the current thing again
+    etable_put(tbl, entity, raw, len);
+}
+
+EntityTable* etable_new(EntityTable* parent, u32 initial_cap) {
+    EntityTable* tbl = malloc(sizeof(*tbl));
+    tbl->parent = parent;
+    tbl->cap = initial_cap;
+    tbl->entities = malloc(sizeof(tbl->entities[0]) * initial_cap);
+    memset(tbl->entities, 0, sizeof(tbl->entities[0]) * initial_cap);
+    tbl->name_strings = malloc(sizeof(tbl->name_strings[0]) * initial_cap);
+    memset(tbl->name_strings, 0, sizeof(tbl->name_strings[0]) * initial_cap);
+
+    return tbl;
+}
+
+EntityHandle entity_new(EntityTable* tbl) {
+    if (an.entities.len == an.entities.cap) {
+        an.entities.cap *= 2;
+        an.entities.items = realloc(an.entities.items, sizeof(an.entities.items[0]) * an.entities.cap);
+    }
+    return an.entities.len++;
+}
+
+// okay thats most of the analyzer infrastructure done

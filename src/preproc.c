@@ -7,4 +7,5 @@
 void preproc_dispatch(Lexer* l) {
     lex_advance(l);
     lex_skip_whitespace(l);
+    crash("todo lmfao");
 }

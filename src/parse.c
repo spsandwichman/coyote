@@ -46,7 +46,7 @@ static void restore_dynbuf(u32 save) {
     dynbuf.start = dynbuf.at[save];
 }
 
-// BEWARE: this may invalidate any active ParseNode*
+// BEWARE! this might invalidate any active ParseNode*
 Index new_node(u8 kind) {
     Index index = p.tree.nodes.len++;
     if (p.tree.nodes.len == p.tree.nodes.cap) {
@@ -78,6 +78,7 @@ Index new_extra_slots(usize slots) {
 }
 
 // this pointer should never be saved and re-used
+// be careful with C expression evaluation order too :skull:
 ParseNode* parse_node(Index i) {
     return &p.tree.nodes.at[i];
 }
@@ -141,7 +142,7 @@ Index parse_fn_prototype(bool is_fnptr) {
     advance();
 
     // use the dynbuf to parse params
-    u32 dbsave = save_dynbuf();
+    u32 sp = save_dynbuf();
 
     expect(TOK_OPEN_PAREN);
     advance();
@@ -212,7 +213,7 @@ Index parse_fn_prototype(bool is_fnptr) {
         Index type = parse_type();
         as_extra(PNExtraFnProto, proto_index)->return_type = type;
     }
-    restore_dynbuf(dbsave);
+    restore_dynbuf(sp);
     return proto_index;
 }
 
@@ -642,6 +643,10 @@ Index parse_base_type() {
 
 Index parse_atomic_terminal() {
     switch (current()->kind) {
+    case TOK_STRING:
+        Index str = new_node(PN_EXPR_STRING);
+        advance();
+        return str;
     case TOK_KEYWORD_TRUE:
         Index bool_true = new_node(PN_EXPR_BOOL_TRUE);
         advance();

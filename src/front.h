@@ -300,6 +300,7 @@ typedef struct ParseTree {
         u32 len;
         u32 cap;
     } nodes;
+    
     struct {
         Index* at;
         u32 len;
@@ -343,11 +344,10 @@ void emit_report(bool error, string source, string path, string highlight, char*
 
 ParseTree parse_file(TokenBuf tb);
 
-#define parse_expr() parse_binary(0)
-
 Index parse_type();
 Index parse_base_type();
 Index parse_binary(isize precedence);
+#define parse_expr() parse_binary(0)
 
 Index parse_stmt();
 Index parse_decl();
@@ -356,7 +356,6 @@ Index parse_var_decl(bool is_extern);
 Index parse_type_decl();
 
 ParseNode* parse_node(Index i);
-
 u8 parse_node_kind(Index i);
 
 typedef u32 TypeHandle;
@@ -421,7 +420,7 @@ typedef struct TypeNodeRecord {
     _TYPE_NODE_BASE
     u8 align;
     u16 len;
-    u32 size;
+    u32 size; // in bytes
 
     // since pointers to structs are VERY common,
     // cache the pointer handle inside the struct
@@ -514,6 +513,8 @@ enum {
     STORAGE_TYPE_UNDEF, // type has not been declared yet
 };
 
+typedef u32 EntityHandle;
+
 // a named thing.
 typedef struct Entity {
     TypeHandle type;
@@ -527,13 +528,8 @@ typedef struct EntityTable EntityTable;
 typedef struct EntityTable {
     EntityTable* parent; // parent scope
 
-    EntityTable* first_child; // first child scope
-    EntityTable* last_child; // last child scope
-
-    EntityTable* next; // next lexical scope at this level
-
-    Index* name_tokens;
-    Index* entities;
+    Index* name_strings;
+    EntityHandle* entities;
     u32 cap;
 } EntityTable;
 
@@ -546,7 +542,7 @@ static_assert(sizeof(SemaExpr) == 8);
 
 typedef struct SemaExprEntity {
     SemaExpr base;
-    Index entity_index;
+    EntityHandle entity;
 } SemaExprEntity;
 
 typedef struct SemaExprInteger {
@@ -572,9 +568,17 @@ typedef struct SemaExprCall {
     Index params[];
 } SemaExprCall;
 
+typedef struct SemaExprCompound {
+    SemaExpr base;
+} SemaExprCompound;
+
 enum {
     SE_ENTITY,
     SE_INTEGER,
+
+    SE_STRING,
+
+    SE_COMPOUND,
 
     // SemaExprBinop
     SE_CAST,
@@ -595,7 +599,6 @@ enum {
     SE_LESS_EQ,
     SE_GREATER_EQ,
     SE_INDEX,
-    SE_SELECTOR,
     SE_BOOL_OR,
     SE_BOOL_AND,
 
@@ -606,16 +609,27 @@ enum {
     SE_NEG,
     SE_BIT_NOT,
 
+    SE_SELECTOR, // lhs = field index
+
     // lmfao
     SE_PASS_OUT,
 
     SE_CALL,
 };
 
-typedef struct SemaStmt {
-    Index parse_node;
+#define _SEMA_STMT_BASE \
+    Index parse_node; \
     u8 kind;
+
+typedef struct SemaStmt {
+    _SEMA_STMT_BASE
 } SemaStmt;
+
+typedef struct SemaStmtDecl {
+    _SEMA_STMT_BASE
+    EntityHandle entity;
+    Index value;
+} SemaStmtDecl;
 
 enum {
     SS_DECL,
@@ -623,7 +637,7 @@ enum {
 
 typedef struct Analyzer {
     struct {
-        u64* items; // allocates in 64 bit blocks
+        u32* items;
         u32 len;
         u32 cap;
     } exprs;
@@ -635,8 +649,19 @@ typedef struct Analyzer {
     } entities;
 
     struct {
-        TypeNode* nodes; // this is kind of an arena? lmao
+        TypeNode* nodes;
         u32 len;
         u32 cap;
     } types;
+
+    struct { // string data arena.
+        u8* chars;
+        u32 len;
+        u32 cap;
+    } strings;
+
+    EntityTable* global;
 } Analyzer;
+
+// i reuse the concept of a contiguous arena with index handles a lot
+// might refactor this into a seperate data structure

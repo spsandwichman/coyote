@@ -277,6 +277,7 @@ static void tokenize(Lexer* l) {
                 }
                 len++;
             }
+            len++;
             // validity will be checked at sema-time
             lex_add_token(l, len, TOK_STRING);
             lex_advance_n(l, len + 1);
