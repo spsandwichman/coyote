@@ -290,4 +290,17 @@ EntityHandle entity_new(EntityTable* tbl) {
     return an.entities.len++;
 }
 
-// okay thats most of the analyzer infrastructure done
+#define expr_as(T, e) ((T*)&an.exprs.items[e])
+#define se_new(T) se_alloc_slots(sizeof(T) / sizeof(an.exprs.items[0]))
+
+Index se_alloc_slots(usize slots) {
+    if (an.exprs.len + slots >= an.exprs.cap) {
+        an.exprs.cap *= 2;
+        an.exprs.cap += slots;
+        an.exprs.items = realloc(an.exprs.items, an.exprs.cap);
+    }
+    Index expr = an.exprs.len;
+    an.exprs.len += slots;
+    memset(&an.exprs.items[expr], 0, sizeof(an.exprs.items[expr]) * slots);
+    return expr;
+}

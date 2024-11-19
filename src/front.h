@@ -387,6 +387,8 @@ enum {
     TYPE_FNPTR,
     // same as above, except it has varargs.
     TYPE_VARIADIC_FNPTR,
+
+    TYPE_NAMED, // TODO ???? what lmao
 };
 
 typedef u32 TypeHandle;
@@ -641,6 +643,12 @@ typedef struct Analyzer {
         u32 len;
         u32 cap;
     } exprs;
+
+    struct {
+        u32* items;
+        u32 len;
+        u32 cap;
+    } stmts;
 
     struct {
         Entity* items;
