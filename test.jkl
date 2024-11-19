@@ -1,9 +1,24 @@
-EXTERN FN mul(IN x: WORD, IN y: WORD) : WORD
+STRUCT Foo
+    x: INT,
+    y: ^Bar,
+END
 
-FN muladd(IN x: WORD, IN y: WORD, IN z: WORD) : WORD
-    RETURN x * y + z
-END 
+FN bruh(IN f: ^Foo)
+    
+    x := f^.x // allowed
 
-FN const_str() : ^UBYTE
-    RETURN " "
+    y := f^.y // allowed, because y is a pointer
+
+    y1 := y^ // error - Bar is undefined
+END
+
+STRUCT Bar
+    z: INT,
+END
+
+FN lmao(IN f: ^Foo)
+    
+    x := f^.x
+
+    y := f^.y^ // Bar is defined now
 END

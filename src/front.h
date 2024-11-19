@@ -388,7 +388,8 @@ enum {
     // same as above, except it has varargs.
     TYPE_VARIADIC_FNPTR,
 
-    TYPE_NAMED, // TODO ???? what lmao
+    // this is how unknown types get constructed.
+    TYPE_ALIAS,
 };
 
 typedef u32 TypeHandle;
@@ -403,6 +404,14 @@ typedef struct TypeNode {
     _TYPE_NODE_BASE
 } TypeNode;
 static_assert(sizeof(TypeNode) == sizeof(u32));
+
+#define TYPE_ALIAS_UNDEF ((TypeHandle)0xFFFFFFFFu)
+
+typedef struct TypeNodeAlias {
+    _TYPE_NODE_BASE
+    TypeHandle subtype; // if TYPE_ALIAS_UNDEF, this type has not been filled out yet
+} TypeNodeAlias;
+verify_type(TypeNodeAlias);
 
 typedef struct TypeNodePointer {
     _TYPE_NODE_BASE
@@ -492,8 +501,6 @@ verify_type(TypeNodeVariadicFunction);
 
 #undef verify_type
 
-void type_init();
-
 enum {
     ENTITY_VAR,
     ENTITY_FN,
@@ -504,15 +511,13 @@ enum {
     STORAGE_LOCAL,   // local variable
     STORAGE_OUT,     // out parameter
 
-    STORAGE_EXTERN,  // not given a value here but 
+    STORAGE_EXTERN,  // not defined here
 
     // globals
     STORAGE_PUBLIC,  // static export
     STORAGE_EXPORT,  // dynamic global
     STORAGE_PRIVATE, //
 
-    // types
-    STORAGE_TYPE_UNDEF, // type has not been declared yet
 };
 
 typedef u32 EntityHandle;
@@ -669,7 +674,14 @@ typedef struct Analyzer {
     } strings;
 
     EntityTable* global;
+
+    ParseTree pt;
+    TokenBuf  tb;
 } Analyzer;
+
+Analyzer sema_analyze(ParseTree pt, TokenBuf tb);
 
 // i reuse the concept of a contiguous arena with index handles a lot
 // might refactor this into a seperate data structure
+
+void report_token(bool error, TokenBuf* tb, u32 token_index, char* message, ...);

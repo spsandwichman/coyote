@@ -31,8 +31,15 @@ TypeHandle type_alloc_slots(usize n, bool align_64) {
 static TypeHandle create_pointer(TypeHandle to) {
     TypeHandle ptr = type_alloc_slots(slotsof(TypeNodePointer), is_align64(TypeNodePointer));
     type_node(ptr)->kind = TYPE_POINTER;
-    ((TypeNodePointer*)type_node(ptr))->subtype = to;
+    as_type(TypeNodePointer, ptr)->subtype = to;
     return ptr;
+}
+
+TypeHandle type_new_alias(TypeHandle to) {
+    TypeHandle alias = type_alloc_slots(slotsof(TypeNodeAlias), is_align64(TypeNodeAlias));
+    type_node(alias)->kind = TYPE_ALIAS;
+    as_type(TypeNodeAlias, alias)->subtype = to;
+    return alias;
 }
 
 TypeHandle type_new_pointer(TypeHandle to) {
@@ -112,21 +119,6 @@ TypeHandle type_new_enum(u8 kind, u16 num_variants) {
         );
         as_type(TypeNodeEnum, e)->kind = TYPE_ENUM64;
         as_type(TypeNodeEnum, e)->len = num_variants;
-    }
-}
-
-void type_init() {
-    an.types.cap = 128;
-    an.types.nodes = malloc(sizeof(an.types.nodes[0]) * an.types.cap);
-    an.types.len = 0;
-
-    for_range(i, 0, _TYPE_SIMPLE_END) {
-        an.types.nodes[an.types.len++].kind = i;
-    }
-
-    for_range(i, 0, _TYPE_SIMPLE_END) {
-        TypeHandle ptr = create_pointer(i);
-        assert(type_new_pointer(i) == ptr);
     }
 }
 
@@ -292,6 +284,7 @@ EntityHandle entity_new(EntityTable* tbl) {
 
 #define expr_as(T, e) ((T*)&an.exprs.items[e])
 #define se_new(T) se_alloc_slots(sizeof(T) / sizeof(an.exprs.items[0]))
+#define se_new_with(T, slots) se_alloc_slots(sizeof(T) / sizeof(an.exprs.items[0]) + slots)
 
 Index se_alloc_slots(usize slots) {
     if (an.exprs.len + slots >= an.exprs.cap) {
@@ -303,4 +296,104 @@ Index se_alloc_slots(usize slots) {
     an.exprs.len += slots;
     memset(&an.exprs.items[expr], 0, sizeof(an.exprs.items[expr]) * slots);
     return expr;
+}
+
+void sema_init() {
+    // initialize type graph
+    an.types.len = 0;
+    an.types.cap = 128;
+    an.types.nodes = malloc(sizeof(an.types.nodes[0]) * an.types.cap);
+
+    for_range(i, 0, _TYPE_SIMPLE_END) {
+        an.types.nodes[an.types.len++].kind = i;
+    }
+
+    for_range(i, 0, _TYPE_SIMPLE_END) {
+        TypeHandle ptr = create_pointer(i);
+        assert(type_new_pointer(i) == ptr);
+    }
+
+    // init entity array
+    an.entities.len = 0;
+    an.entities.cap = 512;
+    an.entities.items = malloc(sizeof(an.entities.items[0]) * an.entities.cap);
+
+    // init global level entity table
+    an.global = etable_new(NULL, 128);
+
+    // add null entity
+    assert(entity_new(an.global) == 0);
+    
+    // init exprs arena
+    an.exprs.len = 0;
+    an.exprs.cap = 512;
+    an.exprs.items = malloc(sizeof(an.exprs.items[0]) * an.exprs.cap);
+
+    // init stmts arena
+    an.stmts.len = 0;
+    an.stmts.cap = 128;
+    an.stmts.items = malloc(sizeof(an.stmts.items[0]) * an.stmts.cap);
+
+    // init string arena
+    an.strings.len = 0;
+    an.strings.cap = 512;
+    an.strings.chars = malloc(sizeof(an.strings.chars[0]) * an.strings.cap);
+}
+
+Analyzer sema_analyze(ParseTree pt, TokenBuf tb) {
+    sema_init();
+    an.pt = pt;
+    an.tb = tb;
+}
+
+bool type_is_defined(TypeHandle t) {
+    if (t < _TYPE_SIMPLE_END || type_node(t)->kind != TYPE_ALIAS) return true;
+    while (type_node(t)->kind != TYPE_ALIAS) {
+        t = as_type(TypeNodeAlias, t)->subtype;
+        if (t == TYPE_ALIAS_UNDEF) return false;
+    }
+    return true;
+}
+
+TypeHandle sema_ingest_type(EntityTable* tbl, Index pnode) {
+    ParseNode* node = parse_node(pnode);
+    u8 node_kind = parse_node_kind(pnode);
+    switch (node_kind) {
+    case PN_TYPE_POINTER:
+        TypeHandle subtype = sema_ingest_type(tbl, node->lhs);
+        TypeHandle ptr = type_new_pointer(subtype);
+        return ptr;
+        break;
+    case PN_EXPR_IDENT:
+        Token t = an.tb.at[node->main_token];
+        EntityHandle e = etable_search(tbl, t.raw, t.len);
+        if (e == 0) { // entity undefined so far
+            // create it and point it to an undefined alias
+            TypeHandle type = type_new_alias(TYPE_ALIAS_UNDEF);
+            e = entity_new(tbl);
+            entity_get(e)->kind = ENTITY_TYPENAME;
+            entity_get(e)->type = type;
+            etable_put(tbl, e, t.raw, t.len);
+            return type;
+        }
+        if (entity_get(e)->kind == ENTITY_TYPENAME) {
+            return entity_get(e)->type;
+        }
+        report_token(true, &an.tb, node->main_token, "entity is not a type");
+    case PN_TYPE_ARRAY:
+        TypeHandle subtype = sema_ingest_type(tbl, node->lhs);
+        TODO("sema - const eval");
+    default:
+        break;
+    }
+}
+
+Index sema_check_expr(EntityTable* tbl, Index pnode) {
+    ParseNode* node = parse_node(pnode);
+    u8 node_kind = parse_node_kind(pnode);
+
+    switch (node_kind) {
+    case PN_EXPR_IDENT:
+        
+    }
 }

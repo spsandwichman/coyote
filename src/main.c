@@ -43,7 +43,5 @@ int main(int argc, char** argv) {
 
     ParseTree pt = parse_file(tb);
 
-    type_init();
-
-    printf("type max %d bytes\n", TYPE_MAX*sizeof(u32));
+    Analyzer an = sema_analyze(pt, tb);
 }

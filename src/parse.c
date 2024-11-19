@@ -19,10 +19,10 @@ static struct {
     u32 start;
 } dynbuf;
 
-static void report_token(bool error, u32 token_index, char* message, ...) {
+void report_token(bool error, TokenBuf* tb, u32 token_index, char* message, ...) {
     va_list varargs;
     va_start(varargs, message);
-    Token t = p.tb.at[token_index];
+    Token t = tb->at[token_index];
     string t_text = {t.raw, t.len};
     bool found = false;
     for_range(i, 0, ctx.sources.len) {
@@ -110,7 +110,7 @@ static inline void advance() {
 
 static void expect(u8 kind) {
     if (current()->kind != kind) {
-        report_token(true, p.cursor, "expected %s, got %s", token_kind[kind], token_kind[current()->kind]);
+        report_token(true, &p.tb, p.cursor, "expected %s, got %s", token_kind[kind], token_kind[current()->kind]);
     }
 }
 
@@ -128,7 +128,7 @@ Index parse_fn_prototype(bool is_fnptr) {
     // consume provided fnptr?
     if (current()->kind == TOK_OPEN_PAREN) {
         if (is_fnptr) {
-            report_token(true, p.cursor, "FNPTR declaration cannot have a type");
+            report_token(true, &p.tb, p.cursor, "FNPTR declaration cannot have a type");
         }
         advance();
         fnptr_type = parse_type();
@@ -172,7 +172,7 @@ Index parse_fn_prototype(bool is_fnptr) {
         } else if (current()->kind == TOK_KEYWORD_OUT) {
             pkind = PN_OUT_PARAM;
         } else {
-            report_token(true, p.cursor, "expected IN or OUT");
+            report_token(true, &p.tb, p.cursor, "expected IN or OUT");
         }
         advance();
 
@@ -274,12 +274,12 @@ Index parse_var_decl(bool is_extern) {
         Index type = parse_type();
         node(decl)->lhs = type;
     } else if (is_extern) {
-        report_token(true, p.cursor, "EXTERN decls must have a type");
+        report_token(true, &p.tb, p.cursor, "EXTERN decls must have a type");
     }
 
     if (current()->kind == TOK_EQ) {
         if (is_extern) {
-            report_token(true, p.cursor, "EXTERN decls cannot have a value");
+            report_token(true, &p.tb, p.cursor, "EXTERN decls cannot have a value");
         }
         advance();
         if (current()->kind == TOK_OPEN_BRACE) {
@@ -578,7 +578,7 @@ Index parse_stmt() {
     case TOK_KEYWORD_FNPTR:
         return parse_fnptr_decl();
     default:
-        report_token(true, p.cursor, "expected a statement");
+        report_token(true, &p.tb, p.cursor, "expected a statement");
     }
     return 0;
 }
@@ -635,7 +635,7 @@ Index parse_base_type() {
         advance();
         return ident;
     default:
-        report_token(true, p.cursor, "expected a type");
+        report_token(true, &p.tb, p.cursor, "expected a type");
         break;
     }
     return 0;
@@ -674,7 +674,7 @@ Index parse_atomic_terminal() {
         advance();
         return numeric;
     }
-    report_token(true, p.cursor, "expected an expression");
+    report_token(true, &p.tb, p.cursor, "expected an expression");
     return 0;
 }
 
