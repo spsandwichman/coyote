@@ -502,9 +502,9 @@ verify_type(TypeNodeVariadicFunction);
 #undef verify_type
 
 enum {
-    ENTITY_VAR,
-    ENTITY_FN,
-    ENTITY_TYPENAME,
+    ENTKIND_VAR,
+    ENTKIND_FN,
+    ENTKIND_TYPENAME,
 };
 
 enum {
@@ -677,6 +677,9 @@ typedef struct Analyzer {
 
     ParseTree pt;
     TokenBuf  tb;
+
+    TypeHandle max_int;
+    TypeHandle max_uint;
 } Analyzer;
 
 Analyzer sema_analyze(ParseTree pt, TokenBuf tb);

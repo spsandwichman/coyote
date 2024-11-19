@@ -331,13 +331,16 @@ void sema_init() {
 
     // init stmts arena
     an.stmts.len = 0;
-    an.stmts.cap = 128;
+    an.stmts.cap = 256;
     an.stmts.items = malloc(sizeof(an.stmts.items[0]) * an.stmts.cap);
 
     // init string arena
     an.strings.len = 0;
     an.strings.cap = 512;
     an.strings.chars = malloc(sizeof(an.strings.chars[0]) * an.strings.cap);
+
+    an.max_int  = TYPE_I64; // assume 64 bit at them moment
+    an.max_uint = TYPE_U64;
 }
 
 Analyzer sema_analyze(ParseTree pt, TokenBuf tb) {
@@ -371,21 +374,67 @@ TypeHandle sema_ingest_type(EntityTable* tbl, Index pnode) {
             // create it and point it to an undefined alias
             TypeHandle type = type_new_alias(TYPE_ALIAS_UNDEF);
             e = entity_new(tbl);
-            entity_get(e)->kind = ENTITY_TYPENAME;
+            entity_get(e)->kind = ENTKIND_TYPENAME;
             entity_get(e)->type = type;
             etable_put(tbl, e, t.raw, t.len);
             return type;
         }
-        if (entity_get(e)->kind == ENTITY_TYPENAME) {
+        if (entity_get(e)->kind == ENTKIND_TYPENAME) {
             return entity_get(e)->type;
         }
         report_token(true, &an.tb, node->main_token, "entity is not a type");
     case PN_TYPE_ARRAY:
-        TypeHandle subtype = sema_ingest_type(tbl, node->lhs);
+        subtype = sema_ingest_type(tbl, node->lhs);
         TODO("sema - const eval");
     default:
         break;
     }
+}
+
+static u64 eval_integer(Index token, char* raw, usize len) {
+    if (len == 1) {
+        return raw[0] - '0';
+    }
+    isize value = 0;
+    isize base = 10;
+    if (raw[0] == 0) switch (raw[1]) {
+    case 'x':
+    case 'X':
+        base = 16;
+        raw += 2; 
+        len -= 2; 
+        break;
+    case 'o':
+    case 'O':
+        base = 8;
+        raw += 2; 
+        len -= 2; 
+        break;
+    case 'b':
+    case 'B':
+        base = 2; 
+        raw += 2; 
+        len -= 2; 
+        break;
+    }
+
+    for_range(i, 0, len) {
+        char c = raw[i];
+        if (c == '_') continue;
+        usize cval = 0;
+        if ('0' <= c && c <= '9') {
+            cval = c - '0';
+        } else if ('a' <= c && c <= 'f') {
+            cval = c - 'a';
+        } else if ('A' <= c && c <= 'F') {
+            cval = c - 'A';
+        }
+        if (cval >= base) {
+            report_token(true, &an.tb, token, "'%c' is not a valid base-%d digit", c, base);
+        }
+        value = value * base + cval;
+    }
+    return value;
 }
 
 Index sema_check_expr(EntityTable* tbl, Index pnode) {
@@ -393,7 +442,29 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
     u8 node_kind = parse_node_kind(pnode);
 
     switch (node_kind) {
-    case PN_EXPR_IDENT:
-        
+    case PN_EXPR_IDENT: {
+        Index sentity = se_new(SemaExprEntity);
+        expr_as(SemaExpr, sentity)->kind = SE_ENTITY;
+        expr_as(SemaExpr, sentity)->parse_node = pnode;
+
+        Token t = an.tb.at[node->main_token];
+        EntityHandle e = etable_search(tbl, t.raw, t.len);
+        if (e == 0) {
+            report_token(true, &an.tb, node->main_token, "'%.*s' is undefined", t.len, t.raw);
+        }
+        if (entity_get(e)->kind == ENTKIND_TYPENAME) {
+            report_token(true, &an.tb, node->main_token, "'%.*s' is a type", t.len, t.raw);
+        }
+        expr_as(SemaExprEntity, sentity)->base.type = entity_get(e)->type;
+        return sentity;
+    }
+    case PN_EXPR_INT: {
+        Token t = an.tb.at[node->main_token];
+        Index integer = se_new(SemaExprInteger);
+        expr_as(SemaExpr, integer)->kind = SE_INTEGER;
+        expr_as(SemaExpr, integer)->parse_node = pnode;
+        expr_as(SemaExpr, integer)->kind = an.max_int;
+        expr_as(SemaExprInteger, integer)->value = eval_integer(node->main_token, t.raw, t.len);
+    }
     }
 }
