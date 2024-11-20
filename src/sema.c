@@ -4,7 +4,7 @@ Analyzer an;
 
 #define type_node(t) (&an.types.nodes[t])
 #define slotsof(T) (sizeof(T) / sizeof(an.types.nodes[0]))
-#define as_type(T, x) ((T*)type_node(x))
+#define type_as(T, x) ((T*)type_node(x))
 
 TypeHandle type_alloc_slots(usize n, bool align_64) {
     if (align_64 && (an.types.len & 1)) {
@@ -31,14 +31,29 @@ TypeHandle type_alloc_slots(usize n, bool align_64) {
 static TypeHandle create_pointer(TypeHandle to) {
     TypeHandle ptr = type_alloc_slots(slotsof(TypeNodePointer), is_align64(TypeNodePointer));
     type_node(ptr)->kind = TYPE_POINTER;
-    as_type(TypeNodePointer, ptr)->subtype = to;
+    type_as(TypeNodePointer, ptr)->subtype = to;
     return ptr;
+}
+
+TypeHandle type_new_alias_undef() {
+    TypeHandle alias = type_alloc_slots(slotsof(TypeNodeAlias), is_align64(TypeNodeAlias));
+    type_node(alias)->kind = TYPE_ALIAS_UNDEF;
+    type_as(TypeNodeAlias, alias)->subtype = TYPE_VOID;
+    return alias;
+}
+
+bool type_is_defined(TypeHandle t) {
+    if (t < _TYPE_SIMPLE_END) return true;
+    while (type_node(t)->kind == TYPE_ALIAS) {
+        t = type_as(TypeNodeAlias, t)->subtype;
+    }
+    return type_node(t)->kind != TYPE_ALIAS_UNDEF;
 }
 
 TypeHandle type_new_alias(TypeHandle to) {
     TypeHandle alias = type_alloc_slots(slotsof(TypeNodeAlias), is_align64(TypeNodeAlias));
     type_node(alias)->kind = TYPE_ALIAS;
-    as_type(TypeNodeAlias, alias)->subtype = to;
+    type_as(TypeNodeAlias, alias)->subtype = to;
     return alias;
 }
 
@@ -49,7 +64,7 @@ TypeHandle type_new_pointer(TypeHandle to) {
     }
     u8 to_kind = type_node(to)->kind;
     if (to_kind == TYPE_STRUCT || to_kind == TYPE_UNION) {
-        return as_type(TypeNodeRecord, to)->pointer_cache;
+        return type_as(TypeNodeRecord, to)->pointer_cache;
     }
     // pointer isn't cached, force its creation
     return create_pointer(to);
@@ -57,9 +72,9 @@ TypeHandle type_new_pointer(TypeHandle to) {
 
 TypeHandle type_new_array(TypeHandle to, u64 len) {
     TypeHandle array = type_alloc_slots(slotsof(TypeNodeArray), is_align64(TypeNodeArray));
-    as_type(TypeNodeArray, array)->kind = TYPE_ARRAY;
-    as_type(TypeNodeArray, array)->subtype = to;
-    as_type(TypeNodeArray, array)->len = len;
+    type_as(TypeNodeArray, array)->kind = TYPE_ARRAY;
+    type_as(TypeNodeArray, array)->subtype = to;
+    type_as(TypeNodeArray, array)->len = len;
     return array;
 }
 
@@ -69,10 +84,10 @@ TypeHandle type_new_record(u8 kind, u16 num_fields) {
         slotsof(((TypeNodeRecord*)0)->fields[0]) * num_fields, // fields
         is_align64(TypeNodeRecord)
     );
-    as_type(TypeNodeRecord, record)->kind = kind;
-    as_type(TypeNodeRecord, record)->len = num_fields;
+    type_as(TypeNodeRecord, record)->kind = kind;
+    type_as(TypeNodeRecord, record)->len = num_fields;
     TypeHandle ptr = create_pointer(record);
-    as_type(TypeNodeRecord, record)->pointer_cache = ptr;
+    type_as(TypeNodeRecord, record)->pointer_cache = ptr;
     return record;
 }
 
@@ -85,16 +100,16 @@ TypeHandle type_new_function(u8 kind, u16 num_params) {
             slotsof(((TypeNodeFunction*)0)->params[0]) * num_params, // params
             is_align64(TypeNodeFunction)
         );
-        as_type(TypeNodeFunction, record)->kind = kind;
-        as_type(TypeNodeFunction, record)->len = num_params;
+        type_as(TypeNodeFunction, record)->kind = kind;
+        type_as(TypeNodeFunction, record)->len = num_params;
     } else {
         record = type_alloc_slots(
             slotsof(TypeNodeVariadicFunction) + // base node
             slotsof(((TypeNodeVariadicFunction*)0)->params[0]) * num_params, // params
             is_align64(TypeNodeFunction)
         );
-        as_type(TypeNodeVariadicFunction, record)->kind = kind;
-        as_type(TypeNodeVariadicFunction, record)->len = num_params;
+        type_as(TypeNodeVariadicFunction, record)->kind = kind;
+        type_as(TypeNodeVariadicFunction, record)->len = num_params;
     }
     return record;
 }
@@ -109,16 +124,16 @@ TypeHandle type_new_enum(u8 kind, u16 num_variants) {
             slotsof(((TypeNodeEnum64*)0)->variants[0]) * num_variants,
             is_align64(TypeNodeEnum64)
         );
-        as_type(TypeNodeEnum64, e)->kind = TYPE_ENUM64;
-        as_type(TypeNodeEnum64, e)->len = num_variants;
+        type_as(TypeNodeEnum64, e)->kind = TYPE_ENUM64;
+        type_as(TypeNodeEnum64, e)->len = num_variants;
     } else {
         e = type_alloc_slots(
             slotsof(TypeNodeEnum) +
             slotsof(((TypeNodeEnum*)0)->variants[0]) * num_variants,
             is_align64(TypeNodeEnum)
         );
-        as_type(TypeNodeEnum, e)->kind = TYPE_ENUM64;
-        as_type(TypeNodeEnum, e)->len = num_variants;
+        type_as(TypeNodeEnum, e)->kind = TYPE_ENUM64;
+        type_as(TypeNodeEnum, e)->len = num_variants;
     }
 }
 
@@ -138,13 +153,12 @@ u32 type_size(TypeHandle t) {
     if (t < _TYPE_SIMPLE_END) {
         return base_sizes[t];
     }
-
     u8 kind = type_node(t)->kind;
     crash("todo");
     return 0;
 }
 
-static usize  FNV_1a(char* raw, usize len) {
+static usize FNV_1a(char* raw, usize len) {
     const usize FNV_OFFSET = 14695981039346656037ull;
     const usize FNV_PRIME = 1099511628211ull;
 
@@ -179,7 +193,6 @@ static Index strpool_alloc(char* raw, usize len) {
 }
 
 
-// this parameter may be invalidated by additions to the entity buffer
 Entity* entity_get(EntityHandle e) {
     return &an.entities.items[e];
 }
@@ -298,6 +311,22 @@ Index expr_alloc_slots(usize slots) {
     return expr;
 }
 
+#define stmt_as(T, e) ((T*)&an.stmts.items[e])
+#define stmt_new(T) stmt_alloc_slots(sizeof(T) / sizeof(an.stmts.items[0]))
+#define stmt_new_with(T, slots) stmt_alloc_slots(sizeof(T) / sizeof(an.stmts.items[0]) + slots)
+
+Index stmt_alloc_slots(usize slots) {
+    if (an.exprs.len + slots >= an.exprs.cap) {
+        an.exprs.cap *= 2;
+        an.exprs.cap += slots;
+        an.exprs.items = realloc(an.exprs.items, an.exprs.cap);
+    }
+    Index expr = an.exprs.len;
+    an.exprs.len += slots;
+    memset(&an.exprs.items[expr], 0, sizeof(an.exprs.items[expr]) * slots);
+    return expr;
+}
+
 void sema_init() {
     // initialize type graph
     an.types.len = 0;
@@ -343,21 +372,6 @@ void sema_init() {
     an.max_uint = TYPE_U64;
 }
 
-Analyzer sema_analyze(ParseTree pt, TokenBuf tb) {
-    sema_init();
-    an.pt = pt;
-    an.tb = tb;
-}
-
-bool type_is_defined(TypeHandle t) {
-    if (t < _TYPE_SIMPLE_END || type_node(t)->kind != TYPE_ALIAS) return true;
-    while (type_node(t)->kind != TYPE_ALIAS) {
-        t = as_type(TypeNodeAlias, t)->subtype;
-        if (t == TYPE_ALIAS_UNDEF) return false;
-    }
-    return true;
-}
-
 TypeHandle sema_ingest_type(EntityTable* tbl, Index pnode) {
     ParseNode* node = parse_node(pnode);
     u8 node_kind = parse_node_kind(pnode);
@@ -372,7 +386,7 @@ TypeHandle sema_ingest_type(EntityTable* tbl, Index pnode) {
         EntityHandle e = etable_search(tbl, t.raw, t.len);
         if (e == 0) { // entity undefined so far
             // create it and point it to an undefined alias
-            TypeHandle type = type_new_alias(TYPE_ALIAS_UNDEF);
+            TypeHandle type = type_new_alias_undef();
             e = entity_new(tbl);
             entity_get(e)->kind = ENTKIND_TYPENAME;
             entity_get(e)->type = type;
@@ -470,4 +484,89 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
     default:
         report_token(true, &an.tb, node->main_token, "expression failed to check");
     }
+}
+
+Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode, u8 kind, bool global) {
+    Token ident = an.tb.at[pnode->main_token];
+
+    u8 storage = STORAGE_LOCAL;
+    if (global) switch (kind) {
+    case PN_STMT_PUBLIC_DECL: storage = STORAGE_PUBLIC; break;
+    case PN_STMT_DECL:
+    case PN_STMT_PRIVATE_DECL: storage = STORAGE_PRIVATE; break;
+    case PN_STMT_EXPORT_DECL:  storage = STORAGE_EXPORT; break;
+    default:
+        crash("invalid decl kind");
+        break;
+    }
+
+    EntityHandle var = etable_search(tbl, ident.raw, ident.len);
+    if (var != 0) { // entity found
+        report_token(false, &an.tb, pnode->main_token, "entity already declared");
+        TODO("check if its EXTERN!");
+    }
+    var = entity_new(tbl);
+    entity_get(var)->storage = storage;
+    etable_put(tbl, var, ident.raw, ident.len);
+
+    Index decl = stmt_new(SemaStmtDecl);
+    stmt_as(SemaStmtDecl, decl)->entity = var;
+    stmt_as(SemaStmtDecl, decl)->kind = ENTKIND_VAR;
+    stmt_as(SemaStmtDecl, decl)->parse_node = pnode_index;
+    Index value = sema_check_expr(tbl, pnode->rhs);
+    TODO("typecheck");
+}
+
+Index sema_check_extern_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode) {
+    Token ident = an.tb.at[pnode->main_token];
+
+    TODO("extern var decl");
+}
+
+bool sema_can_type_implicit_cast(TypeHandle from, TypeHandle to, bool equal_size) {
+    // simple equality
+    if (from == to) return true;
+
+    // peel off aliases
+    while (type_node(from)->kind == TYPE_ALIAS) {
+        from = type_as(TypeNodeAlias, from)->subtype;
+    }
+
+}
+
+Index sema_check_stmt(EntityTable* tbl, Index pnode) {
+
+    bool is_global = tbl == an.global;
+
+    ParseNode* node = parse_node(pnode);
+    u8 node_kind = parse_node_kind(pnode);
+
+    switch (node_kind) {
+    case PN_STMT_PUBLIC_DECL:
+    case PN_STMT_EXPORT_DECL:
+    case PN_STMT_PRIVATE_DECL:
+        if (is_global) {
+            report_token(true, &an.tb, node->main_token - 1, "qualified declaration cannot be local");
+        }
+    case PN_STMT_DECL:
+        return sema_check_var_decl(tbl, pnode, node, node_kind, is_global);
+    case PN_STMT_EXTERN_DECL:
+        return sema_check_extern_var_decl(tbl, pnode, node);
+    default:
+        report_token(true, &an.tb, node->main_token, "unknown decl");
+        break;
+    }
+}
+
+Analyzer sema_analyze(ParseTree pt, TokenBuf tb) {
+    sema_init();
+    an.pt = pt;
+    an.tb = tb;
+
+    for_range(i, 0, pt.len) {
+        Index decl = pt.decls[i];
+        sema_check_stmt(an.global, decl);
+    }
+
+    return an;
 }

@@ -389,7 +389,8 @@ enum {
     TYPE_VARIADIC_FNPTR,
 
     // this is how unknown types get constructed.
-    TYPE_ALIAS,
+    TYPE_ALIAS_UNDEF, // unknown
+    TYPE_ALIAS, // known
 };
 
 typedef u32 TypeHandle;
@@ -405,11 +406,9 @@ typedef struct TypeNode {
 } TypeNode;
 static_assert(sizeof(TypeNode) == sizeof(u32));
 
-#define TYPE_ALIAS_UNDEF ((TypeHandle)0xFFFFFFFFu)
-
 typedef struct TypeNodeAlias {
     _TYPE_NODE_BASE
-    TypeHandle subtype; // if TYPE_ALIAS_UNDEF, this type has not been filled out yet
+    TypeHandle subtype;
 } TypeNodeAlias;
 verify_type(TypeNodeAlias);
 
@@ -588,7 +587,6 @@ enum {
     SE_COMPOUND,
 
     // SemaExprBinop
-    SE_CAST,
     SE_ADD,
     SE_SUB,
     SE_MUL,
@@ -616,7 +614,8 @@ enum {
     SE_NEG,
     SE_BIT_NOT,
 
-    SE_SELECTOR, // lhs = field index
+    SE_CAST,
+    SE_IMPLICIT_CAST, // same as SE_CAST but inserted by the compiler
 
     // lmfao
     SE_PASS_OUT,
@@ -639,7 +638,8 @@ typedef struct SemaStmtDecl {
 } SemaStmtDecl;
 
 enum {
-    SS_DECL,
+    SS_VAR_DECL,
+    SS_FN_DECL,
 };
 
 typedef struct Analyzer {
@@ -679,7 +679,11 @@ typedef struct Analyzer {
     TokenBuf  tb;
 
     TypeHandle max_int;
-    TypeHandle max_uint;
+    TypeHandle max_uint; // TODO extract into TargetInfo struct or smth
+
+    struct {
+        TypeHandle return_type;
+    } fn_context;
 } Analyzer;
 
 Analyzer sema_analyze(ParseTree pt, TokenBuf tb);

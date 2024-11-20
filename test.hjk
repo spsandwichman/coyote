@@ -1,2 +1,0 @@
-
-EXTERN FN add_ints (IN x: INT, IN y: INT) : INT
