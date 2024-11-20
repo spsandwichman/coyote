@@ -283,10 +283,10 @@ EntityHandle entity_new(EntityTable* tbl) {
 }
 
 #define expr_as(T, e) ((T*)&an.exprs.items[e])
-#define se_new(T) se_alloc_slots(sizeof(T) / sizeof(an.exprs.items[0]))
-#define se_new_with(T, slots) se_alloc_slots(sizeof(T) / sizeof(an.exprs.items[0]) + slots)
+#define expr_new(T) expr_alloc_slots(sizeof(T) / sizeof(an.exprs.items[0]))
+#define expr_new_with(T, slots) expr_alloc_slots(sizeof(T) / sizeof(an.exprs.items[0]) + slots)
 
-Index se_alloc_slots(usize slots) {
+Index expr_alloc_slots(usize slots) {
     if (an.exprs.len + slots >= an.exprs.cap) {
         an.exprs.cap *= 2;
         an.exprs.cap += slots;
@@ -443,9 +443,9 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
 
     switch (node_kind) {
     case PN_EXPR_IDENT: {
-        Index sentity = se_new(SemaExprEntity);
-        expr_as(SemaExpr, sentity)->kind = SE_ENTITY;
-        expr_as(SemaExpr, sentity)->parse_node = pnode;
+        Index entity_expr = expr_new(SemaExprEntity);
+        expr_as(SemaExpr, entity_expr)->kind = SE_ENTITY;
+        expr_as(SemaExpr, entity_expr)->parse_node = pnode;
 
         Token t = an.tb.at[node->main_token];
         EntityHandle e = etable_search(tbl, t.raw, t.len);
@@ -455,16 +455,19 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
         if (entity_get(e)->kind == ENTKIND_TYPENAME) {
             report_token(true, &an.tb, node->main_token, "'%.*s' is a type", t.len, t.raw);
         }
-        expr_as(SemaExprEntity, sentity)->base.type = entity_get(e)->type;
-        return sentity;
+        expr_as(SemaExprEntity, entity_expr)->base.type = entity_get(e)->type;
+        return entity_expr;
     }
     case PN_EXPR_INT: {
         Token t = an.tb.at[node->main_token];
-        Index integer = se_new(SemaExprInteger);
+        Index integer = expr_new(SemaExprInteger);
         expr_as(SemaExpr, integer)->kind = SE_INTEGER;
         expr_as(SemaExpr, integer)->parse_node = pnode;
         expr_as(SemaExpr, integer)->kind = an.max_int;
         expr_as(SemaExprInteger, integer)->value = eval_integer(node->main_token, t.raw, t.len);
+        return integer;
     }
+    default:
+        report_token(true, &an.tb, node->main_token, "expression failed to check");
     }
 }
