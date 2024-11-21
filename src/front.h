@@ -371,6 +371,8 @@ enum {
     TYPE_I64,
     TYPE_U64,
 
+    TYPE_INT_CONSTANT,
+
     _TYPE_SIMPLE_END, // any types after this are indices into the TypeStructure array
 
     TYPE_POINTER,
@@ -418,7 +420,7 @@ typedef struct TypeNodePointer {
 } TypeNodePointer;
 verify_type(TypeNodePointer);
 
-#define TYPE_ARRAY_UNKNOWN_LEN ((u32)len)
+#define ARRAY_UNKNOWN_LEN (UINT32_MAX)
 typedef struct TypeNodeArray {
     _TYPE_NODE_BASE
     TypeHandle subtype;

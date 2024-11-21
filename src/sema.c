@@ -42,12 +42,16 @@ TypeHandle type_new_alias_undef() {
     return alias;
 }
 
-bool type_is_defined(TypeHandle t) {
+bool type_is_complete(TypeHandle t) {
     if (t < _TYPE_SIMPLE_END) return true;
     while (type_node(t)->kind == TYPE_ALIAS) {
         t = type_as(TypeNodeAlias, t)->subtype;
     }
-    return type_node(t)->kind != TYPE_ALIAS_UNDEF;
+    if (type_node(t)->kind == TYPE_ALIAS_UNDEF) return false;
+    if (type_node(t)->kind == TYPE_ARRAY) {
+        if (type_as(TypeNodeArray, t)->len == ARRAY_UNKNOWN_LEN) return false;
+    }
+    return true;
 }
 
 TypeHandle type_new_alias(TypeHandle to) {
@@ -137,25 +141,129 @@ TypeHandle type_new_enum(u8 kind, u16 num_variants) {
     }
 }
 
-static u32 base_sizes[] = {
-    [TYPE_VOID] = 0,
-    [TYPE_I8] = 1,
-    [TYPE_U8] = 1,
-    [TYPE_I16] = 2,
-    [TYPE_U16] = 2,
-    [TYPE_I32] = 4,
-    [TYPE_U32] = 4,
-    [TYPE_I64] = 8,
-    [TYPE_U64] = 8,
-};
 
 u32 type_size(TypeHandle t) {
+    static u32 base_sizes[] = {
+        [TYPE_VOID] = 0,
+        [TYPE_I8] = 1,
+        [TYPE_U8] = 1,
+        [TYPE_I16] = 2,
+        [TYPE_U16] = 2,
+        [TYPE_I32] = 4,
+        [TYPE_U32] = 4,
+        [TYPE_I64] = 8,
+        [TYPE_U64] = 8,
+    };
     if (t < _TYPE_SIMPLE_END) {
         return base_sizes[t];
     }
     u8 kind = type_node(t)->kind;
-    crash("todo");
+    TODO("todo");
     return 0;
+}
+
+u32 type_align(TypeHandle t) {
+    static u32 base_aligns[] = {
+        [TYPE_VOID] = 0,
+        [TYPE_I8] = 1,
+        [TYPE_U8] = 1,
+        [TYPE_I16] = 2,
+        [TYPE_U16] = 2,
+        [TYPE_I32] = 4,
+        [TYPE_U32] = 4,
+        [TYPE_I64] = 8,
+        [TYPE_U64] = 8,
+    };
+    if (t < _TYPE_SIMPLE_END) {
+        return base_aligns[t];
+    }
+    u8 kind = type_node(t)->kind;
+    TODO("todo");
+    return 0;
+}
+
+bool type_is_signed(TypeHandle t) {
+    assert(t < _TYPE_SIMPLE_END);
+    return t & 1;
+}
+
+bool type_is_concrete_integer(TypeHandle t) {
+    return TYPE_I8 <= t <= TYPE_U64;
+}
+
+bool type_can_cast(TypeHandle from, TypeHandle to, bool explicit) {
+    // simple equality
+    if (from == to) return true;
+
+    // peel off aliases
+    while (type_node(from)->kind == TYPE_ALIAS) {
+        from = type_as(TypeNodeAlias, from)->subtype;
+    }
+    while (type_node(to)->kind == TYPE_ALIAS) {
+        to = type_as(TypeNodeAlias, to)->subtype;
+    }
+    
+    // cannot cast to incomplete types
+    if (!type_is_complete(to) || !type_is_complete(from)) {
+        return false;
+    }
+    // simple equality
+    if (from == to) return true;
+
+    if (from == TYPE_INT_CONSTANT) {
+        // int constant can implicit cast to any integer
+        if (type_is_concrete_integer(to)) return true;
+        // implicit int constant -> pointer
+        if (type_node(to)->kind == TYPE_POINTER) return true;
+    }
+
+    if (type_is_concrete_integer(to) && type_is_concrete_integer(from)) {
+        // cannot cast between signedness
+        if (type_is_signed(to) != type_is_signed(from)) return false;
+        // concrete integers can cast to any other with the same signedness
+        return true;
+    }
+
+    if (type_node(from)->kind == TYPE_POINTER) {
+        if (type_node(to)->kind == TYPE_POINTER) {
+            TypeHandle from_subtype = type_as(TypeNodePointer, from)->subtype;
+            TypeHandle to_subtype = type_as(TypeNodePointer, to)->subtype;
+
+            // ^T -> ^VOID || ^VOID -> ^T
+            if (from_subtype == TYPE_VOID || to_subtype == TYPE_VOID) {
+                return true;
+            }
+
+            // CAST ^U TO ^V
+            // for any U and V
+            if (explicit) {
+                return true;
+            }
+        } else if (to == an.max_uint) {
+            return true; // implicit ^T -> UWORD
+        }
+    }
+
+    // everything past this must be explicit
+    if (!explicit) return false;
+
+    // array -> array casts
+    if (type_node(from)->kind == TYPE_ARRAY && type_node(to)->kind == TYPE_ARRAY) {
+
+        // check if from (by transitive, 'to' as well) has an unknown length
+        if (type_as(TypeNodeArray, from)->len == ARRAY_UNKNOWN_LEN) return false;
+        // check if the lengths arent the same
+        if (type_as(TypeNodeArray, to)->len != type_as(TypeNodeArray, from)->len) return false;
+
+        // U[N] -> V[N] as long as
+        // sizeof(U) == sizeof(V) && alignof(U) == alignof(V)
+        TypeHandle from_subtype = type_as(TypeNodeArray, from)->subtype;
+        TypeHandle to_subtype = type_as(TypeNodeArray, to)->subtype;
+        return type_size(to_subtype) == type_size(to_subtype)
+            && type_align(to_subtype) == type_align(to_subtype);
+    }
+
+    return false;
 }
 
 static usize FNV_1a(char* raw, usize len) {
@@ -229,7 +337,7 @@ static inline bool _etbl_put(EntityHandle* entities, Index* name_strings, u32 ca
     return false;
 }
 
-// allocates a name in the strin
+// allocates a name in the string pool
 void etable_put(EntityTable* tbl, EntityHandle entity, char* raw, usize len) {
 
     Index name_str = strpool_alloc(raw, len);
@@ -399,7 +507,10 @@ TypeHandle sema_ingest_type(EntityTable* tbl, Index pnode) {
         report_token(true, &an.tb, node->main_token, "entity is not a type");
     case PN_TYPE_ARRAY:
         subtype = sema_ingest_type(tbl, node->lhs);
-        TODO("sema - const eval");
+        if (!type_is_complete(subtype)) {
+            report_token(true, &an.tb, node->main_token, "incomplete type cannot be used");
+        }
+        TODO("const eval");
     default:
         break;
     }
@@ -411,7 +522,7 @@ static u64 eval_integer(Index token, char* raw, usize len) {
     }
     isize value = 0;
     isize base = 10;
-    if (raw[0] == 0) switch (raw[1]) {
+    if (raw[0] == '0') switch (raw[1]) {
     case 'x':
     case 'X':
         base = 16;
@@ -452,6 +563,7 @@ static u64 eval_integer(Index token, char* raw, usize len) {
 }
 
 Index sema_check_expr(EntityTable* tbl, Index pnode) {
+    assert(pnode == 0);
     ParseNode* node = parse_node(pnode);
     u8 node_kind = parse_node_kind(pnode);
 
@@ -477,12 +589,13 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
         Index integer = expr_new(SemaExprInteger);
         expr_as(SemaExpr, integer)->kind = SE_INTEGER;
         expr_as(SemaExpr, integer)->parse_node = pnode;
-        expr_as(SemaExpr, integer)->kind = an.max_int;
+        expr_as(SemaExpr, integer)->kind = TYPE_INT_CONSTANT; // this can cast to any integer
         expr_as(SemaExprInteger, integer)->value = eval_integer(node->main_token, t.raw, t.len);
         return integer;
     }
     default:
-        report_token(true, &an.tb, node->main_token, "expression failed to check");
+        report_token(false, &an.tb, node->main_token, "expression failed to check");
+        crash("unrecognized expression kind");
     }
 }
 
@@ -513,25 +626,40 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
     stmt_as(SemaStmtDecl, decl)->entity = var;
     stmt_as(SemaStmtDecl, decl)->kind = ENTKIND_VAR;
     stmt_as(SemaStmtDecl, decl)->parse_node = pnode_index;
-    Index value = sema_check_expr(tbl, pnode->rhs);
-    TODO("typecheck");
+    
+    // type provided
+    if (pnode->lhs != 0) {
+
+        TypeHandle type = sema_ingest_type(tbl, pnode->lhs);
+        switch (type_node(type)->kind) {
+        case TYPE_STRUCT:
+        case TYPE_UNION:
+        case TYPE_ENUM:
+        case TYPE_ENUM64:
+        case TYPE_FNPTR:
+        case TYPE_VARIADIC_FNPTR:
+            TODO("cant decl these yet!");
+        case TYPE_ALIAS_UNDEF:
+            report_token(false, &an.tb, parse_node(pnode->lhs)->main_token, "use of incomplete type");
+        case TYPE_VOID:
+            report_token(false, &an.tb, parse_node(pnode->lhs)->main_token, "variable cannot be VOID");
+        }
+
+        Index value = 0;
+
+        // value provided
+        if (pnode->rhs != 0) {
+
+        } else {
+            value = 
+        }
+    }
 }
 
 Index sema_check_extern_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode) {
     Token ident = an.tb.at[pnode->main_token];
 
     TODO("extern var decl");
-}
-
-bool sema_can_type_implicit_cast(TypeHandle from, TypeHandle to, bool equal_size) {
-    // simple equality
-    if (from == to) return true;
-
-    // peel off aliases
-    while (type_node(from)->kind == TYPE_ALIAS) {
-        from = type_as(TypeNodeAlias, from)->subtype;
-    }
-
 }
 
 Index sema_check_stmt(EntityTable* tbl, Index pnode) {
