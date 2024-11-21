@@ -188,10 +188,12 @@ bool type_is_signed(TypeHandle t) {
 }
 
 bool type_is_concrete_integer(TypeHandle t) {
-    return TYPE_I8 <= t <= TYPE_U64;
+    return TYPE_I8 <= t && t <= TYPE_U64;
 }
 
 bool type_can_cast(TypeHandle from, TypeHandle to, bool explicit) {
+    // printf("%d -> %d\n", type_node(from)->kind, type_node(to)->kind);
+
     // simple equality
     if (from == to) return true;
 
@@ -216,6 +218,8 @@ bool type_can_cast(TypeHandle from, TypeHandle to, bool explicit) {
         // implicit int constant -> pointer
         if (type_node(to)->kind == TYPE_POINTER) return true;
     }
+
+
 
     if (type_is_concrete_integer(to) && type_is_concrete_integer(from)) {
         // cannot cast between signedness
@@ -293,8 +297,9 @@ static Index strpool_alloc(char* raw, usize len) {
     }
 
     Index str = an.strings.len;
-    memcpy(&an.strings.len, raw, len);
+    memcpy(&an.strings.chars[an.strings.len], raw, len);
     an.strings.chars[an.strings.len + len] = '\0'; // NUL terminated
+
     an.strings.len += len + 1;
 
     return str;
@@ -309,6 +314,11 @@ Entity* entity_get(EntityHandle e) {
 
 EntityHandle etable_search(EntityTable* tbl, char* raw, usize len) {
     if (tbl == NULL) return 0; // not found
+
+    // for_range(i, 0, tbl->cap) {
+    //     Index str = tbl->name_strings[i];
+    //     printf("[%d] '%s' -> %d\n", i, str == 0 ? NULL : &an.strings.chars[str], tbl->entities[i]);
+    // }
 
     usize hash = FNV_1a(raw, len);
     for_range(i, 0, ENTITY_TABLE_MAX_SEARCH) {
@@ -472,7 +482,7 @@ void sema_init() {
     an.stmts.items = malloc(sizeof(an.stmts.items[0]) * an.stmts.cap);
 
     // init string arena
-    an.strings.len = 0;
+    an.strings.len = 1;
     an.strings.cap = 512;
     an.strings.chars = malloc(sizeof(an.strings.chars[0]) * an.strings.cap);
 
@@ -511,7 +521,20 @@ TypeHandle sema_ingest_type(EntityTable* tbl, Index pnode) {
             report_token(true, &an.tb, node->main_token, "incomplete type cannot be used");
         }
         TODO("const eval");
+        
+    case PN_TYPE_VOID:  return TYPE_VOID;
+    case PN_TYPE_BYTE:  return TYPE_U8;
+    case PN_TYPE_UBYTE: return TYPE_I8;
+    case PN_TYPE_INT:   return TYPE_U16;
+    case PN_TYPE_UINT:  return TYPE_I16;
+    case PN_TYPE_LONG:  return TYPE_U32;
+    case PN_TYPE_ULONG: return TYPE_I32;
+    case PN_TYPE_QUAD:  return TYPE_U64;
+    case PN_TYPE_UQUAD: return TYPE_I64;
+    case PN_TYPE_WORD:  return an.max_int;
+    case PN_TYPE_UWORD: return an.max_uint;
     default:
+        crash("unhandled %d", parse_node_kind(pnode));
         break;
     }
 }
@@ -563,7 +586,7 @@ static u64 eval_integer(Index token, char* raw, usize len) {
 }
 
 Index sema_check_expr(EntityTable* tbl, Index pnode) {
-    assert(pnode == 0);
+    assert(pnode != 0);
     ParseNode* node = parse_node(pnode);
     u8 node_kind = parse_node_kind(pnode);
 
@@ -589,7 +612,7 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
         Index integer = expr_new(SemaExprInteger);
         expr_as(SemaExpr, integer)->kind = SE_INTEGER;
         expr_as(SemaExpr, integer)->parse_node = pnode;
-        expr_as(SemaExpr, integer)->kind = TYPE_INT_CONSTANT; // this can cast to any integer
+        expr_as(SemaExpr, integer)->type = TYPE_INT_CONSTANT; // this can cast to any integer
         expr_as(SemaExprInteger, integer)->value = eval_integer(node->main_token, t.raw, t.len);
         return integer;
     }
@@ -597,6 +620,20 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
         report_token(false, &an.tb, node->main_token, "expression failed to check");
         crash("unrecognized expression kind");
     }
+}
+
+// if the value is an int constant, set its type to the TypeHandle and return it
+// else, insert a cast
+Index sema_insert_implicit_cast(Index value, TypeHandle to) {
+    if (expr_as(SemaExpr, value)->type == TYPE_INT_CONSTANT) {
+        expr_as(SemaExpr, value)->type = to;
+        return value;
+    }
+    Index cast = expr_new(SemaExprUnop);
+    expr_as(SemaExprUnop, cast)->base.kind = SE_IMPLICIT_CAST;
+    expr_as(SemaExprUnop, cast)->base.type = to;
+    expr_as(SemaExprUnop, cast)->sub = value;
+    return cast;
 }
 
 Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode, u8 kind, bool global) {
@@ -645,13 +682,23 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
             report_token(false, &an.tb, parse_node(pnode->lhs)->main_token, "variable cannot be VOID");
         }
 
-        Index value = 0;
 
         // value provided
         if (pnode->rhs != 0) {
+            Index value = sema_check_expr(tbl, pnode->rhs);
 
-        } else {
-            value = 
+            TypeHandle value_type = expr_as(SemaExpr, value)->type;
+            // check that the types can implicitly cast
+            bool can_implicit_cast = type_can_cast(value_type, type, false);
+            if (!can_implicit_cast) {
+                u32 token = parse_node(expr_as(SemaExpr, value)->parse_node)->main_token;
+                report_token(true, &an.tb, token, "types are incompatible");
+            }
+            if (value_type != type) {
+                value = sema_insert_implicit_cast(value, type);
+            }
+            
+            stmt_as(SemaStmtDecl, decl)->value = value;
         }
     }
 }
