@@ -2,7 +2,7 @@ any deviation from the original language-defined semantics should be explicitly
 enabled, and never be default behavior. fortunately, the language does allow a
 fair bit of wiggle room in ambigous situations, which can be optimized.
 
-integer types are pretty much suggestions everywhere except in aggregates,
+integer types are pretty much suggestions everywhere except in memory and aggregates,
 where they're forced to have a consistent size. A UBYTE local variable does
 not guarantee that the value of the local is 0..=255
 coyote will force integer bit width, which opens up some optimzations for 
@@ -17,3 +17,6 @@ identifiers with all-UPPERCASE are not allowed apparently? coyote allows those
 and i dont feel like artificially removing that rn
 TODO make all-UPPERCASE identifiers (not keywords) illegal
 
+jackal's notion of truth is 0 -> "false", else -> "true". boolean operations
+are not necessarily guaranteed to produce 1 or TRUE, just a "true" non-zero value, 
+except for the order/comparison operators > < >= <=

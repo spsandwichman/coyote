@@ -1,4 +1,5 @@
 #include "front.h"
+#include "strbuilder.h"
 
 Analyzer an;
 
@@ -28,6 +29,59 @@ TypeHandle type_alloc_slots(usize n, bool align_64) {
 
 #define is_align64(T) (alignof(T) == 8)
 
+static void _type_name(StringBuilder* sb, TypeHandle t) {
+    switch (type_node(t)->kind) {
+    case TYPE_VOID: sb_append_c(sb, "VOID"); break;
+    case TYPE_I8:   sb_append_c(sb, "BYTE"); break;
+    case TYPE_U8:   sb_append_c(sb, "UBYTE"); break;
+    case TYPE_I16:  sb_append_c(sb, "INT"); break;
+    case TYPE_U16:  sb_append_c(sb, "UINT"); break;
+    case TYPE_I32:  sb_append_c(sb, "LONG"); break;
+    case TYPE_U32:  sb_append_c(sb, "ULONG"); break;
+    case TYPE_I64:  sb_append_c(sb, "QUAD"); break;
+    case TYPE_U64:  sb_append_c(sb, "UQUAD"); break;
+    case TYPE_INT_CONSTANT: sb_append_c(sb, type_name(an.max_int)); break;
+    case TYPE_ALIAS:
+    case TYPE_ALIAS_UNDEF: {
+        Index str_index = entity_get(type_as(TypeNodeAlias, t)->entity)->ident_string;
+        const char* cstr = &an.strings.chars[str_index];
+        sb_append_c(sb, cstr);
+        break;
+        }
+    case TYPE_POINTER: {
+        sb_append_c(sb, "^");
+        _type_name(sb, type_as(TypeNodePointer, t)->subtype);
+        break;
+        }
+    default:
+        TODO("unhandled type");
+    }
+}
+
+const char* type_name(TypeHandle t) {
+    switch (t) {
+    case TYPE_VOID: return "VOID";
+    case TYPE_I8:   return "BYTE";
+    case TYPE_U8:   return "UBYTE";
+    case TYPE_I16:  return "INT";
+    case TYPE_U16:  return "UINT";
+    case TYPE_I32:  return "LONG";
+    case TYPE_U32:  return "ULONG";
+    case TYPE_I64:  return "QUAD";
+    case TYPE_U64:  return "UQUAD";
+    case TYPE_INT_CONSTANT: return type_name(an.max_int);
+    default:
+        StringBuilder sb;
+        sb_init(&sb);
+        _type_name(&sb, t);
+        char* str = malloc(sb.len + 1);
+        sb_write(&sb, str);
+        str[sb.len] = '\0';
+        sb_destroy(&sb);
+        return str;
+    }
+}
+
 static TypeHandle create_pointer(TypeHandle to) {
     TypeHandle ptr = type_alloc_slots(slotsof(TypeNodePointer), is_align64(TypeNodePointer));
     type_node(ptr)->kind = TYPE_POINTER;
@@ -35,10 +89,11 @@ static TypeHandle create_pointer(TypeHandle to) {
     return ptr;
 }
 
-TypeHandle type_new_alias_undef() {
+TypeHandle type_new_alias_undef(EntityHandle ent) {
     TypeHandle alias = type_alloc_slots(slotsof(TypeNodeAlias), is_align64(TypeNodeAlias));
     type_node(alias)->kind = TYPE_ALIAS_UNDEF;
     type_as(TypeNodeAlias, alias)->subtype = TYPE_VOID;
+    type_as(TypeNodeAlias, alias)->entity = ent;
     return alias;
 }
 
@@ -54,10 +109,11 @@ bool type_is_complete(TypeHandle t) {
     return true;
 }
 
-TypeHandle type_new_alias(TypeHandle to) {
+TypeHandle type_new_alias(TypeHandle to, EntityHandle ent) {
     TypeHandle alias = type_alloc_slots(slotsof(TypeNodeAlias), is_align64(TypeNodeAlias));
     type_node(alias)->kind = TYPE_ALIAS;
     type_as(TypeNodeAlias, alias)->subtype = to;
+    type_as(TypeNodeAlias, alias)->entity = ent;
     return alias;
 }
 
@@ -326,7 +382,7 @@ EntityHandle etable_search(EntityTable* tbl, char* raw, usize len) {
         if (tbl->entities[index] == 0) {
             break; // this slot is empty, so nothing is after this
         }
-        if (strpool_eq(tbl->name_strings[index], raw, len)) {
+        if (strpool_eq(entity_get(tbl->entities[index])->ident_string, raw, len)) {
             return tbl->entities[index];
         }
     }
@@ -334,13 +390,12 @@ EntityHandle etable_search(EntityTable* tbl, char* raw, usize len) {
     return etable_search(tbl->parent, raw, len);
 }
 
-static inline bool _etbl_put(EntityHandle* entities, Index* name_strings, u32 cap, EntityHandle e, Index name_str, char* raw, usize len) {
+static inline bool _etbl_put(EntityHandle* entities, u32 cap, EntityHandle e, char* raw, usize len) {
     usize hash = FNV_1a(raw, len);
     for_range(i, 0, ENTITY_TABLE_MAX_SEARCH) {
         usize index = (hash + i) % cap;
         if (entities[index] == 0) {
             entities[index] = e;
-            name_strings[index] = name_str;
             return true;
         }
     }
@@ -351,8 +406,9 @@ static inline bool _etbl_put(EntityHandle* entities, Index* name_strings, u32 ca
 void etable_put(EntityTable* tbl, EntityHandle entity, char* raw, usize len) {
 
     Index name_str = strpool_alloc(raw, len);
+    entity_get(entity)->ident_string = name_str;
 
-    if (_etbl_put(tbl->entities, tbl->name_strings, tbl->cap, entity, name_str, raw, len)) {
+    if (_etbl_put(tbl->entities, tbl->cap, entity, raw, len)) {
         return;
     }
 
@@ -364,8 +420,6 @@ void etable_put(EntityTable* tbl, EntityHandle entity, char* raw, usize len) {
     new_cap *= 2;
     EntityHandle* new_entities = malloc(sizeof(tbl->entities[0]) * new_cap);
     memset(new_entities, 0, sizeof(tbl->entities[0]) * new_cap);
-    Index* new_name_strings = malloc(sizeof(tbl->name_strings[0]) * new_cap);
-    memset(new_name_strings, 0, sizeof(tbl->name_strings[0]) * new_cap);
 
     for_range(i, 0, tbl->cap) {
         if (tbl->entities[i] == 0) continue;
@@ -374,20 +428,18 @@ void etable_put(EntityTable* tbl, EntityHandle entity, char* raw, usize len) {
         usize str_len = strlen(str);
 
         bool put = _etbl_put(
-            new_entities, new_name_strings, new_cap, 
-            tbl->entities[i], tbl->name_strings[i],
+            new_entities, new_cap, 
+            tbl->entities[i],
             str, str_len
         );
         if (!put) {
             free(new_entities);
-            free(new_name_strings);
             goto restart;
         }
     }
 
     tbl->cap = new_cap;
     tbl->entities = new_entities;
-    tbl->name_strings = new_name_strings;
 
     // try putting the current thing again
     etable_put(tbl, entity, raw, len);
@@ -399,8 +451,6 @@ EntityTable* etable_new(EntityTable* parent, u32 initial_cap) {
     tbl->cap = initial_cap;
     tbl->entities = malloc(sizeof(tbl->entities[0]) * initial_cap);
     memset(tbl->entities, 0, sizeof(tbl->entities[0]) * initial_cap);
-    tbl->name_strings = malloc(sizeof(tbl->name_strings[0]) * initial_cap);
-    memset(tbl->name_strings, 0, sizeof(tbl->name_strings[0]) * initial_cap);
 
     return tbl;
 }
@@ -504,9 +554,9 @@ TypeHandle sema_ingest_type(EntityTable* tbl, Index pnode) {
         EntityHandle e = etable_search(tbl, t.raw, t.len);
         if (e == 0) { // entity undefined so far
             // create it and point it to an undefined alias
-            TypeHandle type = type_new_alias_undef();
             e = entity_new(tbl);
             entity_get(e)->kind = ENTKIND_TYPENAME;
+            TypeHandle type = type_new_alias_undef(e);
             entity_get(e)->type = type;
             etable_put(tbl, e, t.raw, t.len);
             return type;
@@ -591,6 +641,15 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
     u8 node_kind = parse_node_kind(pnode);
 
     switch (node_kind) {
+    case PN_EXPR_BOOL_TRUE:
+    case PN_EXPR_BOOL_FALSE: {
+        Index boolean = expr_new(SemaExprInteger);
+        expr_as(SemaExpr, boolean)->kind = SE_INTEGER;
+        expr_as(SemaExpr, boolean)->parse_node = pnode;
+        expr_as(SemaExpr, boolean)->type = an.max_uint;
+        expr_as(SemaExprInteger, boolean)->value = node_kind == PN_EXPR_BOOL_TRUE ? 1 : 0;
+        return boolean;
+    }
     case PN_EXPR_IDENT: {
         Index entity_expr = expr_new(SemaExprEntity);
         expr_as(SemaExpr, entity_expr)->kind = SE_ENTITY;
@@ -661,7 +720,7 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
 
     Index decl = stmt_new(SemaStmtDecl);
     stmt_as(SemaStmtDecl, decl)->entity = var;
-    stmt_as(SemaStmtDecl, decl)->kind = ENTKIND_VAR;
+    // stmt_as(SemaStmtDecl, decl)->kind = ENTKIND_VAR;
     stmt_as(SemaStmtDecl, decl)->parse_node = pnode_index;
     
     // type provided
@@ -677,12 +736,10 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
         case TYPE_VARIADIC_FNPTR:
             TODO("cant decl these yet!");
         case TYPE_ALIAS_UNDEF:
-            report_token(false, &an.tb, parse_node(pnode->lhs)->main_token, "use of incomplete type");
+            report_token(true, &an.tb, parse_node(pnode->lhs)->main_token, "use of incomplete type");
         case TYPE_VOID:
-            report_token(false, &an.tb, parse_node(pnode->lhs)->main_token, "variable cannot be VOID");
+            report_token(true, &an.tb, parse_node(pnode->lhs)->main_token, "variable cannot be VOID");
         }
-
-
         // value provided
         if (pnode->rhs != 0) {
             Index value = sema_check_expr(tbl, pnode->rhs);
@@ -700,7 +757,17 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
             
             stmt_as(SemaStmtDecl, decl)->value = value;
         }
+    } else {
+        // take the type from the assigned value
+        Index value = sema_check_expr(tbl, pnode->rhs);
+
+        TypeHandle value_type = expr_as(SemaExpr, value)->type;
+        if (value_type == TYPE_INT_CONSTANT) {
+            expr_as(SemaExpr, value)->type = an.max_int;
+            value_type = an.max_int;
+        }
     }
+    return decl;
 }
 
 Index sema_check_extern_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode) {

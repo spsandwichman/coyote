@@ -395,7 +395,9 @@ enum {
     TYPE_ALIAS, // known
 };
 
+typedef u32 EntityHandle;
 typedef u32 TypeHandle;
+
 #define TYPE_MAX ((1ull << 25) - 1)
 
 #define verify_type(T) static_assert(sizeof(T) % sizeof(TypeNode) == 0)
@@ -411,6 +413,7 @@ static_assert(sizeof(TypeNode) == sizeof(u32));
 typedef struct TypeNodeAlias {
     _TYPE_NODE_BASE
     TypeHandle subtype;
+    EntityHandle entity;
 } TypeNodeAlias;
 verify_type(TypeNodeAlias);
 
@@ -502,8 +505,11 @@ verify_type(TypeNodeVariadicFunction);
 
 #undef verify_type
 
+const char* type_name(TypeHandle t);
+
+
 enum {
-    ENTKIND_VAR,
+    ENTKIND_VAR = 0, // default, variable
     ENTKIND_FN,
     ENTKIND_TYPENAME,
 };
@@ -523,12 +529,15 @@ enum {
 
 typedef u32 EntityHandle;
 
+#define MAX_STRING ((1u << 27) - 1)
+
 // a named thing.
 typedef struct Entity {
     TypeHandle type;
     Index decl_index; // SemaStmt
-    u8 kind;
-    u8 storage;
+    Index ident_string : 27; // index into strpool
+    u8 kind : 2;
+    u8 storage : 3;
 } Entity;
 
 // a scope.
@@ -536,10 +545,11 @@ typedef struct EntityTable EntityTable;
 typedef struct EntityTable {
     EntityTable* parent; // parent scope
 
-    Index* name_strings;
     EntityHandle* entities;
     u32 cap;
 } EntityTable;
+
+Entity* entity_get(EntityHandle e);
 
 typedef struct SemaExpr {
     Index parse_node;
@@ -639,9 +649,16 @@ typedef struct SemaStmtDecl {
     Index value;
 } SemaStmtDecl;
 
+typedef struct SemaStmtGroup {
+    _SEMA_STMT_BASE
+    u16 len;
+    Index stmts[];
+} SemaStmtGroup;
+
 enum {
     SS_VAR_DECL,
     SS_FN_DECL,
+    SS_STMT_GROUP,
 };
 
 typedef struct Analyzer {

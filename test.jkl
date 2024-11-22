@@ -1,2 +1,2 @@
-x : BYTE = 1
-x : BYTE = 1
+x := TRUE
+x := 1
