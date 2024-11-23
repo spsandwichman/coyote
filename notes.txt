@@ -17,6 +17,12 @@ identifiers with all-UPPERCASE are not allowed apparently? coyote allows those
 and i dont feel like artificially removing that rn
 TODO make all-UPPERCASE identifiers (not keywords) illegal
 
-jackal's notion of truth is 0 -> "false", else -> "true". boolean operations
+jackal's notion of truth is 0 -> "false", else -> "true", like C. boolean operations
 are not necessarily guaranteed to produce 1 or TRUE, just a "true" non-zero value, 
 except for the order/comparison operators > < >= <=
+
+binary operators return the type of their left operand, and the right operand
+gets implicitly cast if necessary. I don't really like this but thats how
+the OG compiler works.
+and this means ALL binary operators.
++, -, *, /, %, <<, >>, |, &, ^, !=, =, <, >, <=, >=, AND, OR

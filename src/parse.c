@@ -904,7 +904,7 @@ ParseTree parse_file(TokenBuf tb) {
     p.tree.nodes.kinds = realloc(p.tree.nodes.kinds, sizeof(p.tree.nodes.kinds[0]) * p.tree.nodes.len);
     p.tree.nodes.cap = p.tree.nodes.len;
 
-    p.tree.extra.at = realloc(p.tree.extra.at, sizeof(p.tree.extra.at[0]) * p.tree.extra.len);
+    if (p.tree.extra.len != 0) p.tree.extra.at = realloc(p.tree.extra.at, sizeof(p.tree.extra.at[0]) * p.tree.extra.len);
     p.tree.extra.cap = p.tree.extra.len;
 
     da_destroy(&dynbuf);

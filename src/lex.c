@@ -258,6 +258,7 @@ static void tokenize(Lexer* l) {
                 push_token(TOK_EQ_EQ, 2);
             push_simple_token(TOK_EQ);
         case '\'':
+            ;
             u64 len = 1;
             while (!(lex_peek(l, len) == '\'' && lex_peek(l, len - 1) != '\\')) {
                 if (lex_peek(l, len) == '\0') {
@@ -270,6 +271,7 @@ static void tokenize(Lexer* l) {
             lex_advance_n(l, len + 1);
             goto next_token;
         case '\"':
+            ;
             len = 1;
             while (!(lex_peek(l, len) == '\"' && lex_peek(l, len - 1) != '\\')) {
                 if (lex_peek(l, len) == '\0') {

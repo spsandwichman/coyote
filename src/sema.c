@@ -40,7 +40,8 @@ static void _type_name(StringBuilder* sb, TypeHandle t) {
     case TYPE_U32:  sb_append_c(sb, "ULONG"); break;
     case TYPE_I64:  sb_append_c(sb, "QUAD"); break;
     case TYPE_U64:  sb_append_c(sb, "UQUAD"); break;
-    case TYPE_INT_CONSTANT: sb_append_c(sb, type_name(an.max_int)); break;
+    // case TYPE_INT_CONSTANT: sb_append_c(sb, type_name(an.max_int)); break;
+    case TYPE_INT_CONSTANT: sb_append_c(sb, "<int const>"); break;
     case TYPE_ALIAS:
     case TYPE_ALIAS_UNDEF: {
         Index str_index = entity_get(type_as(TypeNodeAlias, t)->entity)->ident_string;
@@ -69,7 +70,8 @@ const char* type_name(TypeHandle t) {
     case TYPE_U32:  return "ULONG";
     case TYPE_I64:  return "QUAD";
     case TYPE_U64:  return "UQUAD";
-    case TYPE_INT_CONSTANT: return type_name(an.max_int);
+    // case TYPE_INT_CONSTANT: return type_name(an.max_int);
+    case TYPE_INT_CONSTANT: return "<int const>";
     default:
         StringBuilder sb;
         sb_init(&sb);
@@ -248,7 +250,7 @@ bool type_is_concrete_integer(TypeHandle t) {
 }
 
 bool type_can_cast(TypeHandle from, TypeHandle to, bool explicit) {
-    // printf("%d -> %d\n", type_node(from)->kind, type_node(to)->kind);
+    printf("(%d) %d -> (%d) %d\n", from, type_node(from)->kind, to, type_node(to)->kind);
 
     // simple equality
     if (from == to) return true;
@@ -455,7 +457,7 @@ EntityTable* etable_new(EntityTable* parent, u32 initial_cap) {
     return tbl;
 }
 
-EntityHandle entity_new(EntityTable* tbl) {
+EntityHandle entity_new() {
     if (an.entities.len == an.entities.cap) {
         an.entities.cap *= 2;
         an.entities.items = realloc(an.entities.items, sizeof(an.entities.items[0]) * an.entities.cap);
@@ -519,7 +521,7 @@ void sema_init() {
     an.global = etable_new(NULL, 128);
 
     // add null entity
-    assert(entity_new(an.global) == 0);
+    assert(entity_new() == 0);
     
     // init exprs arena
     an.exprs.len = 0;
@@ -554,7 +556,7 @@ TypeHandle sema_ingest_type(EntityTable* tbl, Index pnode) {
         EntityHandle e = etable_search(tbl, t.raw, t.len);
         if (e == 0) { // entity undefined so far
             // create it and point it to an undefined alias
-            e = entity_new(tbl);
+            e = entity_new();
             entity_get(e)->kind = ENTKIND_TYPENAME;
             TypeHandle type = type_new_alias_undef(e);
             entity_get(e)->type = type;
@@ -565,13 +567,13 @@ TypeHandle sema_ingest_type(EntityTable* tbl, Index pnode) {
             return entity_get(e)->type;
         }
         report_token(true, &an.tb, node->main_token, "entity is not a type");
+        break;
     case PN_TYPE_ARRAY:
         subtype = sema_ingest_type(tbl, node->lhs);
         if (!type_is_complete(subtype)) {
             report_token(true, &an.tb, node->main_token, "incomplete type cannot be used");
-        }
+        } 
         TODO("const eval");
-        
     case PN_TYPE_VOID:  return TYPE_VOID;
     case PN_TYPE_BYTE:  return TYPE_U8;
     case PN_TYPE_UBYTE: return TYPE_I8;
@@ -583,10 +585,9 @@ TypeHandle sema_ingest_type(EntityTable* tbl, Index pnode) {
     case PN_TYPE_UQUAD: return TYPE_I64;
     case PN_TYPE_WORD:  return an.max_int;
     case PN_TYPE_UWORD: return an.max_uint;
-    default:
-        crash("unhandled %d", parse_node_kind(pnode));
-        break;
     }
+    crash("unhandled %d", parse_node_kind(pnode));
+    return 0;
 }
 
 static u64 eval_integer(Index token, char* raw, usize len) {
@@ -594,7 +595,7 @@ static u64 eval_integer(Index token, char* raw, usize len) {
         return raw[0] - '0';
     }
     isize value = 0;
-    isize base = 10;
+    usize base = 10;
     if (raw[0] == '0') switch (raw[1]) {
     case 'x':
     case 'X':
@@ -635,12 +636,34 @@ static u64 eval_integer(Index token, char* raw, usize len) {
     return value;
 }
 
+// if the value is an int constant, set its type to the TypeHandle and return it
+// else, insert a cast
+Index sema_insert_implicit_cast(Index value, TypeHandle to) {
+    if (expr_as(SemaExpr, value)->type == TYPE_INT_CONSTANT) {
+        expr_as(SemaExpr, value)->type = to;
+        return value;
+    }
+    Index cast = expr_new(SemaExprUnop);
+    expr_as(SemaExprUnop, cast)->base.kind = SE_IMPLICIT_CAST;
+    expr_as(SemaExprUnop, cast)->base.type = to;
+    expr_as(SemaExprUnop, cast)->sub = value;
+    return cast;
+}
+
 Index sema_check_expr(EntityTable* tbl, Index pnode) {
-    assert(pnode != 0);
+    assert(pnode != 0); // make sure we didn't get a null parse node
     ParseNode* node = parse_node(pnode);
     u8 node_kind = parse_node_kind(pnode);
 
     switch (node_kind) {
+    case PN_EXPR_NULLPTR: {
+        Index boolean = expr_new(SemaExprInteger);
+        expr_as(SemaExpr, boolean)->kind = SE_INTEGER;
+        expr_as(SemaExpr, boolean)->parse_node = pnode;
+        expr_as(SemaExpr, boolean)->type = type_new_pointer(TYPE_VOID);
+        expr_as(SemaExprInteger, boolean)->value = 0;
+        return boolean;
+    }
     case PN_EXPR_BOOL_TRUE:
     case PN_EXPR_BOOL_FALSE: {
         Index boolean = expr_new(SemaExprInteger);
@@ -676,23 +699,25 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
         return integer;
     }
     default:
+        if (_PN_BINOP_BEGIN < node_kind && node_kind < _PN_BINOP_END) {
+            Index lhs = sema_check_expr(tbl, node->lhs);
+            TypeHandle lhs_type = expr_as(SemaExpr, lhs)->type;
+            Index rhs = sema_check_expr(tbl, node->rhs);
+            TypeHandle rhs_type = expr_as(SemaExpr, rhs)->type;
+            if (!type_can_cast(rhs, lhs, false)) {
+                report_token(true, &an.tb, node->main_token, "right '%s' cannot implicit cast to left '%s'", type_name(rhs_type), type_name(lhs_type));
+            }
+
+            if (lhs_type != rhs_type) {
+                rhs = sema_insert_implicit_cast(rhs, lhs_type);
+            }
+
+            TODO("handle from here on out");
+        }
+
         report_token(false, &an.tb, node->main_token, "expression failed to check");
         crash("unrecognized expression kind");
     }
-}
-
-// if the value is an int constant, set its type to the TypeHandle and return it
-// else, insert a cast
-Index sema_insert_implicit_cast(Index value, TypeHandle to) {
-    if (expr_as(SemaExpr, value)->type == TYPE_INT_CONSTANT) {
-        expr_as(SemaExpr, value)->type = to;
-        return value;
-    }
-    Index cast = expr_new(SemaExprUnop);
-    expr_as(SemaExprUnop, cast)->base.kind = SE_IMPLICIT_CAST;
-    expr_as(SemaExprUnop, cast)->base.type = to;
-    expr_as(SemaExprUnop, cast)->sub = value;
-    return cast;
 }
 
 Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode, u8 kind, bool global) {
@@ -714,7 +739,7 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
         report_token(false, &an.tb, pnode->main_token, "entity already declared");
         TODO("check if its EXTERN!");
     }
-    var = entity_new(tbl);
+    var = entity_new();
     entity_get(var)->storage = storage;
     etable_put(tbl, var, ident.raw, ident.len);
 
@@ -737,8 +762,10 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
             TODO("cant decl these yet!");
         case TYPE_ALIAS_UNDEF:
             report_token(true, &an.tb, parse_node(pnode->lhs)->main_token, "use of incomplete type");
+            return 0;
         case TYPE_VOID:
             report_token(true, &an.tb, parse_node(pnode->lhs)->main_token, "variable cannot be VOID");
+            return 0;
         }
         // value provided
         if (pnode->rhs != 0) {
@@ -787,7 +814,7 @@ Index sema_check_stmt(EntityTable* tbl, Index pnode) {
     case PN_STMT_PUBLIC_DECL:
     case PN_STMT_EXPORT_DECL:
     case PN_STMT_PRIVATE_DECL:
-        if (is_global) {
+        if (!is_global) {
             report_token(true, &an.tb, node->main_token - 1, "qualified declaration cannot be local");
         }
     case PN_STMT_DECL:
@@ -796,7 +823,7 @@ Index sema_check_stmt(EntityTable* tbl, Index pnode) {
         return sema_check_extern_var_decl(tbl, pnode, node);
     default:
         report_token(true, &an.tb, node->main_token, "unknown decl");
-        break;
+        return 0;
     }
 }
 

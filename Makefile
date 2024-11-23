@@ -18,7 +18,7 @@ CC = gcc
 LD = gcc
 
 INCLUDEPATHS = -Isrc/
-DEBUGFLAGS = -lm -pg -g
+DEBUGFLAGS = -lm -pg -g -Wall -Wextra 
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
 CFLAGS = -Wno-format -MD -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
 OPT = -O1
