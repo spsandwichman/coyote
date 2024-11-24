@@ -3,7 +3,7 @@ EXTERN x : ^Foo
 x : ^Foo = NULLPTR
 
 STRUCT Foo
-    field: BYTE,
+    field: Bar,
 END
 
 FN set(IN foo: ^Foo, IN y: BYTE): BYTE

@@ -969,6 +969,11 @@ Index sema_check_record_decl(EntityTable* tbl, ParseNode* pnode, Index pnode_ind
         assert(parse_node_kind(field_list->items[i]) == PN_FIELD);
         ParseNode* pfield = parse_node(field_list->items[i]);
         
+        // make sure the type is valid
+        TypeHandle t = sema_ingest_type(tbl, pfield->rhs);
+        if (!type_is_complete(t)) {
+            report_token(true, &an.tb, pfield->main_token + 2, "use of incomplete type");
+        }
     }
     
     TODO("record decl");
