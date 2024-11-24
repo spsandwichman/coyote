@@ -83,7 +83,7 @@ void emit_report(bool error, string source, string path, string highlight, char*
         if (line.raw + i <= highlight.raw) {
             printf(" ");
         } else if (line.raw + i <= highlight.raw + highlight.len) {
-            printf("^");
+            printf("~");
         } else {
             break;
         }

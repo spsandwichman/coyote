@@ -166,6 +166,9 @@ enum {
     PN_COMPOUND_EXPR, // lhs = PNExtraList
     PN_COMPOUND_ITEM, // rhs = indexer, lhs = value
 
+    
+    // DO NOT REARRANGE THESE - important for sema trick
+    // {
     _PN_BINOP_BEGIN,
         PN_EXPR_ADD,
         PN_EXPR_SUB,
@@ -186,6 +189,7 @@ enum {
         PN_EXPR_BOOL_AND,
         PN_EXPR_BOOL_OR,
     _PN_BINOP_END,
+    // }
 
     _PN_UNOP_BEGIN,
         PN_EXPR_DEREF,
@@ -373,7 +377,7 @@ enum {
 
     TYPE_INT_CONSTANT,
 
-    _TYPE_SIMPLE_END, // any types after this are indices into the TypeStructure array
+    _TYPE_SIMPLE_END, // any types after this are indexes
 
     TYPE_POINTER,
     TYPE_ARRAY,
@@ -398,7 +402,8 @@ enum {
 typedef u32 EntityHandle;
 typedef u32 TypeHandle;
 
-#define TYPE_MAX ((1ull << 25) - 1)
+#define TYPEHANDLE_BITS 25
+#define TYPE_MAX ((1ull << TYPEHANDLE_BITS) - 1)
 
 #define verify_type(T) static_assert(sizeof(T) % sizeof(TypeNode) == 0)
 
@@ -476,7 +481,7 @@ typedef struct TypeNodeFunction {
     TypeHandle return_type;
     struct {
         Index name_token; // token index
-        TypeHandle type : 31;
+        TypeHandle type : TYPEHANDLE_BITS;
 
         // this is really a bool, but its u32 because it needs to be 
         // compatible with TypeHandle for bit field to work
@@ -533,11 +538,12 @@ typedef u32 EntityHandle;
 
 // a named thing.
 typedef struct Entity {
-    TypeHandle type;
     Index decl_index; // SemaStmt
     Index ident_string : 27; // index into strpool
-    u8 kind : 2;
-    u8 storage : 3;
+    TypeHandle type : TYPEHANDLE_BITS;
+    u32 kind : 2;
+    u32 storage : 3;
+    u32 is_global : 1;
 } Entity;
 
 // a scope.
@@ -553,8 +559,8 @@ Entity* entity_get(EntityHandle e);
 
 typedef struct SemaExpr {
     Index parse_node;
-    TypeHandle type : 25;
-    u32 kind : 7;
+    TypeHandle type : TYPEHANDLE_BITS;
+    u32 kind : 6;
 } SemaExpr;
 static_assert(sizeof(SemaExpr) == 8);
 
@@ -565,8 +571,14 @@ typedef struct SemaExprEntity {
 
 typedef struct SemaExprInteger {
     SemaExpr base;
-    u64 value;
+    u32 value;
 } SemaExprInteger;
+
+typedef struct SemaExprInteger64 {
+    SemaExpr base;
+    u32 value_low;
+    u32 value_high;
+} SemaExprInteger64;
 
 typedef struct SemaExprBinop {
     SemaExpr base;
@@ -593,12 +605,14 @@ typedef struct SemaExprCompound {
 enum {
     SE_ENTITY,
     SE_INTEGER,
+    SE_INTEGER64,
 
     SE_STRING,
 
     SE_COMPOUND,
 
-    // SemaExprBinop
+    // DO NOT REARRANGE THESE - important for sema trick
+    // {
     SE_ADD,
     SE_SUB,
     SE_MUL,
@@ -615,9 +629,10 @@ enum {
     SE_GREATER,
     SE_LESS_EQ,
     SE_GREATER_EQ,
-    SE_INDEX,
     SE_BOOL_OR,
     SE_BOOL_AND,
+    SE_INDEX,
+    // }
 
     // SemaExprUnop
     SE_BOOL_NOT,
@@ -627,7 +642,7 @@ enum {
     SE_BIT_NOT,
 
     SE_CAST,
-    SE_IMPLICIT_CAST, // same as SE_CAST but inserted by the compiler
+    SE_IMPLICIT_CAST, // same as SE_CAST but only inserted by the compiler
 
     // lmfao
     SE_PASS_OUT,

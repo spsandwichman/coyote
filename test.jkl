@@ -1,4 +1,5 @@
-x := TRUE
+// EXTERN x : ^Foo
 
-y := 2 + 1
+x : ^Foo = NULLPTR
+y := x^
 

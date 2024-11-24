@@ -41,7 +41,7 @@ static void _type_name(StringBuilder* sb, TypeHandle t) {
     case TYPE_I64:  sb_append_c(sb, "QUAD"); break;
     case TYPE_U64:  sb_append_c(sb, "UQUAD"); break;
     // case TYPE_INT_CONSTANT: sb_append_c(sb, type_name(an.max_int)); break;
-    case TYPE_INT_CONSTANT: sb_append_c(sb, "<int const>"); break;
+    case TYPE_INT_CONSTANT: sb_append_c(sb, "<<<int const>>>"); break;
     case TYPE_ALIAS:
     case TYPE_ALIAS_UNDEF: {
         Index str_index = entity_get(type_as(TypeNodeAlias, t)->entity)->ident_string;
@@ -240,6 +240,13 @@ u32 type_align(TypeHandle t) {
     return 0;
 }
 
+TypeHandle type_unalias(TypeHandle t) {
+    while (type_as(TypeNode, t)->kind == TYPE_ALIAS) {
+        t = type_as(TypeNodeAlias, t)->subtype;
+    }
+    return t;
+}
+
 bool type_is_signed(TypeHandle t) {
     assert(t < _TYPE_SIMPLE_END);
     return t & 1;
@@ -249,8 +256,46 @@ bool type_is_concrete_integer(TypeHandle t) {
     return TYPE_I8 <= t && t <= TYPE_U64;
 }
 
+bool type_is_integer(TypeHandle t) {
+    return TYPE_I8 <= t && t <= TYPE_INT_CONSTANT;
+}
+
+bool type_is_integral(TypeHandle t) {
+    u8 kind = type_node(t)->kind;
+    return (TYPE_I8 <= t && t <= TYPE_INT_CONSTANT)
+        || kind == TYPE_POINTER
+        || kind == TYPE_ENUM
+        || kind == TYPE_ENUM64;
+}
+
+bool type_is_equal(TypeHandle from, TypeHandle to) {
+    // simple equality
+    if (from == to) return true;
+    // peel off aliases
+    while (type_node(from)->kind == TYPE_ALIAS) {
+        from = type_as(TypeNodeAlias, from)->subtype;
+    }
+    while (type_node(to)->kind == TYPE_ALIAS) {
+        to = type_as(TypeNodeAlias, to)->subtype;
+    }
+    // simple equality
+    if (from == to) return true;
+    if (type_node(from)->kind != type_node(to)->kind) return false;
+
+    switch (type_node(from)->kind) {
+    case TYPE_POINTER: {
+        TypeHandle from_subtype = type_as(TypeNodePointer, from)->subtype;
+        TypeHandle to_subtype = type_as(TypeNodePointer, to)->subtype;
+        return type_is_equal(from_subtype, to_subtype);
+    }
+
+    default:
+        TODO("");
+    }
+    return 0;
+}
+
 bool type_can_cast(TypeHandle from, TypeHandle to, bool explicit) {
-    printf("(%d) %d -> (%d) %d\n", from, type_node(from)->kind, to, type_node(to)->kind);
 
     // simple equality
     if (from == to) return true;
@@ -355,6 +400,9 @@ static Index strpool_alloc(char* raw, usize len) {
     }
 
     Index str = an.strings.len;
+    if (str >= MAX_STRING) {
+        crash("too many strings!");
+    }
     memcpy(&an.strings.chars[an.strings.len], raw, len);
     an.strings.chars[an.strings.len + len] = '\0'; // NUL terminated
 
@@ -362,7 +410,6 @@ static Index strpool_alloc(char* raw, usize len) {
 
     return str;
 }
-
 
 Entity* entity_get(EntityHandle e) {
     return &an.entities.items[e];
@@ -466,6 +513,7 @@ EntityHandle entity_new() {
 }
 
 #define expr_as(T, e) ((T*)&an.exprs.items[e])
+#define expr_(e) ((SemaExpr*)&an.exprs.items[e])
 #define expr_new(T) expr_alloc_slots(sizeof(T) / sizeof(an.exprs.items[0]))
 #define expr_new_with(T, slots) expr_alloc_slots(sizeof(T) / sizeof(an.exprs.items[0]) + slots)
 
@@ -482,6 +530,7 @@ Index expr_alloc_slots(usize slots) {
 }
 
 #define stmt_as(T, e) ((T*)&an.stmts.items[e])
+#define stmt_(e) ((SemaStmt*)&an.stmts.items[e])
 #define stmt_new(T) stmt_alloc_slots(sizeof(T) / sizeof(an.stmts.items[0]))
 #define stmt_new_with(T, slots) stmt_alloc_slots(sizeof(T) / sizeof(an.stmts.items[0]) + slots)
 
@@ -631,6 +680,7 @@ static u64 eval_integer(Index token, char* raw, usize len) {
         if (cval >= base) {
             report_token(true, &an.tb, token, "'%c' is not a valid base-%d digit", c, base);
         }
+        // TODO add overflow check here
         value = value * base + cval;
     }
     return value;
@@ -639,8 +689,8 @@ static u64 eval_integer(Index token, char* raw, usize len) {
 // if the value is an int constant, set its type to the TypeHandle and return it
 // else, insert a cast
 Index sema_insert_implicit_cast(Index value, TypeHandle to) {
-    if (expr_as(SemaExpr, value)->type == TYPE_INT_CONSTANT) {
-        expr_as(SemaExpr, value)->type = to;
+    if (expr_(value)->type == TYPE_INT_CONSTANT) {
+        expr_(value)->type = to;
         return value;
     }
     Index cast = expr_new(SemaExprUnop);
@@ -650,6 +700,14 @@ Index sema_insert_implicit_cast(Index value, TypeHandle to) {
     return cast;
 }
 
+TypeHandle type_binop_result(TypeHandle lhs, TypeHandle rhs) {
+    if (type_node(lhs)->kind == TYPE_POINTER) return lhs;
+    if (type_node(rhs)->kind == TYPE_POINTER) return rhs;
+    if (lhs == TYPE_INT_CONSTANT) return rhs;
+    // if (rhs == TYPE_INT_CONSTANT) return lhs;
+    return lhs;
+}
+
 Index sema_check_expr(EntityTable* tbl, Index pnode) {
     assert(pnode != 0); // make sure we didn't get a null parse node
     ParseNode* node = parse_node(pnode);
@@ -657,26 +715,47 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
 
     switch (node_kind) {
     case PN_EXPR_NULLPTR: {
-        Index boolean = expr_new(SemaExprInteger);
-        expr_as(SemaExpr, boolean)->kind = SE_INTEGER;
-        expr_as(SemaExpr, boolean)->parse_node = pnode;
-        expr_as(SemaExpr, boolean)->type = type_new_pointer(TYPE_VOID);
-        expr_as(SemaExprInteger, boolean)->value = 0;
-        return boolean;
+        Index ptr = expr_new(SemaExprInteger);
+        expr_(ptr)->kind = SE_INTEGER;
+        expr_(ptr)->parse_node = pnode;
+        expr_(ptr)->type = type_new_pointer(TYPE_VOID);
+        expr_as(SemaExprInteger, ptr)->value = 0;
+        return ptr;
     }
     case PN_EXPR_BOOL_TRUE:
     case PN_EXPR_BOOL_FALSE: {
         Index boolean = expr_new(SemaExprInteger);
-        expr_as(SemaExpr, boolean)->kind = SE_INTEGER;
-        expr_as(SemaExpr, boolean)->parse_node = pnode;
-        expr_as(SemaExpr, boolean)->type = an.max_uint;
+        expr_(boolean)->kind = SE_INTEGER;
+        expr_(boolean)->parse_node = pnode;
+        expr_(boolean)->type = an.max_uint;
         expr_as(SemaExprInteger, boolean)->value = node_kind == PN_EXPR_BOOL_TRUE ? 1 : 0;
         return boolean;
     }
+    case PN_EXPR_INT: {
+        Token t = an.tb.at[node->main_token];
+        u64 value = eval_integer(node->main_token, t.raw, t.len);
+        Index integer;
+        if (value > UINT32_MAX) {
+            integer = expr_new(SemaExprInteger);
+            expr_(integer)->kind = SE_INTEGER;
+        } else {
+            integer = expr_new(SemaExprInteger64);
+            expr_(integer)->kind = SE_INTEGER64;
+        }
+        expr_(integer)->parse_node = pnode;
+        expr_(integer)->type = TYPE_INT_CONSTANT; // this can cast to any integer
+        if (value > UINT32_MAX) {
+            expr_as(SemaExprInteger, integer)->value = (u32) value;
+        } else {
+            expr_as(SemaExprInteger64, integer)->value_low = (u32) value;
+            expr_as(SemaExprInteger64, integer)->value_high = (u32) (value >> 32);
+        }
+        return integer;
+    }
     case PN_EXPR_IDENT: {
         Index entity_expr = expr_new(SemaExprEntity);
-        expr_as(SemaExpr, entity_expr)->kind = SE_ENTITY;
-        expr_as(SemaExpr, entity_expr)->parse_node = pnode;
+        expr_(entity_expr)->kind = SE_ENTITY;
+        expr_(entity_expr)->parse_node = pnode;
 
         Token t = an.tb.at[node->main_token];
         EntityHandle e = etable_search(tbl, t.raw, t.len);
@@ -686,33 +765,48 @@ Index sema_check_expr(EntityTable* tbl, Index pnode) {
         if (entity_get(e)->kind == ENTKIND_TYPENAME) {
             report_token(true, &an.tb, node->main_token, "'%.*s' is a type", t.len, t.raw);
         }
+        expr_as(SemaExprEntity, entity_expr)->entity = e;
         expr_as(SemaExprEntity, entity_expr)->base.type = entity_get(e)->type;
         return entity_expr;
     }
-    case PN_EXPR_INT: {
-        Token t = an.tb.at[node->main_token];
-        Index integer = expr_new(SemaExprInteger);
-        expr_as(SemaExpr, integer)->kind = SE_INTEGER;
-        expr_as(SemaExpr, integer)->parse_node = pnode;
-        expr_as(SemaExpr, integer)->type = TYPE_INT_CONSTANT; // this can cast to any integer
-        expr_as(SemaExprInteger, integer)->value = eval_integer(node->main_token, t.raw, t.len);
-        return integer;
-    }
+    case PN_EXPR_DEREF: {
+        Index deref = expr_new(SemaExprUnop);
+        expr_(deref)->kind = SE_DEREF;
+        expr_(deref)->parse_node = pnode;
+        Index subexpr = sema_check_expr(tbl, node->lhs);
+        expr_as(SemaExprUnop, deref)->sub = subexpr;
+        TypeHandle subexpr_type = type_unalias(expr_(subexpr)->type);
+        if (type_node(subexpr_type)->kind != TYPE_POINTER) {
+            report_token(true, &an.tb, node->main_token, "cannot dereference %s", type_name(subexpr_type));
+        }
+        TypeHandle ptr_subtype = type_as(TypeNodePointer, subexpr_type)->subtype;
+        if (!type_is_complete(ptr_subtype) ) {
+            report_token(true, &an.tb, node->main_token, "use of incomplete type %s", type_name(ptr_subtype));
+        }
+        expr_(deref)->type = type_as(TypeNodePointer, subexpr_type)->subtype;
+        return deref;
+    };
     default:
         if (_PN_BINOP_BEGIN < node_kind && node_kind < _PN_BINOP_END) {
             Index lhs = sema_check_expr(tbl, node->lhs);
-            TypeHandle lhs_type = expr_as(SemaExpr, lhs)->type;
+            TypeHandle lhs_type = expr_(lhs)->type;
             Index rhs = sema_check_expr(tbl, node->rhs);
-            TypeHandle rhs_type = expr_as(SemaExpr, rhs)->type;
-            if (!type_can_cast(rhs, lhs, false)) {
-                report_token(true, &an.tb, node->main_token, "right '%s' cannot implicit cast to left '%s'", type_name(rhs_type), type_name(lhs_type));
+            TypeHandle rhs_type = expr_(rhs)->type;
+
+            if (!type_is_integral(lhs_type) || !type_is_integral(rhs_type)) {
+                report_token(true, &an.tb, node->main_token, "operator undefined for %s and %s", type_name(lhs_type), type_name(rhs_type));
             }
 
-            if (lhs_type != rhs_type) {
-                rhs = sema_insert_implicit_cast(rhs, lhs_type);
-            }
+            TypeHandle result_type = type_binop_result(lhs_type, rhs_type);
 
-            TODO("handle from here on out");
+            Index binop = expr_new(SemaExprBinop);
+            // horrendous. will probably break at some point - too bad!
+            expr_(binop)->kind = node_kind + SE_ADD - PN_EXPR_ADD;
+            expr_(binop)->parse_node = pnode;
+            expr_(binop)->type = result_type;
+            expr_as(SemaExprBinop, binop)->lhs = lhs;
+            expr_as(SemaExprBinop, binop)->rhs = rhs;
+            return binop;
         }
 
         report_token(false, &an.tb, node->main_token, "expression failed to check");
@@ -741,11 +835,12 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
     }
     var = entity_new();
     entity_get(var)->storage = storage;
+    entity_get(var)->is_global = global;
     etable_put(tbl, var, ident.raw, ident.len);
 
     Index decl = stmt_new(SemaStmtDecl);
     stmt_as(SemaStmtDecl, decl)->entity = var;
-    // stmt_as(SemaStmtDecl, decl)->kind = ENTKIND_VAR;
+    stmt_as(SemaStmtDecl, decl)->kind = ENTKIND_VAR;
     stmt_as(SemaStmtDecl, decl)->parse_node = pnode_index;
     
     // type provided
@@ -767,16 +862,17 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
             report_token(true, &an.tb, parse_node(pnode->lhs)->main_token, "variable cannot be VOID");
             return 0;
         }
+        entity_get(var)->type = type;
         // value provided
         if (pnode->rhs != 0) {
             Index value = sema_check_expr(tbl, pnode->rhs);
 
-            TypeHandle value_type = expr_as(SemaExpr, value)->type;
+            TypeHandle value_type = expr_(value)->type;
             // check that the types can implicitly cast
             bool can_implicit_cast = type_can_cast(value_type, type, false);
             if (!can_implicit_cast) {
-                u32 token = parse_node(expr_as(SemaExpr, value)->parse_node)->main_token;
-                report_token(true, &an.tb, token, "types are incompatible");
+                u32 token = parse_node(expr_(value)->parse_node)->main_token;
+                report_token(true, &an.tb, token, "%s cannot implicitly cast to %s", type_name(value_type), type_name(type));
             }
             if (value_type != type) {
                 value = sema_insert_implicit_cast(value, type);
@@ -788,17 +884,30 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
         // take the type from the assigned value
         Index value = sema_check_expr(tbl, pnode->rhs);
 
-        TypeHandle value_type = expr_as(SemaExpr, value)->type;
+        TypeHandle value_type = expr_(value)->type;
         if (value_type == TYPE_INT_CONSTANT) {
-            expr_as(SemaExpr, value)->type = an.max_int;
+            expr_(value)->type = an.max_int;
             value_type = an.max_int;
         }
+        entity_get(var)->type = value_type;
     }
     return decl;
 }
 
 Index sema_check_extern_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode) {
     Token ident = an.tb.at[pnode->main_token];
+
+    TypeHandle decl_type = sema_ingest_type(tbl, pnode->lhs);
+
+    EntityHandle var = etable_search(tbl, ident.raw, ident.len);
+    if (var != 0) { // entity found
+        report_token(false, &an.tb, pnode->main_token, "entity already declared");
+        TODO("check if its EXTERN!");
+    }
+    var = entity_new();
+    entity_get(var)->storage = STORAGE_EXTERN;
+    entity_get(var)->is_global = tbl == an.global;
+    etable_put(tbl, var, ident.raw, ident.len);
 
     TODO("extern var decl");
 }
