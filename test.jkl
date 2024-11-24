@@ -1,5 +1,12 @@
-// EXTERN x : ^Foo
+EXTERN x : ^Foo
 
 x : ^Foo = NULLPTR
-y := x^
 
+STRUCT Foo
+    field: BYTE,
+END
+
+FN set(IN foo: ^Foo, IN y: BYTE): BYTE
+    foo^.field = y
+    RETURN y
+END

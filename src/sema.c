@@ -288,11 +288,12 @@ bool type_is_equal(TypeHandle from, TypeHandle to) {
         TypeHandle to_subtype = type_as(TypeNodePointer, to)->subtype;
         return type_is_equal(from_subtype, to_subtype);
     }
-
+    case TYPE_ALIAS_UNDEF: 
+        return false; // aliases that are not EXACTLY equal arent equal at all
     default:
         TODO("");
     }
-    return 0;
+    return false;
 }
 
 bool type_can_cast(TypeHandle from, TypeHandle to, bool explicit) {
@@ -828,15 +829,32 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
         break;
     }
 
+    TypeHandle extern_type = 0;
     EntityHandle var = etable_search(tbl, ident.raw, ident.len);
     if (var != 0) { // entity found
-        report_token(false, &an.tb, pnode->main_token, "entity already declared");
-        TODO("check if its EXTERN!");
+        u8 var_kind = entity_get(var)->kind;
+        if (var_kind != ENTKIND_VAR) {
+            report_token(true, &an.tb, pnode->main_token, "symbol is not an EXTERN variable");
+        }
+
+        u8 var_storage = entity_get(var)->storage;
+        if (var_storage != STORAGE_EXTERN) {
+            report_token(true, &an.tb, pnode->main_token, "variable already defined");
+        }
+        if (var_storage == STORAGE_EXTERN && !global) {
+            report_token(true, &an.tb, pnode->main_token, "cannot locally define an EXTERN variable");
+        }
+
+
+        extern_type = entity_get(var)->type;
+
+
+    } else {
+        var = entity_new();
+        etable_put(tbl, var, ident.raw, ident.len);
     }
-    var = entity_new();
     entity_get(var)->storage = storage;
     entity_get(var)->is_global = global;
-    etable_put(tbl, var, ident.raw, ident.len);
 
     Index decl = stmt_new(SemaStmtDecl);
     stmt_as(SemaStmtDecl, decl)->entity = var;
@@ -846,8 +864,13 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
     // type provided
     if (pnode->lhs != 0) {
 
-        TypeHandle type = sema_ingest_type(tbl, pnode->lhs);
-        switch (type_node(type)->kind) {
+        TypeHandle decl_type = sema_ingest_type(tbl, pnode->lhs);
+
+        if (extern_type != 0 && !type_is_equal(extern_type, decl_type)) {
+            report_token(true, &an.tb, pnode->main_token, "previous type %s does not match %s", type_name(extern_type), type_name(decl_type));
+        }
+
+        switch (type_node(decl_type)->kind) {
         case TYPE_STRUCT:
         case TYPE_UNION:
         case TYPE_ENUM:
@@ -862,20 +885,20 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
             report_token(true, &an.tb, parse_node(pnode->lhs)->main_token, "variable cannot be VOID");
             return 0;
         }
-        entity_get(var)->type = type;
+        entity_get(var)->type = decl_type;
         // value provided
         if (pnode->rhs != 0) {
             Index value = sema_check_expr(tbl, pnode->rhs);
 
             TypeHandle value_type = expr_(value)->type;
             // check that the types can implicitly cast
-            bool can_implicit_cast = type_can_cast(value_type, type, false);
+            bool can_implicit_cast = type_can_cast(value_type, decl_type, false);
             if (!can_implicit_cast) {
                 u32 token = parse_node(expr_(value)->parse_node)->main_token;
-                report_token(true, &an.tb, token, "%s cannot implicitly cast to %s", type_name(value_type), type_name(type));
+                report_token(true, &an.tb, token, "%s cannot implicitly cast to %s", type_name(value_type), type_name(decl_type));
             }
-            if (value_type != type) {
-                value = sema_insert_implicit_cast(value, type);
+            if (value_type != decl_type) {
+                value = sema_insert_implicit_cast(value, decl_type);
             }
             
             stmt_as(SemaStmtDecl, decl)->value = value;
@@ -898,18 +921,57 @@ Index sema_check_extern_var_decl(EntityTable* tbl, Index pnode_index, ParseNode*
     Token ident = an.tb.at[pnode->main_token];
 
     TypeHandle decl_type = sema_ingest_type(tbl, pnode->lhs);
+    if (decl_type == TYPE_VOID) {
+        report_token(true, &an.tb, pnode->main_token, "variable have type %s", type_name(decl_type));
+    }
 
     EntityHandle var = etable_search(tbl, ident.raw, ident.len);
     if (var != 0) { // entity found
-        report_token(false, &an.tb, pnode->main_token, "entity already declared");
-        TODO("check if its EXTERN!");
+        // report_token(false, &an.tb, pnode->main_token, "entity already declared");
+        u8 var_kind = entity_get(var)->kind;
+        if (var_kind != ENTKIND_VAR) {
+            report_token(true, &an.tb, pnode->main_token, "EXTERN symbol is not a variable");
+        }
+        u8 var_storage = entity_get(var)->storage;
+        if (var_storage == STORAGE_PRIVATE) {
+            report_token(true, &an.tb, pnode->main_token, "cannot EXTERN a PRIVATE variable");
+        }
+        TypeHandle var_type = entity_get(var)->type;
+        if (!type_is_equal(var_type, decl_type)) {
+            report_token(true, &an.tb, pnode->main_token, "previous type %s does not match %s", type_name(var_type), type_name(decl_type));
+        }
+    } else {
+        var = entity_new();
+        entity_get(var)->storage = STORAGE_EXTERN;
+        entity_get(var)->type = decl_type;
+        entity_get(var)->is_global = tbl == an.global;
+        etable_put(tbl, var, ident.raw, ident.len);
     }
-    var = entity_new();
-    entity_get(var)->storage = STORAGE_EXTERN;
-    entity_get(var)->is_global = tbl == an.global;
-    etable_put(tbl, var, ident.raw, ident.len);
 
-    TODO("extern var decl");
+    return 0;
+}
+
+#define as_extra(T, index) ((T*)&an.pt.extra.at[index])
+
+Index sema_check_record_decl(EntityTable* tbl, ParseNode* pnode, Index pnode_index, u8 pnode_kind) {
+    u8 kind = TYPE_STRUCT;
+    switch (pnode_kind) {
+    case PN_STMT_UNION_DECL: kind = TYPE_UNION; break;
+    case PN_STMT_STRUCT_PACKED_DECL: kind = TYPE_PACKED_STRUCT; break;
+    }
+
+    // parse tree references should be stationary now, since it wont ever get added to
+    PNExtraList* field_list = as_extra(PNExtraList, pnode->rhs);
+
+    TypeHandle record = type_new_record(kind, field_list->len);
+
+    for_range(i, 0, field_list->len) {
+        assert(parse_node_kind(field_list->items[i]) == PN_FIELD);
+        ParseNode* pfield = parse_node(field_list->items[i]);
+        
+    }
+    
+    TODO("record decl");
 }
 
 Index sema_check_stmt(EntityTable* tbl, Index pnode) {
@@ -920,16 +982,26 @@ Index sema_check_stmt(EntityTable* tbl, Index pnode) {
     u8 node_kind = parse_node_kind(pnode);
 
     switch (node_kind) {
+        
     case PN_STMT_PUBLIC_DECL:
     case PN_STMT_EXPORT_DECL:
     case PN_STMT_PRIVATE_DECL:
         if (!is_global) {
-            report_token(true, &an.tb, node->main_token - 1, "qualified declaration cannot be local");
+            report_token(true, &an.tb, node->main_token - 1, "qualified declaration must be global");
         }
     case PN_STMT_DECL:
         return sema_check_var_decl(tbl, pnode, node, node_kind, is_global);
     case PN_STMT_EXTERN_DECL:
-        return sema_check_extern_var_decl(tbl, pnode, node);
+        sema_check_extern_var_decl(tbl, pnode, node);
+        return 0; // extern decls dont get added to the sema tree
+    case PN_STMT_STRUCT_DECL:
+    case PN_STMT_STRUCT_PACKED_DECL:
+    case PN_STMT_UNION_DECL:
+        if (!is_global) {
+            report_token(true, &an.tb, node->main_token, "type declaration must be global");
+        }
+        sema_check_record_decl(tbl, node, pnode, node_kind);
+        return 0;
     default:
         report_token(true, &an.tb, node->main_token, "unknown decl");
         return 0;
@@ -942,8 +1014,8 @@ Analyzer sema_analyze(ParseTree pt, TokenBuf tb) {
     an.tb = tb;
 
     for_range(i, 0, pt.len) {
-        Index decl = pt.decls[i];
-        sema_check_stmt(an.global, decl);
+        Index pdecl = pt.decls[i];
+        Index sdecl = sema_check_stmt(an.global, pdecl);
     }
 
     return an;

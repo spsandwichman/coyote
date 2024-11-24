@@ -383,6 +383,7 @@ enum {
     TYPE_ARRAY,
 
     TYPE_STRUCT,
+    TYPE_PACKED_STRUCT,
     TYPE_UNION,
 
     TYPE_ENUM,
@@ -446,7 +447,7 @@ typedef struct TypeNodeRecord {
     // cache the pointer handle inside the struct
     TypeHandle pointer_cache;
     struct {
-        Index name_token; // token index
+        Index name; // strpool index
         TypeHandle type;
     } fields[];
 } TypeNodeRecord;
@@ -457,7 +458,7 @@ typedef struct TypeNodeEnum {
     u16 len;
     TypeHandle underlying;
     struct {
-        Index name_token; // token index
+        Index name; // strpool index
         u32 value;
     } variants[];
 } TypeNodeEnum;
@@ -469,7 +470,7 @@ typedef struct TypeNodeEnum64 {
     u16 len;
     TypeHandle underlying;
     struct {
-        Index name_token; // token index
+        Index name; // strpool index
         u64 value;
     } variants[];
 } TypeNodeEnum64;
@@ -480,7 +481,7 @@ typedef struct TypeNodeFunction {
     u16 len;
     TypeHandle return_type;
     struct {
-        Index name_token; // token index
+        Index name; // strpool index
         TypeHandle type : TYPEHANDLE_BITS;
 
         // this is really a bool, but its u32 because it needs to be 
