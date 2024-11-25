@@ -25,4 +25,4 @@ binary operators return the type of their left operand, and the right operand
 gets implicitly cast if necessary. I don't really like this but thats how
 the OG compiler works.
 and this means ALL binary operators.
-+, -, *, /, %, <<, >>, |, &, ^, !=, =, <, >, <=, >=, AND, OR
++, -, *, /, %, <<, >>, |, &, ^, !=, ==, <, >, <=, >=, AND, OR
