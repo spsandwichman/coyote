@@ -2,10 +2,13 @@
 
 #include "coyote.h"
 #include "front.h"
+#include "sema.h"
+#include "cgen.h"
 
 CoyoteContext ctx;
 
 SourceFile get_source(string path) {
+
     fs_file f;
     fs_get(path, &f);
     
@@ -31,6 +34,11 @@ int main(int argc, char** argv) {
     init_signal_handler();
 #endif
 
+    if (argc == 1) {
+        printf("no path provided\n");
+        exit(0);
+    }
+
     lex_init_keyword_table();
 
     SourceFile src = get_source(str(argv[1]));
@@ -42,6 +50,7 @@ int main(int argc, char** argv) {
     // }
 
     ParseTree pt = parse_file(tb);
-
     Analyzer an = sema_analyze(pt, tb);
+    string cgen = cgen_emit_all(an);
+    printstr(cgen);
 }

@@ -1,11 +1,17 @@
-#include "front.h"
+#include "sema.h"
 #include "strbuilder.h"
 
-Analyzer an;
+static Analyzer an;
 
-#define type_node(t) (&an.types.nodes[t])
 #define slotsof(T) (sizeof(T) / sizeof(an.types.nodes[0]))
-#define type_as(T, x) ((T*)type_node(x))
+
+static usize align_forward(usize ptr, usize align) {
+    if (!is_pow_2(align)) {
+        crash("internal: align is not a power of two (got %zu)\n", align);
+    }
+
+    return (ptr + align - 1) & ~(align - 1);
+}
 
 TypeHandle type_alloc_slots(usize n, bool align_64) {
     if (align_64 && (an.types.len & 1)) {
@@ -216,6 +222,9 @@ u32 type_size(TypeHandle t) {
         return base_sizes[t];
     }
     u8 kind = type_node(t)->kind;
+    switch (kind) {
+    case TYPE_POINTER: return base_sizes[an.max_uint];
+    }
     TODO("todo");
     return 0;
 }
@@ -236,6 +245,9 @@ u32 type_align(TypeHandle t) {
         return base_aligns[t];
     }
     u8 kind = type_node(t)->kind;
+    switch (kind) {
+    case TYPE_POINTER: return base_aligns[an.max_uint];
+    }
     TODO("todo");
     return 0;
 }
@@ -833,13 +845,17 @@ Index sema_check_var_decl(EntityTable* tbl, Index pnode_index, ParseNode* pnode,
     EntityHandle var = etable_search(tbl, ident.raw, ident.len);
     if (var != 0) { // entity found
         u8 var_kind = entity_get(var)->kind;
-        if (var_kind != ENTKIND_VAR) {
-            report_token(true, &an.tb, pnode->main_token, "symbol is not an EXTERN variable");
+        if (var_kind == ENTKIND_TYPENAME) {
+            report_token(true, &an.tb, pnode->main_token, "symbol is a type");
         }
+        if (var_kind == ENTKIND_FN) {
+            report_token(true, &an.tb, pnode->main_token, "symbol is a function");
+        }
+        
 
         u8 var_storage = entity_get(var)->storage;
         if (var_storage != STORAGE_EXTERN) {
-            report_token(true, &an.tb, pnode->main_token, "variable already defined");
+            report_token(true, &an.tb, pnode->main_token, "symbol already declared");
         }
         if (var_storage == STORAGE_EXTERN && !global) {
             report_token(true, &an.tb, pnode->main_token, "cannot locally define an EXTERN variable");
@@ -922,7 +938,7 @@ Index sema_check_extern_var_decl(EntityTable* tbl, Index pnode_index, ParseNode*
 
     TypeHandle decl_type = sema_ingest_type(tbl, pnode->lhs);
     if (decl_type == TYPE_VOID) {
-        report_token(true, &an.tb, pnode->main_token, "variable have type %s", type_name(decl_type));
+        report_token(true, &an.tb, pnode->main_token, "variable cannot store VOID");
     }
 
     EntityHandle var = etable_search(tbl, ident.raw, ident.len);
@@ -953,11 +969,31 @@ Index sema_check_extern_var_decl(EntityTable* tbl, Index pnode_index, ParseNode*
 
 #define as_extra(T, index) ((T*)&an.pt.extra.at[index])
 
-Index sema_check_record_decl(EntityTable* tbl, ParseNode* pnode, Index pnode_index, u8 pnode_kind) {
+#define as_record(x) type_as(TypeNodeRecord, x)
+
+void sema_check_record_decl(EntityTable* tbl, ParseNode* pnode, Index pnode_index, u8 pnode_kind) {
     u8 kind = TYPE_STRUCT;
     switch (pnode_kind) {
     case PN_STMT_UNION_DECL: kind = TYPE_UNION; break;
     case PN_STMT_STRUCT_PACKED_DECL: kind = TYPE_PACKED_STRUCT; break;
+    }
+
+    // make sure this name hasn't already been declared
+    Token* name_token = &an.tb.at[pnode->lhs];
+    EntityHandle ent = etable_search(tbl, name_token->raw, name_token->len);
+    TypeHandle type_alias;
+    if (ent != 0) {
+        if (entity_get(ent)->kind != ENTKIND_TYPENAME || type_node(entity_get(ent)->type)->kind != TYPE_ALIAS_UNDEF) {
+            report_token(true, &an.tb, pnode->lhs, "symbol already declared");
+        }
+        type_alias = entity_get(ent)->type;
+    } else {
+        ent = entity_new();
+        entity_get(ent)->ident_string = strpool_alloc(name_token->raw, name_token->len);
+        entity_get(ent)->is_global = true;
+        entity_get(ent)->kind = ENTKIND_TYPENAME;
+        type_alias = type_new_alias_undef(ent);
+        entity_get(ent)->type = type_alias;
     }
 
     // parse tree references should be stationary now, since it wont ever get added to
@@ -974,9 +1010,52 @@ Index sema_check_record_decl(EntityTable* tbl, ParseNode* pnode, Index pnode_ind
         if (!type_is_complete(t)) {
             report_token(true, &an.tb, pfield->main_token + 2, "use of incomplete type");
         }
+
+        Token* field_token = &an.tb.at[pfield->lhs];
+
+        // make sure the name isn't already present
+        for_range(f, 0, i) {
+            if (strpool_eq(as_record(record)->fields->name, field_token->raw, field_token->len)) {
+                report_token(true, &an.tb, pfield->main_token, "duplicate field name");
+            }
+        }
+
+        usize field_size = type_size(t);
+        usize field_align = type_align(t);
+        usize field_offset = 0;
+        usize new_size = 0;
+        usize new_align = 1;
+
+        switch (kind) {
+        case TYPE_STRUCT:
+            field_offset = align_forward(as_record(record)->size, field_align);
+            new_size = align_forward(field_offset + field_size, new_align);
+            new_align = max(as_record(record)->align, field_align);
+            break;
+        case TYPE_UNION:
+            field_offset = 0;
+            new_size = max(as_record(record)->size, field_size);
+            new_align = max(as_record(record)->align, field_align);
+            break;
+        case TYPE_PACKED_STRUCT:
+            field_offset = as_record(record)->size;
+            new_size = as_record(record)->size + field_size;
+            break;
+        }
+
+        // add field
+        as_record(record)->fields[i].name = strpool_alloc(field_token->raw, field_token->len);
+        as_record(record)->fields[i].type = t;
+        as_record(record)->fields[i].offset = field_offset;
+        as_record(record)->size = new_size;
+        as_record(record)->align = new_align;
     }
-    
-    TODO("record decl");
+
+    // create alias
+    type_node(type_alias)->kind = TYPE_ALIAS;
+    type_as(TypeNodeAlias, type_alias)->subtype = record;
+
+    // TODO("record decl");
 }
 
 Index sema_check_stmt(EntityTable* tbl, Index pnode) {

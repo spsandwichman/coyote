@@ -366,10 +366,11 @@ Index parse_structure_decl(bool is_struct) {
     Index decl = new_node(is_struct ? PN_STMT_STRUCT_DECL : PN_STMT_UNION_DECL);
     node(decl)->main_token = p.cursor;
     advance();
-    if (!is_struct && current()->kind == TOK_KEYWORD_PACKED) {
+    if (is_struct && current()->kind == TOK_KEYWORD_PACKED) {
         set_kind(decl, PN_STMT_STRUCT_PACKED_DECL);
         advance();
     }
+    node(decl)->lhs = p.cursor;
     expect(TOK_IDENTIFIER);
     advance();
 
@@ -568,9 +569,9 @@ Index parse_stmt() {
     case TOK_KEYWORD_FN:
         return parse_fn_decl();
     case TOK_KEYWORD_STRUCT: 
-        return parse_structure_decl(false);
-    case TOK_KEYWORD_UNION:
         return parse_structure_decl(true);
+    case TOK_KEYWORD_UNION:
+        return parse_structure_decl(false);
     case TOK_KEYWORD_ENUM:
         return parse_enum_decl();
     case TOK_KEYWORD_TYPE:

@@ -2,11 +2,17 @@ EXTERN x : ^Foo
 
 x : ^Foo = NULLPTR
 
-STRUCT Foo
-    field: BYTE,
+STRUCT Baz
+    field: INT,
 END
 
-FN set(IN foo: ^Foo, IN y: BYTE): BYTE
-    foo^.field = y
-    RETURN y
+STRUCT Foo
+    field: BYTE,
+    field2: QUAD,
+    ptr: ^Baz,
 END
+
+// FN set(IN foo: ^Foo, IN y: BYTE): BYTE
+//     foo^.field = y
+//     RETURN y
+// END
