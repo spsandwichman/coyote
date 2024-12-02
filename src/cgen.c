@@ -26,46 +26,48 @@ static void emit_structure_typedecl(TypeHandle t) {
     sb_printf(sb, "{}");
 }
 
-void cgen_emit_typedecl(TypeHandle t, char* ident) {
+void cgen_ensure_typedecl(TypeHandle t, const char* ident) {
     if (t < _TYPE_SIMPLE_END) return;
-    // if (type_node(t)->emitted) return; // dont re-emit already emitted types
+    if (type_node(t)->emitted) return; // dont re-emit already emitted types
 
     switch (type_node(t)->kind) {
     case TYPE_ALIAS:
-        char* alias_ident = entity_name(type_as(TypeNodeAlias, t)->entity);
-        cgen_emit_typedecl(type_as(TypeNodeAlias, t)->subtype, alias_ident);
-        // sb_printf(sb, "typedef %s %s;\n", alias_ident, ident);
+        const char* alias_ident = entity_name(type_as(TypeNodeAlias, t)->entity);
+        cgen_ensure_typedecl(type_as(TypeNodeAlias, t)->subtype, alias_ident);
+
+        sb_printf(sb, "typedef %s %s;", alias_ident, ident);
         break;
     case TYPE_STRUCT:
-        if (type_node(t)->visited) {
-            sb_printf(sb, "typedef struct %s %s;\n", ident, ident);
-        } else {
-            type_node(t)->visited = true;
-            
-            // check that all dependencies have been emitted
-            for_range(i, 0, type_as(TypeNodeRecord, t)->len) {
-                cgen_emit_typedecl(type_as(TypeNodeRecord, t)->fields[i].type, "$$");
-            }
-            
-            sb_printf(sb, "typedef struct %s ", ident);
-            emit_structure_typedecl(t);
-            sb_printf(sb, " %s;\n", ident);
-        }
-        break;
-    default:
-        // crash("unhandled typedecl kind");
+        sb_printf(sb, "typedef %s %s;", alias_ident, ident);
     }
-    type_node(t)->emitted = true;
-    type_node(t)->visited = false;
+
+    if (type_node(t)->emitted) return; // dont re-emit already emitted types
 }
 
 void cgen_emit_all_typedecls() {
+    // unknown types just get emitted as anon structs
     for_range(i, 0, an.global->cap) {
-        if (an.global->entities[i] == 0) continue;
-        Entity* ent = entity_get(an.global->entities[i]);
+        EntityHandle ent_handle = an.global->entities[i];
+        if (ent_handle == 0) continue;
+        Entity* ent = entity_get(ent_handle);
         if (ent->kind != ENTKIND_TYPENAME) continue;
 
-        cgen_emit_typedecl(ent->type, "");
+        if (type_node(ent->type)->kind == TYPE_ALIAS_UNDEF) {
+            sb_printf(sb, "typedef struct %s %s;", entity_name(ent_handle), entity_name(ent_handle));
+        }
+    }
+
+    for_range(i, 0, an.global->cap) {
+        EntityHandle ent_handle = an.global->entities[i];
+        if (ent_handle == 0) continue;
+        Entity* ent = entity_get(ent_handle);
+        if (ent->kind != ENTKIND_TYPENAME) continue;
+
+        if (type_node(ent->type)->kind == TYPE_ALIAS_UNDEF) continue;
+
+        const char* name = entity_name(ent_handle);
+        cgen_ensure_typedecl(type_as(TypeNodeAlias, ent->type)->subtype, name);
+        
     }
 }
 
