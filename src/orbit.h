@@ -1,4 +1,4 @@
-#pragma once
+#ifndef ORBIT_H
 #define ORBIT_H
 
 // orbit systems utility header
@@ -16,9 +16,11 @@
 #include <float.h>
 #include <stdalign.h>
 #include <stdnoreturn.h>
+#include <time.h>
 
-#include "orbit/orbit_types.h"
-#include "orbit/orbit_util.h"
-#include "orbit/orbit_da.h"
-#include "orbit/orbit_string.h"
-#include "orbit/orbit_fs.h"
+#include "orbit/type.h"
+#include "orbit/util.h"
+#include "orbit/str.h"
+#include "orbit/newfs.h"
+
+#endif // ORBIT_H

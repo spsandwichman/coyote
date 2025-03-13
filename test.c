@@ -1,10 +1,11 @@
 #include <stdint.h>
-extern uintptr_t x;
-uintptr_t x = 0ULL;
-uintptr_t set(uintptr_t _mng_foo1, uintptr_t _mng_y2) {
+uintptr_t get_b(uintptr_t _mng_f1) {
     uintptr_t _jkl_retv;
-    *(int8_t*)(_mng_foo1) = _mng_y2;
-    _jkl_retv = _mng_y2;
+    uintptr_t __twr_v2;
+    uintptr_t __twr_v3;
+    __twr_v2 = 1ULL;
+    __twr_v3 = _mng_f1 + __twr_v2;
+    _jkl_retv = __twr_v3;
     goto _jkl_epilogue;
     __twr_l1:;
     _jkl_epilogue:;

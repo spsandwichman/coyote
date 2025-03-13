@@ -1,18 +1,8 @@
-EXTERN x : ^Foo
-
-x : ^Foo = NULLPTR
-
-STRUCT Baz
-    field: INT,
+STRUCT PACKED Foo
+    a: BYTE,
+    b: LONG,
 END
 
-STRUCT Foo
-    field: BYTE,
-    field2: QUAD,
-    ptr: ^Baz,
+FN get_b(IN f: ^Foo): ^LONG
+    RETURN &f^.b
 END
-
-// FN set(IN foo: ^Foo, IN y: BYTE): BYTE
-//     foo^.field = y
-//     RETURN y
-// END

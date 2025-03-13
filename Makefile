@@ -1,14 +1,15 @@
 SRCPATHS = \
 	src/*.c \
+	src/orbit/*.c \
 
 SRC = $(wildcard $(SRCPATHS))
 OBJECTS = $(SRC:src/%.c=build/%.o)
 
-EXECUTABLE_NAME = coyote
+EXECUTABLE_NAME = jklpp
 ECHO = echo
 
 ifeq ($(OS),Windows_NT)
-	EXECUTABLE_NAME = coyote.exe
+	EXECUTABLE_NAME = jklpp.exe
 else
 	ECHO = /usr/bin/echo
 	# JANK FIX FOR SANDWICH'S DUMB ECHO ON HIS LINUX MACHINE
@@ -21,7 +22,7 @@ INCLUDEPATHS = -Isrc/
 DEBUGFLAGS = -lm -pg -g -Wall -Wextra 
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
 CFLAGS = -g -Wno-format -MD -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
-OPT = -O0
+OPT = -O2
 
 FILE_NUM = 0
 

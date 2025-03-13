@@ -1,56 +1,50 @@
 #define ORBIT_IMPLEMENTATION
+#include <stdio.h>
+#include "orbit.h"
 
-#include "coyote.h"
-#include "front.h"
-#include "sema.h"
-#include "cgen.h"
-
-CoyoteContext ctx;
-
-SourceFile get_source(string path) {
-
-    fs_file f;
-    fs_get(path, &f);
-    
-    string text = string_alloc(f.size);
-    fs_open(&f, "rb");
-    fs_read_entire(&f, text.raw);
-    fs_close(&f);
-    fs_drop(&f);
-
-    return (SourceFile){
-        .path = path,
-        .text = text,
-    };
-}
-
-void add_source_to_ctx(SourceFile src) {
-    if (ctx.sources.at == NULL) da_init(&ctx.sources, 8);
-    da_append(&ctx.sources, src);
-}
+#include "lex.h"
 
 int main(int argc, char** argv) {
-#ifndef _WIN32
-    init_signal_handler();
-#endif
-
     if (argc == 1) {
-        printf("no path provided\n");
-        exit(0);
+        printf("no file provided\n");
+        return 1;
     }
 
-    lex_init_keyword_table();
+    char* filepath = argv[1];
+    // fs_file file = {0};
+    // if (!fs_get(str(filepath), &file)) return 1;
+    // if (!fs_open(&file, "rb")) return 1;
 
-    SourceFile src = get_source(str(argv[1]));
-    add_source_to_ctx(src);
-    TokenBuf tb = lex_tokenize(&src);
+    // string src = string_alloc(file.size + 1);
+    // fs_read_entire(&file, src.raw);
+    // src.raw[src.len - 1] = ' ';
 
-    // for_range(i, 0, tb.len) {
-    //     printf("%s | %.*s\n", token_kind[tb.at[i].kind], tb.at[i].len, tb.at[i].raw);
+    FsFile* file = fs_open(filepath, false, false);
+    if (file == NULL) {
+        printf("cannot open file %s\n", filepath);
+        return 1;
+    }
+
+    printf("file "str_fmt"\n", str_arg(file->path));
+    printf("size %zu\n", file->size);
+    printf("age  %zu\n", file->youth);
+
+    SrcFile f = {
+        .src = fs_read_entire(file),
+        .path = fs_from_path(&file->path),
+    };
+
+    Vec(Token) tokens = lex_entrypoint(&f);
+
+    printf("%zu tokens\n", tokens.len);
+
+    fs_dir_contents(".", NULL);
+
+    // for_vec(Token* t, &tokens) {
+    //     if (_TOK_PREPROC_BEGIN < t->kind && t->kind < _TOK_PREPROC_END) {
+    //         printf("%s ", token_kind[t->kind]);
+    //         continue;
+    //     }
+    //     printf(str_fmt" ", str_arg(tok_span(*t)));
     // }
-
-    ParseTree pt = parse_file(tb);
-    Analyzer an = sema_analyze(pt, tb);
-    string cgen = cgen_emit_all(an);
-    printstr(cgen);
 }
