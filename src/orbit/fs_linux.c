@@ -1,0 +1,77 @@
+#include "fs.h"
+
+#ifdef OS_LINUX
+
+#include <dirent.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+bool fs_real_path(const char* path, FsPath* out) {
+    if (!realpath(path, out->raw)) return true;
+    out->len = strlen(out->raw);
+    return true;
+}
+
+FsFile* fs_open(const char* path, bool create, bool overwrite) {
+    FsFile* f = malloc(sizeof(FsFile));
+    if (create) {
+        if (overwrite) {
+            f->handle = open(path, O_WRONLY | O_CREAT);
+        } else {
+            f->handle = open(path, O_WRONLY);
+        }
+    } else {
+        f->handle = open(path, O_RDONLY);
+    }
+    
+    if (f->handle == -1) return NULL;
+
+    struct stat info;
+    fstat(f->handle, &info);
+    f->id = info.st_ino;
+    f->size = info.st_size;
+    // convert to microseconds, that's easier and more reliable to deal with in 64 bits
+    f->youth = ((usize)info.st_mtim.tv_sec * 1000000) + (usize)info.st_mtim.tv_nsec / 1000;
+    fs_real_path(path, &f->path);
+    return f;
+}
+
+usize fs_read(FsFile* f, void* buf, usize len) {
+    isize num_read = read(f->handle, buf, len);
+    if (num_read == -1) return 0;
+    return num_read;
+}
+
+string fs_read_entire(FsFile* f) {
+    string s = string_alloc(f->size);
+    read(f->handle, s.raw, s.len);
+    return s;
+}
+void fs_close(FsFile* f) {
+    close(f->handle);
+}
+
+// returns contents. if contents == NULL, return a newly allocated vec.
+Vec(string) fs_dir_contents(const char* path, Vec(string)* _contents) {
+    DIR* d = opendir(path);
+
+    Vec(string) contents = {0};
+    if (_contents == NULL) {
+        contents = vec_new(string, 16);
+    } else {
+        contents = *_contents;
+    }
+    
+    struct dirent* dirent;
+    while ((dirent = readdir(d)) != NULL) {
+        if (strcmp(dirent->d_name, ".")) continue;
+        if (strcmp(dirent->d_name, "..")) continue;
+        vec_append(&contents, string_clone(str(dirent->d_name)));
+    }
+
+    closedir(d);
+    return contents;
+}
+
+#endif

@@ -1,6 +1,9 @@
-#include "newfs.h"
+#include "fs.h"
 
 #ifdef OS_WINDOWS
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 bool fs_real_path(const char* path, FsPath* out) {
     if (GetFullPathNameA(path, PATH_MAX, out->raw, NULL) == 0) {
@@ -60,7 +63,7 @@ FsFile* fs_open(const char* path, bool create, bool overwrite) {
 }
 
 // returns how much was /actually/ read.
-usize fs_read(FsFile* f, u8* buf, usize len) {
+usize fs_read(FsFile* f, void* buf, usize len) {
     DWORD num_read = 0;
     ReadFile((HANDLE)f->handle, buf, len, &num_read, NULL);
     return num_read;
@@ -88,25 +91,24 @@ Vec(string) fs_dir_contents(const char* path, Vec(string)* _contents) {
     search_path[path_len + 1] = '*';
     search_path[path_len + 2] = '\0';
 
-    WIN32_FIND_DATAA data;
-    HANDLE h;
-    if (!FindFirstFileA(search_path, &data)) return contents; // .
-    FindNextFileA(search_path, &data); // ..
 
     if (_contents == NULL) {
-        // contents = vec_new(string, 16);
+        contents = vec_new(string, 16);
     } else {
-        // contents = contents.at;
+        contents = *contents;
     }
 
-    while (FindNextFileA(search_path, &data)) {
-        // printf(":: %s\n", data.cFileName);
-    }
+    WIN32_FIND_DATAA data;
+    HANDLE search_handle = FindFirstFileA(search_path, &data);
+    do {
+        if (strcmp(data.cFileName, ".")) continue;
+        if (strcmp(data.cFileName, "..")) continue;
+        printf(":: %s\n", data.cFileName);
+        vec_append(&contents, string_clone(str(data.cFileName)));
 
-    
+    } while (FindNextFileA(search_handle, &data));
 
-    
-
+    FindClose(search_handle);
     free(search_path);
     return contents;
 }

@@ -21,6 +21,6 @@
 #include "orbit/type.h"
 #include "orbit/util.h"
 #include "orbit/str.h"
-#include "orbit/newfs.h"
+#include "orbit/fs.h"
 
 #endif // ORBIT_H

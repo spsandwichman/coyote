@@ -25,10 +25,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    printf("file "str_fmt"\n", str_arg(file->path));
-    printf("size %zu\n", file->size);
-    printf("age  %zu\n", file->youth);
-
     SrcFile f = {
         .src = fs_read_entire(file),
         .path = fs_from_path(&file->path),
@@ -36,9 +32,7 @@ int main(int argc, char** argv) {
 
     Vec(Token) tokens = lex_entrypoint(&f);
 
-    printf("%zu tokens\n", tokens.len);
-
-    fs_dir_contents(".", NULL);
+    printf("%zu tokens (%zuB used, %zuB capacity)\n", tokens.len, sizeof(Token)*tokens.len, sizeof(Token)*tokens.cap);
 
     // for_vec(Token* t, &tokens) {
     //     if (_TOK_PREPROC_BEGIN < t->kind && t->kind < _TOK_PREPROC_END) {

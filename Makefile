@@ -5,11 +5,11 @@ SRCPATHS = \
 SRC = $(wildcard $(SRCPATHS))
 OBJECTS = $(SRC:src/%.c=build/%.o)
 
-EXECUTABLE_NAME = jklpp
+EXECUTABLE_NAME = coyote
 ECHO = echo
 
 ifeq ($(OS),Windows_NT)
-	EXECUTABLE_NAME = jklpp.exe
+	EXECUTABLE_NAME = coyote.exe
 else
 	ECHO = /usr/bin/echo
 	# JANK FIX FOR SANDWICH'S DUMB ECHO ON HIS LINUX MACHINE
