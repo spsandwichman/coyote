@@ -1,5 +1,5 @@
-#ifndef ORBIT_NEWFS_H
-#define ORBIT_NEWFS_H
+#ifndef ORBIT_FS_H
+#define ORBIT_FS_H
 
 #define _XOPEN_SOURCE 700
 
@@ -13,7 +13,8 @@
 #include <string.h>
 
 #if defined(OS_WINDOWS)
-
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
 #elif defined(OS_LINUX)
     #include <limits.h>
 #else
@@ -35,15 +36,15 @@ typedef struct FsFile {
 } FsFile;
 
 #define fs_from_path(pathptr) (string){.len = (pathptr)->len, .raw = (pathptr)->raw}
+
 bool fs_real_path(const char* path, FsPath* out);
 FsFile* fs_open(const char* path, bool create, bool overwrite);
 usize fs_read(FsFile* f, void* buf, usize len);
 string fs_read_entire(FsFile* f);
 void fs_close(FsFile* f);
 
-bool fs_exists(const char* path);
-bool fs_is_directory(const char* path);
-bool fs_is_file(const char* path);
+char* fs_get_current_dir();
+bool fs_set_current_dir(const char* dir);
 
 Vec_typedef(string);
 // returns contents. if contents == NULL, return a newly allocated vec.

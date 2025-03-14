@@ -65,8 +65,8 @@ Vec(string) fs_dir_contents(const char* path, Vec(string)* _contents) {
     
     struct dirent* dirent;
     while ((dirent = readdir(d)) != NULL) {
-        if (strcmp(dirent->d_name, ".")) continue;
-        if (strcmp(dirent->d_name, "..")) continue;
+        if (strcmp(dirent->d_name, ".") == 0) continue;
+        if (strcmp(dirent->d_name, "..") == 0) continue;
         vec_append(&contents, string_clone(str(dirent->d_name)));
     }
 

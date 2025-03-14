@@ -2,9 +2,6 @@
 
 #ifdef OS_WINDOWS
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
 bool fs_real_path(const char* path, FsPath* out) {
     if (GetFullPathNameA(path, PATH_MAX, out->raw, NULL) == 0) {
         return false;
@@ -24,19 +21,20 @@ bool fs_real_path(const char* path, FsPath* out) {
 FsFile* fs_open(const char* path, bool create, bool overwrite) {
     FsFile* f = malloc(sizeof(FsFile));
     if (create) {
-        f->handle = (void*) CreateFileA(
+        f->handle = (isize) CreateFileA(
             path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, 
             overwrite ? CREATE_ALWAYS : CREATE_NEW,
             0, 0
         );
     } else {
-        f->handle = (void*) CreateFileA(
+        f->handle = (isize) CreateFileA(
             path, GENERIC_READ, FILE_SHARE_READ, NULL, 
             overwrite ? OPEN_ALWAYS : OPEN_EXISTING,
             0, 0
         );
     }
-    if (f->handle == INVALID_HANDLE_VALUE) {
+
+    if ((void*) f->handle == INVALID_HANDLE_VALUE) {
         return NULL;
     }
 
@@ -47,15 +45,15 @@ FsFile* fs_open(const char* path, bool create, bool overwrite) {
 
     windows_why_are_u_say_zis.HighPart = info.nFileIndexHigh;
     windows_why_are_u_say_zis.LowPart  = info.nFileIndexLow;
-    f->id = (usize)windows_why_are_u_say_zis.QuadPart;
+    f->id = (usize) windows_why_are_u_say_zis.QuadPart;
 
     windows_why_are_u_say_zis.HighPart = info.ftLastWriteTime.dwHighDateTime;
     windows_why_are_u_say_zis.LowPart  = info.ftLastWriteTime.dwLowDateTime;
-    f->youth = (usize)windows_why_are_u_say_zis.QuadPart;
+    f->youth = (usize) windows_why_are_u_say_zis.QuadPart;
 
     windows_why_are_u_say_zis.HighPart = info.nFileSizeHigh;
     windows_why_are_u_say_zis.LowPart  = info.nFileSizeLow;
-    f->size = (usize)windows_why_are_u_say_zis.QuadPart;
+    f->size = (usize) windows_why_are_u_say_zis.QuadPart;
 
     fs_real_path(path, &f->path);
 
@@ -89,21 +87,23 @@ Vec(string) fs_dir_contents(const char* path, Vec(string)* _contents) {
     memcpy(search_path, path, path_len);
     search_path[path_len] = '/';
     search_path[path_len + 1] = '*';
-    search_path[path_len + 2] = '\0';
-
+    search_path[path_len + 2] = 0;
 
     if (_contents == NULL) {
         contents = vec_new(string, 16);
     } else {
-        contents = *contents;
+        contents = *_contents;
     }
 
     WIN32_FIND_DATAA data;
     HANDLE search_handle = FindFirstFileA(search_path, &data);
+    if (search_handle == INVALID_HANDLE_VALUE) {
+        return contents;
+    }
+
     do {
-        if (strcmp(data.cFileName, ".")) continue;
-        if (strcmp(data.cFileName, "..")) continue;
-        printf(":: %s\n", data.cFileName);
+        if (strcmp(data.cFileName, ".") == 0) continue;
+        if (strcmp(data.cFileName, "..") == 0) continue;
         vec_append(&contents, string_clone(str(data.cFileName)));
 
     } while (FindNextFileA(search_handle, &data));
@@ -111,6 +111,18 @@ Vec(string) fs_dir_contents(const char* path, Vec(string)* _contents) {
     FindClose(search_handle);
     free(search_path);
     return contents;
+}
+
+char* fs_get_current_dir() {
+    usize required = GetCurrentDirectoryA(0, NULL);
+    char* current_dir = malloc(required + 1);
+    current_dir[required] = 0;
+    GetCurrentDirectoryA(required, current_dir);
+    return current_dir;
+}
+
+bool fs_set_current_dir(const char* dir) {
+    SetCurrentDirectoryA(dir);
 }
 
 #endif
