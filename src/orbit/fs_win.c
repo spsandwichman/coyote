@@ -49,7 +49,7 @@ FsFile* fs_open(const char* path, bool create, bool overwrite) {
 
     windows_why_are_u_say_zis.HighPart = info.ftLastWriteTime.dwHighDateTime;
     windows_why_are_u_say_zis.LowPart  = info.ftLastWriteTime.dwLowDateTime;
-    f->youth = (usize) windows_why_are_u_say_zis.QuadPart;
+    f->last_modified = (usize) windows_why_are_u_say_zis.QuadPart;
 
     windows_why_are_u_say_zis.HighPart = info.nFileSizeHigh;
     windows_why_are_u_say_zis.LowPart  = info.nFileSizeLow;
@@ -76,6 +76,14 @@ string fs_read_entire(FsFile* f) {
 
 void fs_close(FsFile* f) {
     CloseHandle((HANDLE)f->handle);
+    f->handle = (isize)INVALID_HANDLE_VALUE;
+}
+
+void fs_destroy(FsFile* f) {
+    if (f->handle != 0 && f->handle != (isize)INVALID_HANDLE_VALUE) {
+        fs_close(f);
+    }
+    free(f);
 }
 
 Vec(string) fs_dir_contents(const char* path, Vec(string)* _contents) {

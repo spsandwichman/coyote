@@ -25,13 +25,20 @@ int main(int argc, char** argv) {
 
     Vec(Token) tokens = lex_entrypoint(&f);
 
-    printf("%zu chars -> %zu tokens (%zuB used, %zuB capacity)\n", file->size, tokens.len, sizeof(Token)*tokens.len, sizeof(Token)*tokens.cap);
+    // printf("%zu chars -> %zu tokens (%zuB used, %zuB capacity)\n", file->size, tokens.len, sizeof(Token)*tokens.len, sizeof(Token)*tokens.cap);
 
-    // for_vec(Token* t, &tokens) {
-    //     if (_TOK_PREPROC_BEGIN < t->kind && t->kind < _TOK_PREPROC_END) {
-    //         printf("%s ", token_kind[t->kind]);
-    //         continue;
-    //     }
-    //     printf(str_fmt" ", str_arg(tok_span(*t)));
-    // }
+    for_vec(Token* t, &tokens) {
+        if (_TOK_PREPROC_BEGIN < t->kind && t->kind < _TOK_PREPROC_END) {
+            printf("%s ", token_kind[t->kind]);
+            continue;
+        }
+        if (t->kind == TOK_STRING) {
+            printf("\"");
+        }
+        printf(str_fmt, str_arg(tok_span(*t)));
+        if (t->kind == TOK_STRING) {
+            printf("\"");
+        }
+        printf(" ");
+    }
 }

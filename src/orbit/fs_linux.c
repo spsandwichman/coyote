@@ -32,7 +32,7 @@ FsFile* fs_open(const char* path, bool create, bool overwrite) {
     f->id = info.st_ino;
     f->size = info.st_size;
     // convert to microseconds, that's easier and more reliable to deal with in 64 bits
-    f->youth = ((usize)info.st_mtim.tv_sec * 1000000) + (usize)info.st_mtim.tv_nsec / 1000;
+    f->last_modified = ((usize)info.st_mtim.tv_sec * 1000000) + (usize)info.st_mtim.tv_nsec / 1000;
     fs_real_path(path, &f->path);
     return f;
 }
@@ -50,6 +50,14 @@ string fs_read_entire(FsFile* f) {
 }
 void fs_close(FsFile* f) {
     close(f->handle);
+    f->handle = -1;
+}
+
+void fs_destroy(FsFile* f) {
+    if (f->handle != 0 && f->handle != -1) {
+        fs_close(f);
+    }
+    free(f);
 }
 
 // returns contents. if contents == NULL, return a newly allocated vec.

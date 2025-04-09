@@ -11,37 +11,40 @@
 *)
 
 (* comma-separated list with optional trailing comma *)
-list<X> = [X {"," X} [","]]
+list<X> = [X {"," X} [","]];
 
-file = {decl}
+file = {decl};
 
-storageclass = PUBLIC | PRIVATE | EXPORT
+storageclass = PUBLIC | PRIVATE | EXPORT;
 
 decl =
-    | [storageclass] ident ":" type ["=" (expr | compoundexpr)]
-    | [storageclass] ident ":" "=" (expr | compoundexpr)
+    | [storageclass] ident ":" type ["=" expr]
+    | [storageclass] ident ":" "=" expr
     | [storageclass] fndecl
     | EXTERN ident ":" type     (* EXTERN parses differently so it cant go in storageclass *)
     | EXTERN FN fnproto 
     | typedecl
+    ;
 
-fnproto = ["(" type ")"] ident "(" list<param> ")" [":" type]
-fndecl = FN fnproto {stmt} END
+fnproto = ["(" type ")"] ident "(" list<param> ")" [":" type];
+fndecl = FN fnproto {stmt} END;
 typedecl = 
     | STRUCT [PACKED] ident list<field> END
     | UNION ident list<field> END
     | ENUM ident ":" type list<variant> END
     | TYPE ident ":" type
     | FNPTR fnproto
+    ;
 
-param = (IN | OUT) field | "..." ident ident (* fn and fnptr *)
-field = ident ":" type                       (* structs and unions *)
-variant = ident | ident "=" expr             (* enums *)
+param = (IN | OUT) field | "..." ident ident; (* fn and fnptr *)
+field = ident ":" type;                       (* structs and unions *)
+variant = ident | ident "=" expr;             (* enums *)
 
 assignop = 
     | "=" 
     | "+=" | "-=" | "*=" | "/=" | "%=" 
     | "&=" | "|=" | "$=" | "<<=" | ">>="
+    ;
 
 stmt = 
     | expr
@@ -57,53 +60,57 @@ stmt =
     | NOTHING         (* blank statement *)
     | IF expr THEN {stmt} (END | else)
     | WHILE expr DO {stmt} END
+    ;
 
 else = 
     | ELSEIF expr THEN {stmt} else
     | ELSE {stmt} END
+    ;
 
 binop =
     | "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "|" | "&" | "$"
     | "!=" | "==" | "<" | ">" | "<=" | ">=" | AND | OR
+    ;
 
-compoundexpr = 
-    | "{" list<item> "}"
-    | "{" list<expr> "}"
-
-item = "[" expr "]" "=" expr
-
+item = "[" expr "]" "=" expr;
 
 expr = 
     | expr binop expr         (* no precedence for now its ok *)
     | unary
+    ;
 
-unop =
-    | "&" | "-" | "~" | NOT | SIZEOFVALUE
+unop = "&" | "-" | "~" | NOT | SIZEOFVALUE;
 
 unary = 
     | CONTAINEROF expr TO type "." ident {"." ident}
     | CAST expr TO type
     | unop unary
     | atomic
+    ;
 
 atomic = 
     | ident | literal | TRUE | FALSE | NULLPTR
     | "(" expr ")"
+    | "{" list<item> "}"
+    | "{" list<expr> "}"
     | OFFSETOF type "." ident
     | SIZEOF type
     | atomic "[" expr "]"
     | atomic "^"
     | atomic "." ident
     | atomic "(" list<argument> ")"
+    ;
 
-argument = [OUT] expr
+argument = [OUT] expr;
 
 type = 
     | basetype
     | basetype "[" expr "]"
+    ;
 
 basetype = 
     | QUAD | UQUAD | LONG | ULONG | INT | UINT | BYTE | UBYTE | VOID
     | ident
     | "(" type ")"
     | "^" basetype
+    ;

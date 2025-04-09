@@ -457,9 +457,18 @@ static i64 eval_integer(Token t) {
     return 123;
 }
 
+// resolve escape sequences, etc.
+static CompactString string_value(CompactString s) {
+    // if the string contains no escape sequences,
+    // we can return a slice of the input without 
+    // the initial and final quotes
+}
+
 static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
     PreprocVal v = {0};
     Token t = lex_next_raw(l);
+    v.raw = t.raw;
+    v.len = t.len;
 
     switch (t.kind) {
     case TOK_OPEN_BRACKET:
@@ -468,7 +477,9 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
         break;
     case TOK_IDENTIFIER:
         string span = tok_span(t);
-        if (replacement_exists(span, scope)) {
+        if (string_eq(span, constr("JKL_FUNC_NAME"))) {
+            
+        } else if (replacement_exists(span, scope)) {
             v = get_replacement_value(span, scope);
         } else {
             TODO("error: preprocessor symbol undefined");
@@ -476,8 +487,6 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
         break;
     case TOK_INTEGER:
         v.kind = PPVAL_INTEGER;
-        v.raw = t.raw;
-        v.len = t.len;
         v.integer = eval_integer(t);
         break;
     case TOK_OPEN_PAREN:
@@ -494,7 +503,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
             } else if (string_eq(tok_span(op), constr("STRCAT"))) {
                 PreprocVal lhs = preproc_collect_value(l, scope);
                 PreprocVal rhs = preproc_collect_value(l, scope);
-                if (lhs.kind != PPVAL_STRING || rhs.kind != PPVAL_STRING) {
+                if (lhs.kind != PPVAL_STRING && rhs.kind != PPVAL_STRING) {
                     TODO("error: expected string");
                 }
                 // dirty!
@@ -509,7 +518,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
             } else if (string_eq(tok_span(op), constr("STRCMP"))) {
                 PreprocVal lhs = preproc_collect_value(l, scope);
                 PreprocVal rhs = preproc_collect_value(l, scope);
-                if (lhs.kind != PPVAL_STRING || rhs.kind != PPVAL_STRING) {
+                if (lhs.kind != PPVAL_STRING && rhs.kind != PPVAL_STRING) {
                     TODO("error: expected string");
                 }
                 v.kind = PPVAL_INTEGER;
@@ -517,7 +526,6 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
             } else {
                 TODO("error: invalid operator");
             }
-            break;
         } else if ((TOK_PLUS <= op.kind && op.kind <= TOK_GREATER) 
             || op.kind == TOK_KEYWORD_AND || op.kind == TOK_KEYWORD_OR) 
         {
@@ -570,10 +578,14 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
         if (lex_next_raw(l).kind != TOK_CLOSE_PAREN) {
             TODO("error: expected )");
         }
-        
+        break;
+    case TOK_STRING:
+        v.kind = PPVAL_STRING;
+        v.string.len = t.len - 2;
+        v.string.raw = t.raw + 1;
         break;
     default:
-        TODO("error: expected value");
+        TODO("error: expected value, got token '%s'", token_kind[t.kind]);
     }
 
     return v;
@@ -734,6 +746,13 @@ static void emit_preproc_val(PreprocVal val, Vec(Token)* tokens, PreprocScope* s
         lex_with_preproc(&local_lexer, tokens, local_scope);
         preproc_val_pool.len = saved_ppv_len; // allow reuse of pool space
         macro_arg_pool.len = saved_ma_len; // allow reuse of pool space
+        break;
+    case PPVAL_STRING:
+        Token t;
+        t.kind = TOK_STRING;
+        t.len = val.string.len;
+        t.raw = val.string.raw;
+        vec_append(tokens, t);
         break;
     default:
         UNREACHABLE;

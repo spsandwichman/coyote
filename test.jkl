@@ -1,8 +1,20 @@
-STRUCT PACKED Foo
-    a: BYTE,
-    b: LONG,
-END
+#MACRO KeAssert ( expression ) [
+    #DEFINE EXPR_STRING ( STRCAT ( STRCAT "'" expression ) "'" )
+    #DEFINE FN_STRING ( STRCAT ( STRCAT "\"" JKL_FILE_NAME ) "\"" )
+    #DEFINE LN_STRING ( STRCAT "" JKL_LINE_NUMBER )
 
-FN get_b(IN f: ^Foo): ^LONG
-    RETURN &f^.b
-END
+    // IF NOT (expression) THEN
+    //     KeCrash (
+    //         "%s%s:%d: %s\n", // fmt
+    //         &KiAssertionMessage[0],
+    //         FN_STRING,
+    //         LN_STRING,
+    //         EXPR_STRING,
+    //     )
+    // END
+
+    EXPR_STRING
+]
+
+
+KeAssert(1 + 2)

@@ -31,7 +31,7 @@ typedef struct FsFile {
     usize id;
     usize size;
     // units unspecified, but greater means more recent
-    usize youth;
+    usize last_modified;
     FsPath path;
 } FsFile;
 
@@ -42,6 +42,7 @@ FsFile* fs_open(const char* path, bool create, bool overwrite);
 usize fs_read(FsFile* f, void* buf, usize len);
 string fs_read_entire(FsFile* f);
 void fs_close(FsFile* f);
+void fs_destroy(FsFile* f);
 
 char* fs_get_current_dir();
 bool fs_set_current_dir(const char* dir);

@@ -1,5 +1,8 @@
 #include "parse.h"
 
-// static struct {
-    
-// } type_buffer;
+static struct {
+    TypeBufSlot* at;
+    u32 len;
+    u32 cap;
+} type_buffer;
+
