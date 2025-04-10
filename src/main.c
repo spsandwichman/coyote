@@ -4,6 +4,8 @@
 
 #include "lex.h"
 
+#include "iron/iron.h"
+
 int main(int argc, char** argv) {
     if (argc == 1) {
         printf("no file provided\n");
@@ -41,4 +43,6 @@ int main(int argc, char** argv) {
         }
         printf(" ");
     }
+
+    fe_init_signal_handler();
 }

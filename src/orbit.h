@@ -18,9 +18,9 @@
 #include <stdnoreturn.h>
 #include <time.h>
 
-#include "orbit/type.h"
-#include "orbit/util.h"
-#include "orbit/str.h"
-#include "orbit/fs.h"
+#include "common/type.h"
+#include "common/util.h"
+#include "common/str.h"
+#include "common/fs.h"
 
 #endif // ORBIT_H

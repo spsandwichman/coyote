@@ -1,6 +1,7 @@
 SRCPATHS = \
 	src/*.c \
-	src/orbit/*.c \
+	src/iron/*.c \
+	src/common/*.c \
 
 SRC = $(wildcard $(SRCPATHS))
 OBJECTS = $(SRC:src/%.c=build/%.o)
@@ -21,7 +22,7 @@ LD = gcc
 INCLUDEPATHS = -Isrc/
 DEBUGFLAGS = -lm -pg -g -Wall -Wextra 
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
-CFLAGS = -g -Wno-format -MD -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
+CFLAGS = -g -rdynamic -Wno-format -MD -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
 OPT = -O2
 
 FILE_NUM = 0

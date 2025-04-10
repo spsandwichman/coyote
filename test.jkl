@@ -1,7 +1,8 @@
 #MACRO KeAssert ( expression ) [
-    #DEFINE EXPR_STRING ( STRCAT ( STRCAT "'" expression ) "'" )
-    #DEFINE FN_STRING ( STRCAT ( STRCAT "\"" JKL_FILE_NAME ) "\"" )
-    #DEFINE LN_STRING ( STRCAT "" JKL_LINE_NUMBER )
+    #DEFINE EXPR_STRING expression
+    // #DEFINE EXPR_STRING ( STRCAT ( STRCAT "'" expression ) "'" )
+    // #DEFINE FN_STRING ( STRCAT ( STRCAT "\"" JKL_FILE_NAME ) "\"" )
+    // #DEFINE LN_STRING ( STRCAT "" JKL_LINE_NUMBER )
 
     // IF NOT (expression) THEN
     //     KeCrash (

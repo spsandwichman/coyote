@@ -3,8 +3,8 @@
 
 #include <assert.h>
 #include "orbit.h"
-#include "orbit/vec.h"
-#include "orbit/strmap.h"
+#include "common/vec.h"
+#include "common/strmap.h"
 
 #define _LEX_KEYWORDS_ \
     T(AND) \

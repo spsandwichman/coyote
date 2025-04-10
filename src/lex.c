@@ -864,7 +864,7 @@ static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) 
                 if (val.kind == PPVAL_MACRO) {
                     vec_append(tokens, preproc_token(TOK_PREPROC_MACRO_PASTE, span));
                     collect_macro_args_and_emit(l, val, tokens, scope);
-                    vec_append(tokens, preproc_token_no_span(TOK_PREPROC_MACRO_PASTE));
+                    vec_append(tokens, preproc_token_no_span(TOK_PREPROC_PASTE_END));
                 } else {
                     vec_append(tokens, preproc_token(val.is_macro_arg ? TOK_PREPROC_MACRO_ARG_PASTE 
                                                                       : TOK_PREPROC_DEFINE_PASTE, span));
