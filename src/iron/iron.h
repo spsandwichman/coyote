@@ -41,21 +41,46 @@ typedef _Float16 f16;
     #define for_n(iterator, start, end) for (usize iterator = (start); iterator < (end); ++iterator)
 #endif
 
+// crash at runtime with a stack trace (if available)
 void fe_runtime_crash(const char* error, ...);
+
+// initialize signal handler that calls fe_runtime_crash
+// in the event of a bad signal
 void fe_init_signal_handler();
 
 typedef struct FeInst FeInst;
 typedef struct FeBlock FeBlock;
+typedef struct FeSymbol FeSymbol;
 typedef struct FeFunction FeFunction;
+typedef struct FeFunctionPrototype FeFunctionPrototype;
 typedef struct FeModule FeModule;
 
-// typedef struct FeTargetDef {
+typedef struct FeFunction {
+    FeBlock* entry_block;
+} FeFunction;
 
-// } FeTargetDef;
+typedef struct FeFunctionPrototype {
+    
+} FeFunctionPrototype;
+
+enum FeArchEnum {
+    FE_ARCH_NONE = 0,
+    FE_ARCH_XR,
+};
 
 typedef struct FeBlock {
     FeInst* bookend;
+    FeFunction* funk;
+    FeBlock* list_next;
+    FeBlock* list_prev;
 } FeBlock;
+
+#define for_inst(inst, blockptr) \
+    for (FeInst* inst = (blockptr)->bookend->next; inst->kind != FE_BOOKEND; inst = inst->next)
+
+#define for_inst_reverse(inst, blockptr) \
+    for (FeInst* inst = (blockptr)->bookend->prev; inst->kind != FE_BOOKEND; inst = inst->prev)
+
 
 enum FeTyEnum {
     FE_TY_VOID,
@@ -99,11 +124,22 @@ enum FeInstKindEnum {
     FE_ILE, FE_ULE,
     FE_EQ,
     FE_NE,
+
+    FE_FADD,
+    FE_FSUB,
+    FE_FMUL,
+    FE_FDIV,
+    FE_FREM,
     
     // Unop
     FE_MOV,
     FE_NOT,
     FE_NEG,
+    FE_TRUNCATE, // integer downcast
+    FE_SIGNEXT,  // signed integer upcast
+    FE_ZEROEXT,  // unsigned integer upcast
+    FE_INTTOFLOAT,  // integer to float
+    FE_FLOATTOINT,  // float to integer
 
     // Load
     FE_LOAD,
@@ -119,10 +155,16 @@ enum FeInstKindEnum {
     FE_CASCADE_VOLATILE,
     FE_CASCADE_UNIQUE,
 
-    
+    // Branch
+    FE_BRANCH,
+
+    // Jump
+    FE_JUMP,
+
     _FE_BASE_INST_MAX,
 
-    _FE_XR_INST_START,
+    // architecture-specific nodes.
+    _FE_XR_INST_START = FE_ARCH_XR * 256,
     _FE_XR_INST_END = _FE_XR_INST_START + 256,
 
     _FE_INST_MAX,
@@ -131,14 +173,15 @@ enum FeInstKindEnum {
 typedef struct FeInst {
     u16 kind;
     u8 ty;
+    u32 flags; // for various things
     FeInst* prev;
     FeInst* next;
 
     usize extra[];
 } FeInst;
 
-#define fe_extra(instptr) ((void*)&(instptr)->extra)
-#define fe_extra_T(instptr, T) ((T*)&(instptr)->extra)
+#define fe_extra(instptr) ((void*)&(instptr)->extra[0])
+#define fe_extra_T(instptr, T) ((T*)&(instptr)->extra[0])
 #define fe_from_extra(extraptr) ((FeInst*)((usize)extraptr - offsetof(FeInst, extra)))
 
 typedef struct {
@@ -146,7 +189,7 @@ typedef struct {
 } FeInstBookend;
 
 typedef struct {
-    FeInst* src;
+    FeInst* val;
     usize idx;
 } FeInstProj;
 
@@ -161,7 +204,7 @@ typedef struct {
 
 typedef struct {
     FeInst* ptr;
-    // something something alignment
+    // something something alignment something
 } FeInstLoad;
 
 typedef struct {
@@ -169,21 +212,32 @@ typedef struct {
     FeInst* val;
 } FeInstStore;
 
+typedef struct {
+    FeInst* cond;
+    FeBlock* if_true;
+    FeBlock* if_false;
+} FeInstBranch;
+
+typedef struct {
+    FeBlock* to;
+} FeInstJump;
+
 // check this assumption with some sort
 // with a runtime init function
-#define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstBinop)
+#define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstBranch)
 
 #define FE_IPOOL_FREE_SPACES_LEN FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1
 typedef struct FeInstPoolChunk FeInstPoolChunk;
 typedef struct FeInstPoolFreeSpace FeInstPoolFreeSpace;
 typedef struct {
-    FeInstPoolChunk* front;
+    FeInstPoolChunk* top;
     FeInstPoolFreeSpace* free_spaces[FE_IPOOL_FREE_SPACES_LEN];
 } FeInstPool;
 
-FeInstPool fe_ipool_new();
+void fe_ipool_init(FeInstPool* pool);
 FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size);
 void fe_ipool_free(FeInstPool* pool, FeInst* inst);
+void fe_ipool_destroy(FeInstPool* pool);
 
 usize fe_inst_extra_size(u8 kind);
 usize fe_inst_extra_size_unsafe(u8 kind);

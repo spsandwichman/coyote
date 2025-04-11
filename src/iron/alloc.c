@@ -6,12 +6,15 @@ static const u8 base_extra_size_table[_FE_BASE_INST_MAX] = {
 
     [FE_BOOKEND]                     = sizeof(FeInstBookend),
     [FE_PROJ]                        = sizeof(FeInstProj),
-    [FE_IADD ... FE_ASR]             = sizeof(FeInstBinop),
-    [FE_MOV ... FE_NEG]              = sizeof(FeInstUnop),
+    [FE_IADD ... FE_FREM]            = sizeof(FeInstBinop),
+    [FE_MOV ... FE_FLOATTOINT]       = sizeof(FeInstUnop),
 
     [FE_LOAD ... FE_LOAD_VOLATILE]   = sizeof(FeInstLoad),
     [FE_STORE ... FE_STORE_VOLATILE] = sizeof(FeInstStore),
     [FE_CASCADE_VOLATILE ... FE_CASCADE_UNIQUE] = 0,
+
+    [FE_BRANCH] = sizeof(FeInstBranch),
+    [FE_JUMP]   = sizeof(FeInstJump),
 };
 
 usize fe_inst_extra_size_unsafe(u8 kind) {
@@ -55,13 +58,11 @@ static FeInstPoolChunk* ipool_new_chunk() {
     return chunk;
 }
 
-FeInstPool fe_ipool_new() {
-    FeInstPool pool;
-    pool.front = ipool_new_chunk();
+void fe_ipool_init(FeInstPool* pool) {
+    pool->top = ipool_new_chunk();
     for_n(i, 0, FE_IPOOL_FREE_SPACES_LEN) {
-        pool.free_spaces[i] = NULL;
+        pool->free_spaces[i] = NULL;
     }
-    return pool;
 }
 
 FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
@@ -78,15 +79,17 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
             // pop from slot list
             FeInst* inst = (FeInst*)pool->free_spaces[i];
             pool->free_spaces[i] = pool->free_spaces[i]->next;
+            inst->kind = 0xFFFF;
             return inst;
         }
     }
 
     // try to allocate on the front block
-    if (pool->front->used + node_slots <= IPOOL_CHUNK_DATA_SIZE) {
+    if (pool->top->used + node_slots <= IPOOL_CHUNK_DATA_SIZE) {
         // allocate on this block!
-        FeInst* inst = (FeInst*)&pool->front->data[pool->front->used];
-        pool->front->used += node_slots;
+        FeInst* inst = (FeInst*)&pool->top->data[pool->top->used];
+        pool->top->used += node_slots;
+        inst->kind = 0xFFFF;
         return inst;
     }
 
@@ -95,10 +98,12 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
 
     // we need to make a new block and allocate on this.
     FeInstPoolChunk* new_chunk = ipool_new_chunk();
-    new_chunk->next = pool->front;
-    pool->front = new_chunk;
+    new_chunk->next = pool->top;
+    pool->top = new_chunk;
     new_chunk->used += node_slots;
-    return (FeInst*) &new_chunk->data;
+    FeInst* inst = (FeInst*) &new_chunk->data;
+    inst->kind = 0xFFFF;
+    return inst;
 }
 
 void fe_ipool_free(FeInstPool* pool, FeInst* inst) {
@@ -107,8 +112,8 @@ void fe_ipool_free(FeInstPool* pool, FeInst* inst) {
     usize extra_size = fe_inst_extra_size(inst->kind);
     memset(extra, 0, extra_size);
 
-    // maximize slots
-    usize size_class = extra_size / sizeof(pool->front->data[0]);
+    // reclaime slots
+    usize size_class = extra_size / sizeof(pool->top->data[0]);
     while (extra[size_class] == 0 && size_class < FE_IPOOL_FREE_SPACES_LEN) {
         size_class += 1;
     }
@@ -117,4 +122,14 @@ void fe_ipool_free(FeInstPool* pool, FeInst* inst) {
     FeInstPoolFreeSpace* free_space = (FeInstPoolFreeSpace*)inst;
     free_space->next = pool->free_spaces[size_class];
     pool->free_spaces[size_class] = free_space;
+}
+
+void fe_ipool_destroy(FeInstPool* pool) {
+    FeInstPoolChunk* top = pool->top;
+    while (top != NULL) {
+        FeInstPoolChunk* this = top;
+        top = top->next;
+        free(this);
+    } 
+    *pool = (FeInstPool){0};
 }
