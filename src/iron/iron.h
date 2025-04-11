@@ -53,6 +53,10 @@ typedef struct FeModule FeModule;
 
 // } FeTargetDef;
 
+typedef struct FeBlock {
+    FeInst* bookend;
+} FeBlock;
+
 enum FeTyEnum {
     FE_TY_VOID,
 
@@ -91,10 +95,8 @@ enum FeInstKindEnum {
     FE_XOR,
     FE_SHL,
     FE_LSR, FE_ASR,
-    FE_ILT, FE_ULT, 
+    FE_ILT, FE_ULT,
     FE_ILE, FE_ULE,
-    FE_IGT, FE_UGT,
-    FE_IGE, FE_UGE,
     FE_EQ,
     FE_NE,
     
@@ -117,8 +119,7 @@ enum FeInstKindEnum {
     FE_CASCADE_VOLATILE,
     FE_CASCADE_UNIQUE,
 
-
-
+    
     _FE_BASE_INST_MAX,
 
     _FE_XR_INST_START,
@@ -132,7 +133,13 @@ typedef struct FeInst {
     u8 ty;
     FeInst* prev;
     FeInst* next;
+
+    usize extra[];
 } FeInst;
+
+#define fe_extra(instptr) ((void*)&(instptr)->extra)
+#define fe_extra_T(instptr, T) ((T*)&(instptr)->extra)
+#define fe_from_extra(extraptr) ((FeInst*)((usize)extraptr - offsetof(FeInst, extra)))
 
 typedef struct {
     FeBlock* block;
@@ -166,12 +173,17 @@ typedef struct {
 // with a runtime init function
 #define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstBinop)
 
+#define FE_IPOOL_FREE_SPACES_LEN FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1
 typedef struct FeInstPoolChunk FeInstPoolChunk;
 typedef struct FeInstPoolFreeSpace FeInstPoolFreeSpace;
 typedef struct {
     FeInstPoolChunk* front;
-    FeInstPoolFreeSpace* free_spaces[FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1];
+    FeInstPoolFreeSpace* free_spaces[FE_IPOOL_FREE_SPACES_LEN];
 } FeInstPool;
+
+FeInstPool fe_ipool_new();
+FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size);
+void fe_ipool_free(FeInstPool* pool, FeInst* inst);
 
 usize fe_inst_extra_size(u8 kind);
 usize fe_inst_extra_size_unsafe(u8 kind);

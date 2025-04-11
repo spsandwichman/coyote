@@ -1,11 +1,14 @@
 #include <stdarg.h>
 #include <stdio.h>
-#include <signal.h>
-#include <sys/types.h>
-#include <execinfo.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef __linux__
+    #include <signal.h>
+    #include <sys/types.h>
+    #include <execinfo.h>
+    #include <errno.h>
+#endif
+
 
 #include "iron.h"
 
@@ -52,7 +55,11 @@ void fe_runtime_crash(const char* error, ...) {
     exit(-1);
 }
 
-#ifndef __WIN32__
+#ifdef __WIN32__
+void fe_init_signal_handler() {
+    // nothing here yet.
+}
+#else
 static void signal_handler(int sig, siginfo_t* info, void* ucontext) {
     // ucontext = ucontext;
     switch (sig) {
