@@ -6,6 +6,13 @@
 
 #include "iron/iron.h"
 
+static void quick_print(FeFunction* f) {
+    FeDataBuffer db;
+    fe_db_init(&db, 512);
+    fe_print_func(&db, f);
+    printf("%.*s", db.len, db.at);
+}
+
 int main(int argc, char** argv) {
     if (argc == 1) {
         printf("no file provided\n");
@@ -26,23 +33,119 @@ int main(int argc, char** argv) {
     };
 
     Vec(Token) tokens = lex_entrypoint(&f);
-
+    (void)tokens;
     // printf("%zu chars -> %zu tokens (%zuB used, %zuB capacity)\n", file->size, tokens.len, sizeof(Token)*tokens.len, sizeof(Token)*tokens.cap);
 
-    for_vec(Token* t, &tokens) {
-        if (_TOK_PREPROC_BEGIN < t->kind && t->kind < _TOK_PREPROC_END) {
-            printf("%s ", token_kind[t->kind]);
-            continue;
-        }
-        if (t->kind == TOK_STRING) {
-            printf("\"");
-        }
-        printf(str_fmt, str_arg(tok_span(*t)));
-        if (t->kind == TOK_STRING) {
-            printf("\"");
-        }
-        printf(" ");
-    }
+    // for_vec(Token* t, &tokens) {
+    //     if (_TOK_PREPROC_BEGIN < t->kind && t->kind < _TOK_PREPROC_END) {
+    //         printf("%s ", token_kind[t->kind]);
+    //         continue;
+    //     }
+    //     if (t->kind == TOK_STRING) {
+    //         printf("\"");
+    //     }
+    //     printf(str_fmt, str_arg(tok_span(*t)));
+    //     if (t->kind == TOK_STRING) {
+    //         printf("\"");
+    //     }
+    //     printf(" ");
+    // }
+    // printf("\n");
 
     fe_init_signal_handler();
+    FeInstPool ipool;
+    fe_ipool_init(&ipool);
+
+    FeModule* mod = fe_new_module(FE_ARCH_XR17032);
+
+    /*
+        FN addmul(IN a: UQUAD, IN b: UQUAD, OUT b: UQUAD): UQUAD
+            b = a * b
+            RETURN a + b
+        END
+    */
+
+    // set up function to call
+    // FeFuncSignature* sign = fe_new_funcsig(FE_CC_JACKAL, 2, 1);
+    // fe_funcsig_param(sign, 0)->ty = FE_TY_I32;
+    // fe_funcsig_param(sign, 1)->ty = FE_TY_I32;
+    // fe_funcsig_return(sign, 0)->ty = FE_TY_I32;
+
+    // // make the function and its symbol
+    // FeSymbol* sym = fe_new_symbol(mod, "addmul", 0, FE_BIND_GLOBAL);
+    // FeFunction* func = fe_new_function(mod, sym, sign, &ipool);    
+    // FeBlock* entry = func->entry_block;
+
+    // FeInst* add = fe_append_end(entry, fe_inst_binop(func,
+    //     FE_TY_I32, FE_IADD,
+    //     fe_func_param(func, 0),
+    //     // fe_func_param(func, 1)
+    //     fe_append_end(entry, fe_inst_const(func, FE_TY_I32, 10))
+    // ));
+    // FeInst* mul = fe_append_end(entry, fe_inst_binop(func,
+    //     FE_TY_I32, FE_IMUL,
+    //     add,
+    //     fe_func_param(func, 1)
+    // ));
+    // FeInst* ret = fe_append_end(entry, fe_inst_return(func));
+    // fe_set_return_arg(ret, 0, mul);
+    FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool);
+
+    FeFunction* func = make_factorial(mod, &ipool);
+    
+    quick_print(func);
+    fe_xr_isel(func);
+    quick_print(func);
+}
+
+FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool) {
+
+    // set up function to call
+    FeFuncSignature* fact_sig = fe_new_funcsig(FE_CC_JACKAL, 1, 1);
+    fe_funcsig_param(fact_sig, 0)->ty = FE_TY_I32;
+    fe_funcsig_return(fact_sig, 0)->ty = FE_TY_I32;
+
+    // make the function and its symbol
+    FeSymbol* fact_sym = fe_new_symbol(mod, "factorial", 0, FE_BIND_GLOBAL);
+    FeFunction* fact = fe_new_function(mod, fact_sym, fact_sig, ipool);
+
+    // construct the function's body
+    FeBlock* entry = fact->entry_block;
+    FeBlock* if_true = fe_new_block(fact);
+    FeBlock* if_false = fe_new_block(fact);
+    FeInst* param = fe_func_param(fact, 0);
+
+    { // entry block
+        FeInst* const0 = fe_append_end(entry, fe_inst_const(fact, FE_TY_I32, 0));
+        FeInst* eq = fe_append_end(entry, fe_inst_binop(fact, 
+            FE_TY_I32, FE_EQ,
+            param,
+            const0
+        ));
+        fe_append_end(entry, fe_inst_branch(fact, eq, if_true, if_false));
+    }
+    { // if_true block
+        FeInst* const1 = fe_append_end(if_true, fe_inst_const(fact, FE_TY_I32, 1));
+        FeInst* ret = fe_append_end(if_true, fe_inst_return(fact));
+        fe_set_return_arg(ret, 0, const1);
+    }
+    { // if_false block
+        FeInst* const1 = fe_append_end(if_false, fe_inst_const(fact, FE_TY_I32, 1));
+        FeInst* isub = fe_append_end(if_false, fe_inst_binop(fact, 
+            FE_TY_I32, FE_ISUB,
+            param,
+            const1
+        ));
+        FeInst* call = fe_append_end(if_false, fe_inst_call_direct(fact, fact));
+        fe_set_call_arg(call, 0, isub);
+        FeInst* imul = fe_append_end(if_false, fe_inst_binop(fact, 
+            FE_TY_I32, FE_IMUL,
+            param,
+            call
+        ));
+
+        FeInst* ret = fe_append_end(if_false, fe_inst_return(fact));
+        fe_set_return_arg(ret, 0, imul);
+    }
+    return fact;
 }

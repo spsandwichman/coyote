@@ -1,37 +1,42 @@
 #include "iron.h"
 
-static const u8 base_extra_size_table[_FE_BASE_INST_MAX] = {
+static const u8 base_extra_size_table[] = {
     // default error value
-    [0 ... _FE_BASE_INST_MAX - 1] = 255,
+    [0 ... _FE_BASE_INST_END - 1] = 255,
 
-    [FE_BOOKEND]                     = sizeof(FeInstBookend),
-    [FE_PROJ]                        = sizeof(FeInstProj),
-    [FE_IADD ... FE_FREM]            = sizeof(FeInstBinop),
-    [FE_MOV ... FE_FLOATTOINT]       = sizeof(FeInstUnop),
+    [FE_BOOKEND] = sizeof(FeInstBookend),
+    [FE_PROJ ... FE_PROJ_VOLATILE] = sizeof(FeInstProj),
+    [FE_CONST] = sizeof(FeInstConst),
+    [FE_PARAM] = sizeof(FeInstParam),
+    [FE_IADD ... FE_FREM] = sizeof(FeInstBinop),
+    [FE_MOV ... FE_F2I] = sizeof(FeInstUnop),
 
-    [FE_LOAD ... FE_LOAD_VOLATILE]   = sizeof(FeInstLoad),
+    [FE_LOAD ... FE_LOAD_VOLATILE] = sizeof(FeInstLoad),
     [FE_STORE ... FE_STORE_VOLATILE] = sizeof(FeInstStore),
-    [FE_CASCADE_VOLATILE ... FE_CASCADE_UNIQUE] = 0,
+    [FE_CASCADE_UNIQUE ... FE_CASCADE_VOLATILE] = 0,
 
     [FE_BRANCH] = sizeof(FeInstBranch),
-    [FE_JUMP]   = sizeof(FeInstJump),
+    [FE_JUMP] = sizeof(FeInstJump),
+    [FE_RETURN] = sizeof(FeInstReturn),
+    
+    [FE_CALL_DIRECT] = sizeof(FeInstCallDirect),
+    [FE_CALL_INDIRECT] = sizeof(FeInstCallIndirect),
 };
 
-usize fe_inst_extra_size_unsafe(u8 kind) {
+usize fe_inst_extra_size_unsafe(FeInstKind kind) {
     u8 size = 255;
-    if (kind < _FE_BASE_INST_MAX) {
+    if (kind <= _FE_BASE_INST_END) {
         size = base_extra_size_table[kind];
+    }
+    if (_FE_XR_INST_BEGIN <= kind && kind <= _FE_XR_INST_END) {
+        size = fe_xr_extra_size_unsafe(kind);
     }
 
     return (usize) size;
 }
 
-usize fe_inst_extra_size(u8 kind) {
-    u8 size = 255;
-    if (kind < _FE_BASE_INST_MAX) {
-        size = base_extra_size_table[kind];
-    }
-
+usize fe_inst_extra_size(FeInstKind kind) {
+    u8 size = fe_inst_extra_size_unsafe(kind);
     if (size == 255) {
         fe_runtime_crash("invalid inst kind %u", kind);
     }
@@ -74,6 +79,7 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
     usize node_slots = extra_slots + sizeof(FeInst) / 8;
 
     // check if there's any reusable slots.
+    // THE VOICESSSSSS
     for_n(i, extra_slots, FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1) {
         if (pool->free_spaces[i] != NULL) {
             // pop from slot list
@@ -91,7 +97,7 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
         pool->top->used += node_slots;
         inst->kind = 0xFFFF;
         return inst;
-    }
+    } 
 
     // TODO see if the rest of the space in this block can be
     // converted into a free space. not a huge concern but just a small thing
@@ -112,7 +118,7 @@ void fe_ipool_free(FeInstPool* pool, FeInst* inst) {
     usize extra_size = fe_inst_extra_size(inst->kind);
     memset(extra, 0, extra_size);
 
-    // reclaime slots
+    // reclaim slots
     usize size_class = extra_size / sizeof(pool->top->data[0]);
     while (extra[size_class] == 0 && size_class < FE_IPOOL_FREE_SPACES_LEN) {
         size_class += 1;
@@ -122,6 +128,23 @@ void fe_ipool_free(FeInstPool* pool, FeInst* inst) {
     FeInstPoolFreeSpace* free_space = (FeInstPoolFreeSpace*)inst;
     free_space->next = pool->free_spaces[size_class];
     pool->free_spaces[size_class] = free_space;
+}
+
+// "free" the memory without actually giving it back to the allocator
+// return the amount of usable space available
+usize fe_ipool_free_manual(FeInstPool* pool, FeInst* inst) {
+    // set inst extra memory to zero
+    usize* extra = fe_extra(inst);
+    usize extra_size = fe_inst_extra_size(inst->kind);
+    memset(extra, 0, extra_size);
+
+    // reclaim slots
+    usize size_class = extra_size / sizeof(pool->top->data[0]);
+    while (extra[size_class] == 0 && size_class < FE_IPOOL_FREE_SPACES_LEN) {
+        size_class += 1;
+    }
+
+    return size_class * sizeof(pool->top->data[0]) + sizeof(FeInst);
 }
 
 void fe_ipool_destroy(FeInstPool* pool) {

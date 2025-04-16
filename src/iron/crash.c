@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #ifdef __linux__
-    #include <signal.h>
     #include <sys/types.h>
     #include <execinfo.h>
     #include <errno.h>
@@ -12,7 +12,7 @@
 
 #include "iron.h"
 
-void fe_runtime_crash(const char* error, ...) {
+noreturn void fe_runtime_crash(const char* error, ...) {
     fflush(stdout);
 
     printf("\niron runtime crash: ");
@@ -56,15 +56,37 @@ void fe_runtime_crash(const char* error, ...) {
 }
 
 #ifdef __WIN32__
+static void signal_handler(int sig) {
+    switch (sig) {
+    case SIGSEGV:
+        fe_runtime_crash("segfault");
+        break;
+    case SIGINT:
+        fe_runtime_crash("debug interrupt");
+        break;
+    case SIGFPE:
+        fe_runtime_crash("fatal arithmetic exception");
+        break;
+    case SIGTERM:
+        exit(0);
+        break;
+    default:
+        fe_runtime_crash("unhandled signal %d", sig);
+        break;
+    }
+}
 void fe_init_signal_handler() {
-    // nothing here yet.
+    signal(SIGSEGV, signal_handler);
+    signal(SIGINT, signal_handler);
+    signal(SIGFPE, signal_handler);
+    signal(SIGTERM, signal_handler);
 }
 #else
 static void signal_handler(int sig, siginfo_t* info, void* ucontext) {
     // ucontext = ucontext;
     switch (sig) {
     case SIGSEGV:
-        fe_runtime_crash("segfault at addr 0x%lx\n", (long)info->si_addr);
+        fe_runtime_crash("segfault at addr 0x%lx", (long)info->si_addr);
         break;
     case SIGINT:
         printf("debug interrupt caught");
@@ -73,7 +95,7 @@ static void signal_handler(int sig, siginfo_t* info, void* ucontext) {
         fe_runtime_crash("fatal arithmetic exception");
         break;
     default:
-        fe_runtime_crash("unhandled signal %s caught\n", strsignal(sig));
+        fe_runtime_crash("unhandled signal %s caught", strsignal(sig));
         break;
     }
 }

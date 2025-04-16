@@ -1,6 +1,7 @@
 SRCPATHS = \
 	src/*.c \
 	src/iron/*.c \
+	src/iron/xr17032/*.c \
 	src/common/*.c \
 
 SRC = $(wildcard $(SRCPATHS))
@@ -15,8 +16,8 @@ LD = gcc
 INCLUDEPATHS = -Isrc/
 DEBUGFLAGS = -lm -pg -g -Wall -Wextra 
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
-CFLAGS = -g -Wno-format -MD -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
-OPT = -O2
+CFLAGS = -g -Wall -fwrapv -Wno-format -MD -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
+OPT = -O0
 
 ifeq ($(OS),Windows_NT)
 	EXECUTABLE_NAME = coyote.exe
