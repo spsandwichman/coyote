@@ -121,10 +121,9 @@ void fe_xr_isel(FeFunction* f) {
         }
     }
 
-    // repalce instructions with selected instructions
+    // replace instructions with selected instructions
     for_n(i, START, inst_count) {
         fe_replace(isel_map[i].from, isel_map[i].to);
-        // fe_inst_free(f, isel_map[i].from);
     }
 
     // replace inputs to all selected instructions

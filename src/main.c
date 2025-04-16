@@ -66,32 +66,32 @@ int main(int argc, char** argv) {
     */
 
     // set up function to call
-    // FeFuncSignature* sign = fe_new_funcsig(FE_CC_JACKAL, 2, 1);
-    // fe_funcsig_param(sign, 0)->ty = FE_TY_I32;
-    // fe_funcsig_param(sign, 1)->ty = FE_TY_I32;
-    // fe_funcsig_return(sign, 0)->ty = FE_TY_I32;
+    FeFuncSignature* sign = fe_new_funcsig(FE_CC_JACKAL, 2, 1);
+    fe_funcsig_param(sign, 0)->ty = FE_TY_I32;
+    fe_funcsig_param(sign, 1)->ty = FE_TY_I32;
+    fe_funcsig_return(sign, 0)->ty = FE_TY_I32;
 
-    // // make the function and its symbol
-    // FeSymbol* sym = fe_new_symbol(mod, "addmul", 0, FE_BIND_GLOBAL);
-    // FeFunction* func = fe_new_function(mod, sym, sign, &ipool);    
-    // FeBlock* entry = func->entry_block;
+    // make the function and its symbol
+    FeSymbol* sym = fe_new_symbol(mod, "addmul", 0, FE_BIND_GLOBAL);
+    FeFunction* func = fe_new_function(mod, sym, sign, &ipool);    
+    FeBlock* entry = func->entry_block;
 
-    // FeInst* add = fe_append_end(entry, fe_inst_binop(func,
-    //     FE_TY_I32, FE_IADD,
-    //     fe_func_param(func, 0),
-    //     // fe_func_param(func, 1)
-    //     fe_append_end(entry, fe_inst_const(func, FE_TY_I32, 10))
-    // ));
-    // FeInst* mul = fe_append_end(entry, fe_inst_binop(func,
-    //     FE_TY_I32, FE_IMUL,
-    //     add,
-    //     fe_func_param(func, 1)
-    // ));
-    // FeInst* ret = fe_append_end(entry, fe_inst_return(func));
-    // fe_set_return_arg(ret, 0, mul);
-    FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool);
+    FeInst* add = fe_append_end(entry, fe_inst_binop(func,
+        FE_TY_I32, FE_IADD,
+        fe_func_param(func, 0),
+        // fe_func_param(func, 1)
+        fe_append_end(entry, fe_inst_const(func, FE_TY_I32, 10000))
+    ));
+    FeInst* mul = fe_append_end(entry, fe_inst_binop(func,
+        FE_TY_I32, FE_IMUL,
+        add,
+        fe_func_param(func, 1)
+    ));
+    FeInst* ret = fe_append_end(entry, fe_inst_return(func));
+    fe_set_return_arg(ret, 0, mul);
+    // FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool);
 
-    FeFunction* func = make_factorial(mod, &ipool);
+    // FeFunction* func = make_factorial(mod, &ipool);
     
     quick_print(func);
     fe_xr_isel(func);
