@@ -5,12 +5,14 @@
 
 enum {
     // FeXrRegImm16
+
     FE_XR_ADDI = _FE_XR_INST_BEGIN, // out = rb + uimm16
+    FE_XR_LUI, // out = rb | (uimm16 << 16)
     FE_XR_SUBI, // out = rb - uimm16
 
-    // FeInstBinop (lmao)
+    // FeXrRegReg
     FE_XR_ADD, // out = rb + rc
-    FE_XR_SUB, // out = rb + rc
+    FE_XR_SUB, // out = rb - rc
     FE_XR_MUL, // out = rb * rc
 
     // void

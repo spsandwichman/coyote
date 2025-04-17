@@ -99,6 +99,7 @@ static const char* inst_name[_FE_BASE_INST_END] = {
 
     [FE_CASCADE_UNIQUE] = "cascade_unique",
     [FE_CASCADE_VOLATILE] = "cascade_volatile",
+    [FE_FAKE_SOURCE] = "fake_source",
 
     [FE_BRANCH] = "branch",
     [FE_JUMP] = "jump",

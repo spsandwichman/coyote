@@ -284,6 +284,7 @@ enum FeInstKindEnum {
     // (none)
     FE_CASCADE_UNIQUE,
     FE_CASCADE_VOLATILE,
+    FE_FAKE_SOURCE,
 
     // Branch
     FE_BRANCH,

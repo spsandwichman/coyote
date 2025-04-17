@@ -35,17 +35,26 @@ static FeInst* isel(FeFunction* f, FeInst* inst) {
     FeInst* sel = NULL;
 
     switch (inst->kind) {
+    case FE_CONST:
+        if (can_const_u16(inst)) {
+            // emit as just an ADDI.
+            sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
+            sel->kind = FE_XR_ADDI; sel->ty = FE_TY_I32;
+            fe_extra_T(sel, FeXrRegImm16)->val = fake_zero(f);
+            fe_extra_T(sel, FeXrRegImm16)->val = as_u16(binop->rhs);
+        } else {
+            
+        }
+        break;
     case FE_IADD:
         if (can_const_u16(binop->rhs)) {
             sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
-            sel->kind = FE_XR_ADDI;
-            sel->ty = inst->ty;
+            sel->kind = FE_XR_ADDI; sel->ty = FE_TY_I32;
             fe_extra_T(sel, FeXrRegImm16)->val = binop->lhs;
             fe_extra_T(sel, FeXrRegImm16)->num = as_u16(binop->rhs);
         } else {
             sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegReg));
-            sel->kind = FE_XR_ADD;
-            sel->ty = inst->ty;
+            sel->kind = FE_XR_ADD; sel->ty = FE_TY_I32;
             fe_extra_T(sel, FeXrRegReg)->lhs = binop->lhs;
             fe_extra_T(sel, FeXrRegReg)->rhs = binop->rhs;
         }
@@ -53,14 +62,12 @@ static FeInst* isel(FeFunction* f, FeInst* inst) {
     case FE_ISUB:
         if (can_const_u16(binop->rhs)) {
             sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
-            sel->kind = FE_XR_SUBI;
-            sel->ty = inst->ty;
+            sel->kind = FE_XR_SUBI; sel->ty = FE_TY_I32;
             fe_extra_T(sel, FeXrRegImm16)->val = binop->lhs;
             fe_extra_T(sel, FeXrRegImm16)->num = as_u16(binop->rhs);
         } else {
             sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegReg));
-            sel->kind = FE_XR_SUB;
-            sel->ty = inst->ty;
+            sel->kind = FE_XR_SUB; sel->ty = FE_TY_I32;
             fe_extra_T(sel, FeXrRegReg)->lhs = binop->lhs;
             fe_extra_T(sel, FeXrRegReg)->rhs = binop->rhs;
         }

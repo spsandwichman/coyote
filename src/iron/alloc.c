@@ -13,7 +13,7 @@ static const u8 base_extra_size_table[] = {
 
     [FE_LOAD ... FE_LOAD_VOLATILE] = sizeof(FeInstLoad),
     [FE_STORE ... FE_STORE_VOLATILE] = sizeof(FeInstStore),
-    [FE_CASCADE_UNIQUE ... FE_CASCADE_VOLATILE] = 0,
+    [FE_CASCADE_UNIQUE ... FE_FAKE_SOURCE] = 0,
 
     [FE_BRANCH] = sizeof(FeInstBranch),
     [FE_JUMP] = sizeof(FeInstJump),
