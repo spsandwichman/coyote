@@ -70,12 +70,13 @@ FeBlock* fe_new_block(FeFunction* f) {
     return block;
 }
 
-FeFunction* fe_new_function(FeModule* mod, FeSymbol* sym, FeFuncSignature* sig, FeInstPool* ipool) {
+FeFunction* fe_new_function(FeModule* mod, FeSymbol* sym, FeFuncSignature* sig, FeInstPool* ipool, FeVRegBuffer* vregs) {
     FeFunction* f = fe_malloc(sizeof(FeFunction));
     memset(f, 0, sizeof(FeFunction));
     f->sig = sig;
     f->mod = mod;
     f->ipool = ipool;
+    f->vregs = vregs;
     f->sym = sym;
     sym->func = f;
     sym->kind = FE_SYMKIND_FUNC;
@@ -229,6 +230,7 @@ FeInst** fe_inst_list_inputs(FeInst* inst, usize* len_out) {
     case FE_CASCADE_UNIQUE:
     case FE_CASCADE_VOLATILE:
     case FE_JUMP:
+    case FE_MACH_REG:
         *len_out = 0;
         return NULL;
     default:
@@ -250,36 +252,73 @@ FeInst* fe_inst_remove(FeInst* inst) {
 }
 
 FeInst* fe_insert_before(FeInst* point, FeInst* i) {
-    // i->next = point;
-    // i->prev = point->prev;
-    // point->prev->next = i;
-    // point->prev = i;
     FeInst* p_prev = point->prev;
     p_prev->next = i;
     point->prev = i;
     i->next = point;
     i->prev = p_prev;
-
-    // register_uses(i);
     return i;
 }
 
 FeInst* fe_insert_after(FeInst* point, FeInst* i) {
-    // i->prev = point;
-    // i->next = point->next;
-    // point->next->prev = i;
-    // point->next = i;
     FeInst* p_next = point->next;
     p_next->prev = i;
     point->next = i;
     i->prev = point;
     i->next = p_next;
-
-    // register_uses(i);
     return i;
 }
 
+void fe_inst_replace_pos(FeInst* from, FeInst* to) {
+    from->next->prev = to;
+    from->prev->next = to;
+    to->next = from->next;
+    to->prev = from->prev;
+}
 
+FeInstChain fe_new_chain(FeInst* initial) {
+    FeInstChain chain = {0};
+    chain.begin = initial;
+    chain.end = initial;
+    return chain;
+}
+
+FeInstChain fe_chain_append_end(FeInstChain chain, FeInst* i) {
+    chain.end->next = i;
+    i->prev = chain.end;
+    chain.end = i;
+    return chain;
+}
+
+FeInstChain fe_chain_append_begin(FeInstChain chain, FeInst* i) {
+    chain.begin->prev = i;
+    i->next = chain.begin;
+    chain.begin = i;
+    return chain;
+}
+
+void fe_insert_chain_before(FeInst* point, FeInstChain chain) {
+    FeInst* p_prev = point->prev;
+    p_prev->next = chain.begin;
+    point->prev = chain.end;
+    chain.end->next = point;
+    chain.begin->prev = p_prev;
+}
+
+void fe_insert_chain_after(FeInst* point, FeInstChain chain) {
+    FeInst* p_next = point->next;
+    p_next->prev = chain.end;
+    point->next = chain.begin;
+    chain.begin->prev = point;
+    chain.end->next = p_next;
+}
+
+void fe_chain_replace_pos(FeInst* from, FeInstChain to) {
+    from->next->prev = to.end;
+    from->prev->next = to.begin;
+    to.end->next = from->next;
+    to.begin->prev = from->prev;
+}
 
 FeInst* fe_inst_const(FeFunction* f, FeTy ty, u64 val) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstConst));

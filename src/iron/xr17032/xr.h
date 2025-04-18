@@ -32,7 +32,11 @@ typedef struct {
 } FeXrRegReg;
 
 enum {
-    _XR_REG_ZERO,
+    XR_REGCLASS_REG = 1,
+};
+
+enum {
+    XR_REG_ZERO,
 
     // temporary registers (jkl: caller-saved)
     XR_REG_T0, XR_REG_T1, XR_REG_T2, XR_REG_T3, XR_REG_T4, XR_REG_T5,
@@ -52,11 +56,13 @@ enum {
     XR_REG_LR,
 };
 
-usize fe_xr_extra_size_unsafe(FeInstKind kind);
 char* fe_xr_inst_name(FeInstKind kind);
+char* fe_xr_reg_name(u16 real);
+
+usize fe_xr_extra_size_unsafe(FeInstKind kind);
 void fe_xr_print_args(FeDataBuffer* db, FeInst* inst);
 FeInst** fe_xr_list_inputs(FeInst* inst, usize* len_out);
 
-void fe_xr_isel(FeFunction* f);
+FeInstChain fe_xr_isel(FeFunction* f, FeInst* inst);
 
 #endif

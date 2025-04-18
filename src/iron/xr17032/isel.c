@@ -1,9 +1,5 @@
 #include "iron/iron.h"
 
-// static bool use_is(FeInst* inst, usize count) {
-//     return inst->use_count == count;
-// }
-
 static bool can_const_u16(FeInst* inst) {
     return inst->kind == FE_CONST && fe_extra_T(inst, FeInstConst)->val <= UINT16_MAX;
 }
@@ -12,148 +8,111 @@ static u16 as_u16(FeInst* inst) {
     return (u16)fe_extra_T(inst, FeInstConst)->val;
 }
 
-// static void remove_use(FeFunction* f, FeInst* inst) {
-//     if (inst->use_count <= 1) {
-//         fe_inst_free(f, fe_inst_remove(inst));
-//     } else {
-//         inst->use_count--;
-//     }
-// }
-
-void fe_replace(FeInst* from, FeInst* to) {
-    from->next->prev = to;
-    from->prev->next = to;
-    to->next = from->next;
-    to->prev = from->prev;
+static u16 as_hi_u16(FeInst* inst) {
+    return (u16)(fe_extra_T(inst, FeInstConst)->val >> 16);
 }
 
-static FeInst* isel(FeFunction* f, FeInst* inst) {
+
+static FeInst* fake_zero(FeFunction* f) {
+    FeInst* zero = fe_ipool_alloc(f->ipool, 0);
+    zero->kind = FE_MACH_REG;
+    zero->ty = FE_TY_I32;
+    FeVReg zero_reg = fe_vreg_new(f->vregs, zero, XR_REGCLASS_REG);
+    fe_vreg(f->vregs, zero_reg)->real = XR_REG_ZERO;
+    return zero;
+}
+
+FeInstChain fe_xr_isel(FeFunction* f, FeInst* inst) {
     void* extra = fe_extra(inst);
     FeInstBinop* binop = extra;
-    FeInstReturn* ret = extra;
-
-    FeInst* sel = NULL;
 
     switch (inst->kind) {
     case FE_CONST:
         if (can_const_u16(inst)) {
             // emit as just an ADDI.
-            sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
-            sel->kind = FE_XR_ADDI; sel->ty = FE_TY_I32;
-            fe_extra_T(sel, FeXrRegImm16)->val = fake_zero(f);
-            fe_extra_T(sel, FeXrRegImm16)->val = as_u16(binop->rhs);
+            FeInst* addi = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
+            addi->kind = FE_XR_ADDI; addi->ty = FE_TY_I32;
+            FeInst* zero = fake_zero(f);
+            fe_extra_T(addi, FeXrRegImm16)->val = zero;
+            fe_extra_T(addi, FeXrRegImm16)->num = as_u16(inst);
+            FeInstChain chain = fe_new_chain(addi);
+            chain = fe_chain_append_begin(chain, zero);
+            return chain;
         } else {
-            
+            // emit as an addi and an lui.
+            FeInst* addi = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
+            addi->kind = FE_XR_ADDI; addi->ty = FE_TY_I32;
+            FeInst* zero = fake_zero(f);
+            fe_extra_T(addi, FeXrRegImm16)->val = zero;
+            fe_extra_T(addi, FeXrRegImm16)->num = as_u16(inst);
+
+            FeInst* lui = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
+            lui->kind = FE_XR_LUI; lui->ty = FE_TY_I32;
+
+            fe_extra_T(lui, FeXrRegImm16)->val = addi;
+            fe_extra_T(lui, FeXrRegImm16)->num = as_hi_u16(inst);
+
+            FeInstChain chain = fe_new_chain(zero);
+            chain = fe_chain_append_end(chain, addi);
+            chain = fe_chain_append_end(chain, lui);
+            return chain;
         }
-        break;
+        return fe_new_chain(inst);
     case FE_IADD:
         if (can_const_u16(binop->rhs)) {
-            sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
-            sel->kind = FE_XR_ADDI; sel->ty = FE_TY_I32;
-            fe_extra_T(sel, FeXrRegImm16)->val = binop->lhs;
-            fe_extra_T(sel, FeXrRegImm16)->num = as_u16(binop->rhs);
+            FeInst* add = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
+            add->kind = FE_XR_ADDI; add->ty = FE_TY_I32;
+            fe_extra_T(add, FeXrRegImm16)->val = binop->lhs;
+            fe_extra_T(add, FeXrRegImm16)->num = as_u16(binop->rhs);
+            return fe_new_chain(add);
         } else {
-            sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegReg));
-            sel->kind = FE_XR_ADD; sel->ty = FE_TY_I32;
-            fe_extra_T(sel, FeXrRegReg)->lhs = binop->lhs;
-            fe_extra_T(sel, FeXrRegReg)->rhs = binop->rhs;
+            FeInst* add = fe_ipool_alloc(f->ipool, sizeof(FeXrRegReg));
+            add->kind = FE_XR_ADD; add->ty = FE_TY_I32;
+            fe_extra_T(add, FeXrRegReg)->lhs = binop->lhs;
+            fe_extra_T(add, FeXrRegReg)->rhs = binop->rhs;
+            return fe_new_chain(add);
         }
         break;
     case FE_ISUB:
         if (can_const_u16(binop->rhs)) {
-            sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
-            sel->kind = FE_XR_SUBI; sel->ty = FE_TY_I32;
-            fe_extra_T(sel, FeXrRegImm16)->val = binop->lhs;
-            fe_extra_T(sel, FeXrRegImm16)->num = as_u16(binop->rhs);
+            FeInst* sub = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
+            sub->kind = FE_XR_SUBI; sub->ty = FE_TY_I32;
+            fe_extra_T(sub, FeXrRegImm16)->val = binop->lhs;
+            fe_extra_T(sub, FeXrRegImm16)->num = as_u16(binop->rhs);
+            return fe_new_chain(sub);
         } else {
-            sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegReg));
-            sel->kind = FE_XR_SUB; sel->ty = FE_TY_I32;
-            fe_extra_T(sel, FeXrRegReg)->lhs = binop->lhs;
-            fe_extra_T(sel, FeXrRegReg)->rhs = binop->rhs;
+            FeInst* sub = fe_ipool_alloc(f->ipool, sizeof(FeXrRegReg));
+            sub->kind = FE_XR_SUB; sub->ty = FE_TY_I32;
+            fe_extra_T(sub, FeXrRegReg)->lhs = binop->lhs;
+            fe_extra_T(sub, FeXrRegReg)->rhs = binop->rhs;
+            return fe_new_chain(sub);
         }
-        break;
-    case FE_IMUL:
-        sel = fe_ipool_alloc(f->ipool, sizeof(FeXrRegReg));
-        sel->kind = FE_XR_MUL;
-        sel->ty = inst->ty;
-        fe_extra_T(sel, FeXrRegReg)->lhs = binop->lhs;
-        fe_extra_T(sel, FeXrRegReg)->rhs = binop->rhs;
-        break;
-    case FE_RETURN:
-        sel = fe_ipool_alloc(f->ipool, 0);
-        sel->kind = FE_XR_RET;
-        sel->ty = FE_TY_VOID;
-        for_n(i, 0, ret->len) {
+    case FE_IMUL: {
+        FeInst* mul = fe_ipool_alloc(f->ipool, sizeof(FeXrRegReg));
+        mul->kind = FE_XR_MUL;
+        mul->ty = inst->ty;
+        fe_extra_T(mul, FeXrRegReg)->lhs = binop->lhs;
+        fe_extra_T(mul, FeXrRegReg)->rhs = binop->rhs;
+        return fe_new_chain(mul);
+    }
+    case FE_RETURN: {
+        FeInstReturn* inst_ret = extra;
+        FeInst* ret = fe_ipool_alloc(f->ipool, 0);
+        ret->kind = FE_XR_RET;
+        ret->ty = FE_TY_VOID;
+        FeInstChain chain = fe_new_chain(ret);
+        for_n(i, 0, inst_ret->len) {
             FeInst* mov = fe_ipool_alloc(f->ipool, sizeof(FeInstUnop));
             mov->kind = FE_MOV_VOLATILE;
             mov->ty = FE_TY_VOID;
             mov->flags = 0;
             fe_extra_T(mov, FeInstUnop)->un = fe_return_arg(inst, i);
-            fe_insert_before(inst, mov);
+            // fe_insert_before(inst, mov);
+            chain = fe_chain_append_begin(chain, mov);
         }
-        // fe_replace(inst, sel);
-        break;
+        return chain;
+    }
     default:
-        return inst;
+        return fe_new_chain(inst);
     }
-    sel->flags = 0;
-    return sel;
-}
-
-typedef struct FeInstPair {
-    FeInst* to;
-    FeInst* from;
-} FeInstPair;
-
-void fe_xr_isel(FeFunction* f) {
-    fe_inst_update_uses(f);
-
-    // assign each instruction an index starting from 1.
-    const usize START = 1;
-    usize inst_count = START;
-    for_blocks(block, f) {
-        for_inst(inst, block) {
-            inst->flags = inst_count++;
-        }
-    }
-
-    FeInstPair* isel_map = fe_malloc(sizeof(*isel_map) * inst_count);
-    memset(isel_map, 0, sizeof(*isel_map) * inst_count);
-
-    for_blocks(block, f) {
-        for_inst_reverse(inst, block) {
-            FeInst* sel = isel(f, inst);
-            isel_map[inst->flags].from = inst;
-            isel_map[inst->flags].to = sel;
-        }
-    }
-
-    // replace instructions with selected instructions
-    for_n(i, START, inst_count) {
-        fe_replace(isel_map[i].from, isel_map[i].to);
-    }
-
-    // replace inputs to all selected instructions
-    for_blocks(block, f) {
-        for_inst(inst, block) {
-            usize inputs_len = 0;
-            FeInst** inputs = fe_inst_list_inputs(inst, &inputs_len);
-            for_n(i, 0, inputs_len) {
-                if (inputs[i]->kind == FE_PARAM) continue;
-                if (inputs[i]->flags == 0) continue;
-
-                inputs[i] = isel_map[inputs[i]->flags].to;
-            }
-        }
-    }
-
-    for_n(i, START, inst_count) {
-        if (isel_map[i].from != isel_map[i].to) {
-            fe_inst_free(f, isel_map[i].from);
-        }
-    }
-
-    fe_free(isel_map);
-
-    printf("isel complete\n");
 }

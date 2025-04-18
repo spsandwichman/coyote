@@ -99,7 +99,7 @@ static const char* inst_name[_FE_BASE_INST_END] = {
 
     [FE_CASCADE_UNIQUE] = "cascade_unique",
     [FE_CASCADE_VOLATILE] = "cascade_volatile",
-    [FE_FAKE_SOURCE] = "fake_source",
+    [FE_MACH_REG] = "mach_reg",
 
     [FE_BRANCH] = "branch",
     [FE_JUMP] = "jump",
@@ -147,7 +147,7 @@ void fe__print_ref(FeDataBuffer* db, FeInst* ref) {
     if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
 }
 
-static void print_inst(FeDataBuffer* db, FeInst* inst) {
+static void print_inst(FeFunction* func, FeDataBuffer* db, FeInst* inst) {
 
     if (inst->ty != FE_TY_VOID) {
         fe__print_ref(db, inst);
@@ -197,10 +197,10 @@ static void print_inst(FeDataBuffer* db, FeInst* inst) {
     case FE_CONST:
         switch (inst->ty) {
         case FE_TY_BOOL: fe_db_writef(db, "%s", fe_extra_T(inst, FeInstConst)->val ? "true" : "false"); break;
-        case FE_TY_I64:  fe_db_writef(db, "%llu", fe_extra_T(inst, FeInstConst)->val); break;
-        case FE_TY_I32:  fe_db_writef(db, "%llu", (u64)(u32)fe_extra_T(inst, FeInstConst)->val); break;
-        case FE_TY_I16:  fe_db_writef(db, "%llu", (u64)(u16)fe_extra_T(inst, FeInstConst)->val); break;
-        case FE_TY_I8:   fe_db_writef(db, "%llu", (u64)(u8)fe_extra_T(inst, FeInstConst)->val); break;
+        case FE_TY_I64:  fe_db_writef(db, "0x%llx", fe_extra_T(inst, FeInstConst)->val); break;
+        case FE_TY_I32:  fe_db_writef(db, "0x%llx", (u64)(u32)fe_extra_T(inst, FeInstConst)->val); break;
+        case FE_TY_I16:  fe_db_writef(db, "0x%llx", (u64)(u16)fe_extra_T(inst, FeInstConst)->val); break;
+        case FE_TY_I8:   fe_db_writef(db, "0x%llx", (u64)(u8)fe_extra_T(inst, FeInstConst)->val); break;
         default:
             fe_db_writef(db, "[TODO]");
             break;
@@ -218,6 +218,13 @@ static void print_inst(FeDataBuffer* db, FeInst* inst) {
             fe_db_writecstr(db, ": ");
             fe_db_writecstr(db, ty_name[arg->ty]);
         }
+        break;
+    case FE_MACH_REG:
+        FeVReg vr = inst->vr_out;
+        FeVirtualReg* vreg = fe_vreg(func->vregs, vr);
+        u8 class = vreg->class;
+        u16 real = vreg->real;
+        fe_db_writecstr(db, fe_reg_name(func->mod->target.arch, class, real));
         break;
     case _FE_XR_INST_BEGIN ... _FE_XR_INST_END:
         fe_xr_print_args(db, inst);
@@ -278,7 +285,7 @@ void fe_print_func(FeDataBuffer* db, FeFunction* func) {
         }
         for_inst(inst, block) {
             fe_db_writecstr(db, "    ");
-            print_inst(db, inst);
+            print_inst(func, db, inst);
         }
     }
     fe_db_writecstr(db, "}\n");

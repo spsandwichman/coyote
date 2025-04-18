@@ -55,15 +55,10 @@ int main(int argc, char** argv) {
     fe_init_signal_handler();
     FeInstPool ipool;
     fe_ipool_init(&ipool);
+    FeVRegBuffer vregs;
+    fe_vrbuf_init(&vregs, 2048);
 
     FeModule* mod = fe_new_module(FE_ARCH_XR17032);
-
-    /*
-        FN addmul(IN a: UQUAD, IN b: UQUAD, OUT b: UQUAD): UQUAD
-            b = a * b
-            RETURN a + b
-        END
-    */
 
     // set up function to call
     FeFuncSignature* sign = fe_new_funcsig(FE_CC_JACKAL, 2, 1);
@@ -73,14 +68,14 @@ int main(int argc, char** argv) {
 
     // make the function and its symbol
     FeSymbol* sym = fe_new_symbol(mod, "addmul", 0, FE_BIND_GLOBAL);
-    FeFunction* func = fe_new_function(mod, sym, sign, &ipool);    
+    FeFunction* func = fe_new_function(mod, sym, sign, &ipool, &vregs);   
     FeBlock* entry = func->entry_block;
 
     FeInst* add = fe_append_end(entry, fe_inst_binop(func,
         FE_TY_I32, FE_IADD,
         fe_func_param(func, 0),
-        // fe_func_param(func, 1)
-        fe_append_end(entry, fe_inst_const(func, FE_TY_I32, 10000))
+        fe_func_param(func, 1)
+        // fe_append_end(entry, fe_inst_const(func, FE_TY_I32, 0xFFFFF))
     ));
     FeInst* mul = fe_append_end(entry, fe_inst_binop(func,
         FE_TY_I32, FE_IMUL,
@@ -94,11 +89,14 @@ int main(int argc, char** argv) {
     // FeFunction* func = make_factorial(mod, &ipool);
     
     quick_print(func);
-    fe_xr_isel(func);
+    fe_isel(func);
     quick_print(func);
 }
 
 FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool) {
+
+    FeVRegBuffer vregs;
+    fe_vrbuf_init(&vregs, 2048);
 
     // set up function to call
     FeFuncSignature* fact_sig = fe_new_funcsig(FE_CC_JACKAL, 1, 1);
@@ -107,7 +105,7 @@ FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool) {
 
     // make the function and its symbol
     FeSymbol* fact_sym = fe_new_symbol(mod, "factorial", 0, FE_BIND_GLOBAL);
-    FeFunction* fact = fe_new_function(mod, fact_sym, fact_sig, ipool);
+    FeFunction* fact = fe_new_function(mod, fact_sym, fact_sig, ipool, &vregs);
 
     // construct the function's body
     FeBlock* entry = fact->entry_block;

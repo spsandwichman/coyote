@@ -13,7 +13,7 @@ static const u8 base_extra_size_table[] = {
 
     [FE_LOAD ... FE_LOAD_VOLATILE] = sizeof(FeInstLoad),
     [FE_STORE ... FE_STORE_VOLATILE] = sizeof(FeInstStore),
-    [FE_CASCADE_UNIQUE ... FE_FAKE_SOURCE] = 0,
+    [FE_CASCADE_UNIQUE ... FE_MACH_REG] = 0,
 
     [FE_BRANCH] = sizeof(FeInstBranch),
     [FE_JUMP] = sizeof(FeInstJump),
@@ -70,6 +70,15 @@ void fe_ipool_init(FeInstPool* pool) {
     }
 }
 
+static FeInst* init_inst(FeInst* inst) {
+    inst->kind = 0xFF;
+    inst->flags = 0;
+    inst->ty = FE_TY_VOID;
+    inst->next = NULL;
+    inst->prev = NULL;
+    return inst;
+}
+
 FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
     if (extra_size > FE_INST_EXTRA_MAX_SIZE)  {
         fe_runtime_crash("extra size > max size");
@@ -85,8 +94,7 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
             // pop from slot list
             FeInst* inst = (FeInst*)pool->free_spaces[i];
             pool->free_spaces[i] = pool->free_spaces[i]->next;
-            inst->kind = 0xFFFF;
-            return inst;
+            return init_inst(inst);
         }
     }
 
@@ -95,8 +103,7 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
         // allocate on this block!
         FeInst* inst = (FeInst*)&pool->top->data[pool->top->used];
         pool->top->used += node_slots;
-        inst->kind = 0xFFFF;
-        return inst;
+        return init_inst(inst);
     } 
 
     // TODO see if the rest of the space in this block can be
@@ -108,8 +115,7 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
     pool->top = new_chunk;
     new_chunk->used += node_slots;
     FeInst* inst = (FeInst*) &new_chunk->data;
-    inst->kind = 0xFFFF;
-    return inst;
+    return init_inst(inst);
 }
 
 void fe_ipool_free(FeInstPool* pool, FeInst* inst) {

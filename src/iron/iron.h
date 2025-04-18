@@ -68,8 +68,6 @@ enum FeCallConvEnum {
     FE_CC_JACKAL, // hi will
 };
 
-typedef u32 FeVReg; // vreg index.
-
 typedef u8 FeTy;
 typedef struct FeInst FeInst;
 typedef struct FeBlock FeBlock;
@@ -78,6 +76,9 @@ typedef struct FeFunction FeFunction;
 typedef struct FeFuncSignature FeFuncSignature;
 typedef struct FeModule FeModule;
 typedef struct FeInstPool FeInstPool;
+
+typedef u32 FeVReg; // vreg index.
+typedef struct FeVRegBuffer FeVRegBuffer;
 
 typedef u8 FeSymbolBinding;
 enum FeSymbolBindingEnum {
@@ -124,6 +125,7 @@ typedef struct FeFunction {
     FeSymbol* sym;
     FeModule* mod;
     FeInstPool* ipool;
+    FeVRegBuffer* vregs;
 
     FeInst** params;
 
@@ -284,7 +286,7 @@ enum FeInstKindEnum {
     // (none)
     FE_CASCADE_UNIQUE,
     FE_CASCADE_VOLATILE,
-    FE_FAKE_SOURCE,
+    FE_MACH_REG,
 
     // Branch
     FE_BRANCH,
@@ -444,7 +446,12 @@ FeFuncParam* fe_funcsig_param(FeFuncSignature* sig, usize index);
 FeFuncParam* fe_funcsig_return(FeFuncSignature* sig, usize index);
 
 FeBlock* fe_new_block(FeFunction* f);
-FeFunction* fe_new_function(FeModule* mod, FeSymbol* sym, FeFuncSignature* sig, FeInstPool* ipool);
+FeFunction* fe_new_function(
+    FeModule* mod, 
+    FeSymbol* sym, 
+    FeFuncSignature* sig, 
+    FeInstPool* ipool, 
+    FeVRegBuffer* vregs);
 FeInst* fe_func_param(FeFunction* f, usize index);
 
 FeInst* fe_insert_before(FeInst* point, FeInst* i);
@@ -452,6 +459,21 @@ FeInst* fe_insert_after(FeInst* point, FeInst* i);
 #define fe_append_begin(block, inst) fe_insert_after((block)->bookend, inst)
 #define fe_append_end(block, inst) fe_insert_before((block)->bookend, inst)
 FeInst* fe_inst_remove(FeInst* inst);
+void fe_inst_replace_pos(FeInst* from, FeInst* to);
+
+// a "chain" is a free-floating (not attached to a block)
+// list of instructions.
+typedef struct FeInstChain {
+    FeInst* begin;
+    FeInst* end;
+} FeInstChain;
+
+FeInstChain fe_new_chain(FeInst* initial);
+FeInstChain fe_chain_append_end(FeInstChain chain, FeInst* i);
+FeInstChain fe_chain_append_begin(FeInstChain chain, FeInst* i);
+void fe_insert_chain_before(FeInst* point, FeInstChain chain);
+void fe_insert_chain_after(FeInst* point, FeInstChain chain);
+void fe_chain_replace_pos(FeInst* from, FeInstChain to);
 
 void fe_inst_free(FeFunction* f, FeInst* inst);
 void fe_inst_update_uses(FeFunction* f);
@@ -471,7 +493,6 @@ void fe_set_return_arg(FeInst* ret, usize index, FeInst* arg);
 
 FeInst* fe_inst_branch(FeFunction* f, FeInst* cond, FeBlock* if_true, FeBlock* if_false);
 FeInst* fe_inst_jump(FeFunction* f, FeBlock* to);
-
 
 FeTy fe_proj_ty(FeInst* tuple, usize index);
 
@@ -499,13 +520,27 @@ void fe_ipool_destroy(FeInstPool* pool);
 
 // ----------------------------- codegen -----------------------------
 
-#define FE_REG_REAL_UNASSIGNED UINT16_MAX
+#define FE_VREG_REAL_UNASSIGNED UINT16_MAX
 
 typedef struct FeVirtualReg {
     u8 class;
     u16 real;
+    u16 hint;
     FeInst* def;
 } FeVirtualReg;
+
+typedef struct FeVRegBuffer {
+    FeVirtualReg* at;
+    u32 len;
+    u32 cap;
+} FeVRegBuffer;
+
+void fe_isel(FeFunction* f);
+char* fe_reg_name(FeArch arch, u8 class, u16 real);
+
+void fe_vrbuf_init(FeVRegBuffer* buf, usize cap);
+FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, u8 class);
+FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr);
 
 // ------------------------------ utils ------------------------------
 
@@ -547,7 +582,6 @@ noreturn void fe_runtime_crash(const char* error, ...);
 // initialize signal handler that calls fe_runtime_crash
 // in the event of a bad signal
 void fe_init_signal_handler();
-
 
 #include "xr17032/xr.h"
 
