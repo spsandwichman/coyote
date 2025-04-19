@@ -126,7 +126,7 @@ void fe_ipool_free(FeInstPool* pool, FeInst* inst) {
 
     // reclaim slots
     usize size_class = extra_size / sizeof(pool->top->data[0]);
-    while (extra[size_class] == 0 && size_class < FE_IPOOL_FREE_SPACES_LEN) {
+    while (size_class < FE_IPOOL_FREE_SPACES_LEN - 1 && extra[size_class] == 0) {
         size_class += 1;
     }
 
@@ -146,7 +146,7 @@ usize fe_ipool_free_manual(FeInstPool* pool, FeInst* inst) {
 
     // reclaim slots
     usize size_class = extra_size / sizeof(pool->top->data[0]);
-    while (extra[size_class] == 0 && size_class < FE_IPOOL_FREE_SPACES_LEN) {
+    while (size_class < FE_IPOOL_FREE_SPACES_LEN - 1 && extra[size_class] == 0) {
         size_class += 1;
     }
 
