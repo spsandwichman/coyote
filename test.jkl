@@ -1,18 +1,26 @@
-EXTERN x : ^Foo
+// #MACRO KeAssert ( expression ) [
+//     #DEFINE EXPR_STRING expression
+//     // #DEFINE EXPR_STRING ( STRCAT ( STRCAT "'" expression ) "'" )
+//     // #DEFINE FN_STRING ( STRCAT ( STRCAT "\"" JKL_FILE_NAME ) "\"" )
+//     // #DEFINE LN_STRING ( STRCAT "" JKL_LINE_NUMBER )
 
-x : ^Foo = NULLPTR
+//     // IF NOT (expression) THEN
+//     //     KeCrash (
+//     //         "%s%s:%d: %s\n", // fmt
+//     //         &KiAssertionMessage[0],
+//     //         FN_STRING,
+//     //         LN_STRING,
+//     //         EXPR_STRING,
+//     //     )
+//     // END
 
-STRUCT Baz
-    field: INT,
+//     EXPR_STRING
+// ]
+
+
+// KeAssert(1 + 2)
+
+FN add(IN a: UQUAD, IN b: UQUAD, OUT mul: UQUAD): UQUAD
+    mul = a * b
+    RETURN a + b
 END
-
-STRUCT Foo
-    field: BYTE,
-    field2: QUAD,
-    ptr: ^Baz,
-END
-
-// FN set(IN foo: ^Foo, IN y: BYTE): BYTE
-//     foo^.field = y
-//     RETURN y
-// END
