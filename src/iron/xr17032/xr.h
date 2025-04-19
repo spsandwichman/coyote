@@ -15,6 +15,13 @@ enum {
     FE_XR_SUB, // out = rb - rc
     FE_XR_MUL, // out = rb * rc
 
+    FE_XR_BEQ,
+    FE_XR_BNE,
+    FE_XR_BLT,
+    FE_XR_BGT,
+    FE_XR_BLE,
+    FE_XR_BGE,
+
     // void
     FE_XR_RET,
 };
@@ -22,7 +29,7 @@ enum {
 #define fe_kind_is_xr(kind) (_FE_XR_INST_BEGIN <= (kind) && (kind) <= _FE_XR_INST_END)
 
 typedef struct {
-    FeInst* val;
+    FeInst* reg;
     u16 num;
 } FeXrRegImm16;
 
@@ -30,6 +37,12 @@ typedef struct {
     FeInst* lhs;
     FeInst* rhs;
 } FeXrRegReg;
+
+typedef struct {
+    FeInst* reg;
+    FeBlock* dest;
+    FeBlock* _else; // gets emitted as a secondary jump IF NECESSARY
+} FeXrRegBranch;
 
 enum {
     XR_REGCLASS_REG = 1,
@@ -62,7 +75,9 @@ char* fe_xr_reg_name(u16 real);
 usize fe_xr_extra_size_unsafe(FeInstKind kind);
 void fe_xr_print_args(FeDataBuffer* db, FeInst* inst);
 FeInst** fe_xr_list_inputs(FeInst* inst, usize* len_out);
+FeBlock** fe_xr_term_list_targets(FeInst* term, usize* len_out);
 
 FeInstChain fe_xr_isel(FeFunction* f, FeInst* inst);
+void fe_xr_opt(FeFunction* f);
 
 #endif

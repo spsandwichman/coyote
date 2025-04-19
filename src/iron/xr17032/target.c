@@ -20,14 +20,21 @@ usize fe_xr_extra_size_unsafe(FeInstKind kind) {
 char* fe_xr_inst_name(FeInstKind kind) {
     switch (kind) {
     case FE_XR_ADDI: return "xr.addi";
-    case FE_XR_LUI: return "xr.lui";
+    case FE_XR_LUI:  return "xr.lui";
     case FE_XR_SUBI: return "xr.subi";
 
-    case FE_XR_ADD:  return "xr.add";
-    case FE_XR_SUB:  return "xr.sub";
-    case FE_XR_MUL:  return "xr.mul";
+    case FE_XR_ADD: return "xr.add";
+    case FE_XR_SUB: return "xr.sub";
+    case FE_XR_MUL: return "xr.mul";
 
-    case FE_XR_RET:  return "xr.ret";
+    case FE_XR_BEQ: return "xr.beq";
+    case FE_XR_BNE: return "xr.bne";
+    case FE_XR_BLT: return "xr.blt";
+    case FE_XR_BGT: return "xr.bgt";
+    case FE_XR_BLE: return "xr.ble";
+    case FE_XR_BGE: return "xr.bge";
+
+    case FE_XR_RET: return "xr.ret";
     }
     return "xr.???";
 }
@@ -80,7 +87,7 @@ void fe_xr_print_args(FeDataBuffer* db, FeInst* inst) {
     case FE_XR_ADDI:
     case FE_XR_LUI:
     case FE_XR_SUBI:
-        fe__print_ref(db, fe_extra_T(inst, FeXrRegImm16)->val);
+        fe__print_ref(db, fe_extra_T(inst, FeXrRegImm16)->reg);
         fe_db_writef(db, ", 0x%x", (u16)fe_extra_T(inst, FeXrRegImm16)->num);
         break;    
     case FE_XR_ADD:
@@ -90,6 +97,19 @@ void fe_xr_print_args(FeDataBuffer* db, FeInst* inst) {
         fe_db_writecstr(db, ", ");
         fe__print_ref(db, fe_extra_T(inst, FeXrRegReg)->rhs);
         break;    
+    case FE_XR_BEQ:
+    case FE_XR_BNE:
+    case FE_XR_BLT:
+    case FE_XR_BGT:
+    case FE_XR_BLE:
+    case FE_XR_BGE:
+        fe__print_ref(db, fe_extra_T(inst, FeXrRegBranch)->reg);
+        fe_db_writecstr(db, ", ");
+        fe__print_block(db, fe_extra_T(inst, FeXrRegBranch)->dest);
+        fe_db_writecstr(db, " (else ");
+        fe__print_block(db, fe_extra_T(inst, FeXrRegBranch)->_else);
+        fe_db_writecstr(db, ")");
+        break;
     case FE_XR_RET:
         break;
     default:
@@ -103,17 +123,44 @@ FeInst** fe_xr_list_inputs(FeInst* inst, usize* len_out) {
     case FE_XR_LUI:
     case FE_XR_SUBI:
         *len_out = 1;
-        return &fe_extra_T(inst, FeXrRegImm16)->val;
+        return &fe_extra_T(inst, FeXrRegImm16)->reg;
     case FE_XR_ADD:
     case FE_XR_SUB:
     case FE_XR_MUL:
         *len_out = 2;
-        return &fe_extra_T(inst, FeXrRegReg)->lhs;
+        return &fe_extra_T(inst, FeXrRegReg)->lhs;   
+    case FE_XR_BEQ:
+    case FE_XR_BNE:
+    case FE_XR_BLT:
+    case FE_XR_BGT:
+    case FE_XR_BLE:
+    case FE_XR_BGE:
+        *len_out = 1;
+        return &fe_extra_T(inst, FeXrRegBranch)->reg;
     case FE_XR_RET:
         *len_out = 0;
         return NULL;
     default:
         fe_runtime_crash("xr_list_inputs: unknown kind %d", inst->kind);
+        break;
+    }
+}
+
+FeBlock** fe_xr_term_list_targets(FeInst* term, usize* len_out) {
+    switch (term->kind) {
+    case FE_XR_BEQ:
+    case FE_XR_BNE:
+    case FE_XR_BLT:
+    case FE_XR_BGT:
+    case FE_XR_BLE:
+    case FE_XR_BGE:
+        *len_out = 2;
+        return &fe_extra_T(term, FeXrRegBranch)->dest;
+    case FE_XR_RET:
+        *len_out = 0;
+        return NULL;
+    default:
+        fe_runtime_crash("xr_list_targets: unknown kind %d", term->kind);
         break;
     }
 }

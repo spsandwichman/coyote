@@ -71,7 +71,6 @@ static const char* inst_name[_FE_BASE_INST_END] = {
     [FE_ILE] = "ile",
     [FE_ULE] = "ule",
     [FE_EQ]  = "eq",
-    [FE_NE]  = "ne",
 
     [FE_FADD] = "fadd",
     [FE_FSUB] = "fsub",
@@ -135,7 +134,7 @@ static void print_inst_ty(FeDataBuffer* db, FeInst* inst) {
     }
 }
 
-void fe__print_block_ref(FeDataBuffer* db, FeBlock* ref) {
+void fe__print_block(FeDataBuffer* db, FeBlock* ref) {
     if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->flags));
     fe_db_writef(db, "%u:", ref->flags);
     if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
@@ -190,9 +189,9 @@ static void print_inst(FeFunction* func, FeDataBuffer* db, FeInst* inst) {
         FeInstBranch* branch = fe_extra(inst);
         fe__print_ref(db, branch->cond);
         fe_db_writecstr(db, ", ");
-        fe__print_block_ref(db, branch->if_true);
+        fe__print_block(db, branch->if_true);
         fe_db_writecstr(db, ", ");
-        fe__print_block_ref(db, branch->if_false);
+        fe__print_block(db, branch->if_false);
         break;
     case FE_CONST:
         switch (inst->ty) {
@@ -280,7 +279,7 @@ void fe_print_func(FeDataBuffer* db, FeFunction* func) {
     for_blocks(block, func) {
         if (block != func->entry_block) {
             fe_db_writecstr(db, "  ");
-            fe__print_block_ref(db, block);
+            fe__print_block(db, block);
             fe_db_writecstr(db, "\n");
         }
         for_inst(inst, block) {

@@ -1,6 +1,7 @@
 SRCPATHS = \
 	src/*.c \
 	src/iron/*.c \
+	src/iron/opt/*.c \
 	src/iron/xr17032/*.c \
 	src/common/*.c \
 

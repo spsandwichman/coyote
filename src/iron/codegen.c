@@ -44,7 +44,7 @@ void fe_isel(FeFunction* f) {
     memset(isel_map, 0, sizeof(*isel_map) * inst_count);
 
     for_blocks(block, f) {
-        for_inst_reverse(inst, block) {
+        for_inst(inst, block) {
             FeInstChain sel = fe_xr_isel(f, inst);
             isel_map[inst->flags].from = inst;
             isel_map[inst->flags].to = sel;
@@ -77,6 +77,9 @@ void fe_isel(FeFunction* f) {
     }
 
     fe_free(isel_map);
+
+    fe_xr_opt(f);
+    fe_opt_tdce(f);
 
     printf("isel complete\n");
 }

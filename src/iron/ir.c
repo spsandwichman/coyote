@@ -120,53 +120,54 @@ FeInst* fe_func_param(FeFunction* f, usize index) {
     return f->params[index];
 }
 
-static void update_uses(FeInst* inst) {
-    switch (inst->kind) {
-    case FE_PROJ:
-    case FE_PROJ_VOLATILE:
-        fe_extra_T(inst, FeInstProj)->val->use_count++;
-        break;
-    case FE_IADD ... FE_FREM:
-        fe_extra_T(inst, FeInstBinop)->lhs->use_count++;
-        fe_extra_T(inst, FeInstBinop)->rhs->use_count++;
-        break;
-    case FE_MOV ... FE_F2I:
-        fe_extra_T(inst, FeInstUnop)->un->use_count++;
-        break;
-    case FE_LOAD ... FE_LOAD_VOLATILE:
-        fe_extra_T(inst, FeInstLoad)->ptr->use_count++;
-        break;
-    case FE_STORE ... FE_STORE_VOLATILE:
-        fe_extra_T(inst, FeInstStore)->ptr->use_count++;
-        fe_extra_T(inst, FeInstStore)->val->use_count++;
-        break;
-    case FE_BRANCH:
-        fe_extra_T(inst, FeInstBranch)->cond->use_count++;
-        break;
-    case FE_CALL_DIRECT:  
-    case FE_CALL_INDIRECT:
-        FeInstCallDirect* call = fe_extra(inst);
-        for_n(i, 0, call->len) {
-            fe_call_arg(inst, i)->use_count++;
-        }
-        break;
-    case FE_RETURN:
-        FeInstReturn* ret = fe_extra(inst);
-        for_n(i, 0, ret->len) {
-            fe_return_arg(inst, i)->use_count++;
-        }
-        break;
-    case FE_BOOKEND:
-    case FE_PARAM:
-    case FE_CONST:
-    case FE_CASCADE_UNIQUE:
-    case FE_CASCADE_VOLATILE:
-        break;
-    default:
-        fe_runtime_crash("register_uses: unknown kind %d", inst->kind);
-        break;
-    }
-}
+// static void update_uses(FeInst* inst) {
+//     switch (inst->kind) {
+//     case FE_PROJ:
+//     case FE_PROJ_VOLATILE:
+//         fe_extra_T(inst, FeInstProj)->val->use_count++;
+//         break;
+//     case FE_IADD ... FE_FREM:
+//         fe_extra_T(inst, FeInstBinop)->lhs->use_count++;
+//         fe_extra_T(inst, FeInstBinop)->rhs->use_count++;
+//         break;
+//     case FE_MOV ... FE_F2I:
+//         fe_extra_T(inst, FeInstUnop)->un->use_count++;
+//         break;
+//     case FE_LOAD ... FE_LOAD_VOLATILE:
+//         fe_extra_T(inst, FeInstLoad)->ptr->use_count++;
+//         break;
+//     case FE_STORE ... FE_STORE_VOLATILE:
+//         fe_extra_T(inst, FeInstStore)->ptr->use_count++;
+//         fe_extra_T(inst, FeInstStore)->val->use_count++;
+//         break;
+//     case FE_BRANCH:
+//         fe_extra_T(inst, FeInstBranch)->cond->use_count++;
+//         break;
+//     case FE_CALL_DIRECT:  
+//     case FE_CALL_INDIRECT:
+//         FeInstCallDirect* call = fe_extra(inst);
+//         for_n(i, 0, call->len) {
+//             fe_call_arg(inst, i)->use_count++;
+//         }
+//         break;
+//     case FE_RETURN:
+//         FeInstReturn* ret = fe_extra(inst);
+//         for_n(i, 0, ret->len) {
+//             fe_return_arg(inst, i)->use_count++;
+//         }
+//         break;
+//     case FE_MACH_REG:
+//     case FE_BOOKEND:
+//     case FE_PARAM:
+//     case FE_CONST:
+//     case FE_CASCADE_UNIQUE:
+//     case FE_CASCADE_VOLATILE:
+//         break;
+//     default:
+//         fe_runtime_crash("update_uses: unknown kind %d", inst->kind);
+//         break;
+//     }
+// }
 
 void fe_inst_update_uses(FeFunction* f) {
     for_blocks(block, f) {
@@ -176,7 +177,11 @@ void fe_inst_update_uses(FeFunction* f) {
     }
     for_blocks(block, f) {
         for_inst(inst, block) {
-            update_uses(inst);
+            usize len;
+            FeInst** inputs = fe_inst_list_inputs(inst, &len);
+            for_n (i, 0, len) {
+                inputs[i]->use_count++;
+            }
         }
     }
 }
@@ -218,6 +223,7 @@ FeInst** fe_inst_list_inputs(FeInst* inst, usize* len_out) {
         }
     case FE_RETURN:
         FeInstReturn* ret = fe_extra(inst);
+        *len_out = ret->len;
         if (ret->cap == 0) {
             return &ret->single;
         } else {
@@ -236,6 +242,28 @@ FeInst** fe_inst_list_inputs(FeInst* inst, usize* len_out) {
     default:
         fe_runtime_crash("list_inputs: unknown kind %d", inst->kind);
         break;
+    }
+}
+
+FeBlock** fe_inst_term_list_targets(FeInst* term, usize* len_out) {
+    if (!fe_inst_has_trait(term->kind, FE_TRAIT_TERMINATOR)) {
+        fe_runtime_crash("list_targets: inst %d is not a terminator", term->kind);
+    }
+    if (fe_kind_is_xr(term->kind)) {
+        return fe_xr_term_list_targets(term, len_out);
+    }
+
+    switch (term->kind) {
+    case FE_JUMP:
+        *len_out = 1;
+        return &fe_extra_T(term, FeInstJump)->to;
+    case FE_BRANCH:
+        *len_out = 2;
+        return &fe_extra_T(term, FeInstBranch)->if_true;
+    case FE_RETURN:
+    default:
+        *len_out = 0;
+        return NULL;
     }
 }
 
@@ -538,7 +566,8 @@ enum {
     FAST_ASSOC  = FE_TRAIT_FAST_ASSOCIATIVE,
 
     VOL         = FE_TRAIT_VOLATILE,
-    TERM        = FE_TRAIT_TERMINATOR,
+    // term always implies volatile
+    TERM        = FE_TRAIT_TERMINATOR | FE_TRAIT_VOLATILE,
     SAME_IN_OUT = FE_TRAIT_SAME_IN_OUT_TY,
     SAME_INS    = FE_TRAIT_SAME_INPUT_TYS,
     INT_IN      = FE_TRAIT_INT_INPUT_TYS,
@@ -572,7 +601,6 @@ static FeTrait inst_traits[_FE_INST_END] = {
     [FE_ILE]  = INT_IN | SAME_INS | BOOL_OUT,
     [FE_ULE]  = INT_IN | SAME_INS | BOOL_OUT,
     [FE_EQ]   = INT_IN | VEC_IN | SAME_INS | BOOL_OUT | COMMU,
-    [FE_NE]   = INT_IN | VEC_IN | SAME_INS | BOOL_OUT | COMMU,
 
     [FE_FADD] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | FAST_ASSOC | FAST_COMMU,
     [FE_FSUB] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
@@ -609,7 +637,8 @@ static FeTrait inst_traits[_FE_INST_END] = {
     [FE_XR_ADD]  = INT_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
     [FE_XR_SUB]  = INT_IN | SAME_IN_OUT | SAME_INS,
     [FE_XR_MUL]  = INT_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
-    [FE_XR_RET]  = VOL | TERM,
+    [FE_XR_BEQ ... FE_XR_BGE] = VOL | TERM,
+    [FE_XR_RET]  = TERM,
 };
 
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait) {

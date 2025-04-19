@@ -145,20 +145,29 @@ typedef struct FeModule {
     } funcs;
 } FeModule;
 
-// enum {
-//     FE_ATTR_LOOP_HEADER        = 1,
-//     FE_ATTR_AFFINE_LOOP_HEADER,
-//     FE_ATTR_LOOP_BODY,
-//     FE_ATTR_AFFINE_LOOP_BODY,
-// };
+typedef struct FeCFGNode FeCFGNode;
+typedef struct FeCFGNode {
+    FeBlock* block;
+    u16 out_len;
+    u16 in_len;
+    u16 rev_post;
+
+    FeCFGNode** ins;
+} FeCFGNode;
+
+#define fe_cfgn_in(cfgn, i) ((cfgn)->ins[i])
+#define fe_cfgn_out(cfgn, i) ((cfgn)->ins[i + (cfgn)->in_len])
 
 typedef struct FeBlock {
     FeFunction* func;
-    u64 flags;
+    u32 flags;
     FeInst* bookend;
 
     FeBlock* list_next;
     FeBlock* list_prev;
+
+    // dominance/cfg info
+    FeCFGNode* cfg_node;
 } FeBlock;
 
 #define for_funcs(f, modptr) \
@@ -254,7 +263,7 @@ enum FeInstKindEnum {
     FE_ILT, FE_ULT,
     FE_ILE, FE_ULE,
     FE_EQ,
-    FE_NE,
+    
     FE_FADD,
     FE_FSUB,
     FE_FMUL,
@@ -478,6 +487,7 @@ void fe_chain_replace_pos(FeInst* from, FeInstChain to);
 void fe_inst_free(FeFunction* f, FeInst* inst);
 void fe_inst_update_uses(FeFunction* f);
 FeInst** fe_inst_list_inputs(FeInst* inst, usize* len_out);
+FeBlock** fe_inst_term_list_targets(FeInst* term, usize* len_out);
 
 FeInst* fe_inst_const(FeFunction* f, FeTy ty, u64 val);
 FeInst* fe_inst_unop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* val);
@@ -517,6 +527,13 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size);
 void fe_ipool_free(FeInstPool* pool, FeInst* inst);
 usize fe_ipool_free_manual(FeInstPool* pool, FeInst* inst);
 void fe_ipool_destroy(FeInstPool* pool);
+
+// ------------------------------- opt -------------------------------
+
+void fe_calculate_cfg(FeFunction* f);
+
+void fe_opt_tdce(FeFunction* f);
+void fe_opt_algsimp(FeFunction* f);
 
 // ----------------------------- codegen -----------------------------
 
