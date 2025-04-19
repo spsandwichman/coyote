@@ -6,7 +6,7 @@ void fe_vrbuf_init(FeVRegBuffer* buf, usize cap) {
     buf->at = fe_malloc(cap * sizeof(buf->at[0]));
 }
 
-FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, u8 class) {
+FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class) {
     if (buf->len == buf->cap) {
         buf->cap += buf->cap >> 1;
         buf->at = fe_realloc(buf->at, buf->cap * sizeof(buf->at[0]));
@@ -14,12 +14,15 @@ FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, u8 class) {
     FeVReg vr = buf->len++;
     buf->at[vr].class = class;
     buf->at[vr].def = def;
+    buf->at[vr].def_block = def_block;
     buf->at[vr].real = FE_VREG_REAL_UNASSIGNED;
+    buf->at[vr].hint = FE_VREG_NONE;
     def->vr_out = vr;
     return vr;
 }
 
 FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr) {
+    if (vr == FE_VREG_NONE) return NULL;
     return &buf->at[vr];
 }
 
@@ -28,11 +31,18 @@ typedef struct {
     FeInst* from;
 } InstPair;
 
+/*
+    %3 = add %1, %2
+->
+    %3 = fox.add %1, %2
+*/
+
+
 void fe_isel(FeFunction* f) {
     fe_inst_update_uses(f);
 
+    usize START = 1;
     // assign each instruction an index starting from 1.
-    const usize START = 1;
     usize inst_count = START;
     for_blocks(block, f) {
         for_inst(inst, block) {
@@ -45,7 +55,7 @@ void fe_isel(FeFunction* f) {
 
     for_blocks(block, f) {
         for_inst(inst, block) {
-            FeInstChain sel = fe_xr_isel(f, inst);
+            FeInstChain sel = fe_xr_isel(f, block, inst);
             isel_map[inst->flags].from = inst;
             isel_map[inst->flags].to = sel;
         }
@@ -62,8 +72,7 @@ void fe_isel(FeFunction* f) {
             usize inputs_len = 0;
             FeInst** inputs = fe_inst_list_inputs(inst, &inputs_len);
             for_n(i, 0, inputs_len) {
-                if (inputs[i]->kind == FE_PARAM) continue;
-                if (inputs[i]->flags == 0) continue;
+                if (inputs[i]->flags == FE_ISEL_GENERATED) continue;
 
                 inputs[i] = isel_map[inputs[i]->flags].to.end;
             }
@@ -81,7 +90,21 @@ void fe_isel(FeFunction* f) {
     fe_xr_opt(f);
     fe_opt_tdce(f);
 
+    // create virtual registers for instructions that dont have them yet
+    for_blocks(block, f) {
+        for_inst(inst, block) {
+            if ((inst->ty != FE_TY_VOID || inst->ty != FE_TY_TUPLE) && inst->vr_out == FE_VREG_NONE) {
+                // TODO choose register class based on architecture and type
+                inst->vr_out = fe_vreg_new(f->vregs, inst, block, XR_REGCLASS_REG);
+            }
+        }
+    }
+
     printf("isel complete\n");
+
+    fe_regalloc_linear_scan(f);
+
+    printf("regalloc complete\n");
 }
 
 char* fe_reg_name(FeArch arch, u8 class, u16 real) {

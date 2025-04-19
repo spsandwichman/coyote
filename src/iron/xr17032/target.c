@@ -19,24 +19,24 @@ usize fe_xr_extra_size_unsafe(FeInstKind kind) {
 
 char* fe_xr_inst_name(FeInstKind kind) {
     switch (kind) {
-    case FE_XR_ADDI: return "xr.addi";
-    case FE_XR_LUI:  return "xr.lui";
-    case FE_XR_SUBI: return "xr.subi";
+    case FE_XR_ADDI: return "addi";
+    case FE_XR_LUI:  return "lui";
+    case FE_XR_SUBI: return "subi";
 
-    case FE_XR_ADD: return "xr.add";
-    case FE_XR_SUB: return "xr.sub";
-    case FE_XR_MUL: return "xr.mul";
+    case FE_XR_ADD: return "add";
+    case FE_XR_SUB: return "sub";
+    case FE_XR_MUL: return "mul";
 
-    case FE_XR_BEQ: return "xr.beq";
-    case FE_XR_BNE: return "xr.bne";
-    case FE_XR_BLT: return "xr.blt";
-    case FE_XR_BGT: return "xr.bgt";
-    case FE_XR_BLE: return "xr.ble";
-    case FE_XR_BGE: return "xr.bge";
+    case FE_XR_BEQ: return "beq";
+    case FE_XR_BNE: return "bne";
+    case FE_XR_BLT: return "blt";
+    case FE_XR_BGT: return "bgt";
+    case FE_XR_BLE: return "ble";
+    case FE_XR_BGE: return "bge";
 
-    case FE_XR_RET: return "xr.ret";
+    case FE_XR_RET: return "ret";
     }
-    return "xr.???";
+    return "???";
 }
 
 char* fe_xr_reg_name(u16 real) {
@@ -54,7 +54,6 @@ char* fe_xr_reg_name(u16 real) {
     case XR_REG_A1: return "a1";
     case XR_REG_A2: return "a2";
     case XR_REG_A3: return "a3";
-    case XR_REG_A4: return "a4";
 
     case XR_REG_S0: return "s0";
     case XR_REG_S1: return "s1";
@@ -82,20 +81,63 @@ char* fe_xr_reg_name(u16 real) {
     return "???";
 }
 
-void fe_xr_print_args(FeDataBuffer* db, FeInst* inst) {
+FeRegStatus fe_xr_reg_status(u16 real) {
+    switch (real) {
+    case XR_REG_ZERO:
+        return FE_REG_UNUSABLE;
+    case XR_REG_T0:
+    case XR_REG_T1:
+    case XR_REG_T2:
+    case XR_REG_T3:
+    case XR_REG_T4:
+    case XR_REG_T5:
+        return FE_REG_CALL_CLOBBERED;
+    case XR_REG_A0:
+    case XR_REG_A1:
+    case XR_REG_A2:
+    case XR_REG_A3:
+        return FE_REG_CALL_CLOBBERED;
+    case XR_REG_S0:
+    case XR_REG_S1:
+    case XR_REG_S2:
+    case XR_REG_S3:
+    case XR_REG_S4:
+    case XR_REG_S5:
+    case XR_REG_S6:
+    case XR_REG_S7:
+    case XR_REG_S8:
+    case XR_REG_S9:
+    case XR_REG_S10:
+    case XR_REG_S11:
+    case XR_REG_S12:
+    case XR_REG_S13:
+    case XR_REG_S14:
+    case XR_REG_S15:
+    case XR_REG_S16:
+    case XR_REG_S17:
+        return FE_REG_CALL_PRESERVED;
+    case XR_REG_TP:
+    case XR_REG_SP:
+    case XR_REG_LR:
+    default: 
+        return FE_REG_UNUSABLE;
+    }
+}
+
+void fe_xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
     switch (inst->kind) {
     case FE_XR_ADDI:
     case FE_XR_LUI:
     case FE_XR_SUBI:
-        fe__print_ref(db, fe_extra_T(inst, FeXrRegImm16)->reg);
+        fe__print_ref(f, db, fe_extra_T(inst, FeXrRegImm16)->reg);
         fe_db_writef(db, ", 0x%x", (u16)fe_extra_T(inst, FeXrRegImm16)->num);
         break;    
     case FE_XR_ADD:
     case FE_XR_SUB:
     case FE_XR_MUL:
-        fe__print_ref(db, fe_extra_T(inst, FeXrRegReg)->lhs);
+        fe__print_ref(f, db, fe_extra_T(inst, FeXrRegReg)->lhs);
         fe_db_writecstr(db, ", ");
-        fe__print_ref(db, fe_extra_T(inst, FeXrRegReg)->rhs);
+        fe__print_ref(f, db, fe_extra_T(inst, FeXrRegReg)->rhs);
         break;    
     case FE_XR_BEQ:
     case FE_XR_BNE:
@@ -103,11 +145,11 @@ void fe_xr_print_args(FeDataBuffer* db, FeInst* inst) {
     case FE_XR_BGT:
     case FE_XR_BLE:
     case FE_XR_BGE:
-        fe__print_ref(db, fe_extra_T(inst, FeXrRegBranch)->reg);
+        fe__print_ref(f, db, fe_extra_T(inst, FeXrRegBranch)->reg);
         fe_db_writecstr(db, ", ");
-        fe__print_block(db, fe_extra_T(inst, FeXrRegBranch)->dest);
+        fe__print_block(f, db, fe_extra_T(inst, FeXrRegBranch)->dest);
         fe_db_writecstr(db, " (else ");
-        fe__print_block(db, fe_extra_T(inst, FeXrRegBranch)->_else);
+        fe__print_block(f, db, fe_extra_T(inst, FeXrRegBranch)->_else);
         fe_db_writecstr(db, ")");
         break;
     case FE_XR_RET:

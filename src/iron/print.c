@@ -134,22 +134,30 @@ static void print_inst_ty(FeDataBuffer* db, FeInst* inst) {
     }
 }
 
-void fe__print_block(FeDataBuffer* db, FeBlock* ref) {
+void fe__print_block(FeFunction* f, FeDataBuffer* db, FeBlock* ref) {
     if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->flags));
     fe_db_writef(db, "%u:", ref->flags);
     if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
 }
 
-void fe__print_ref(FeDataBuffer* db, FeInst* ref) {
+void fe__print_ref(FeFunction* f, FeDataBuffer* db, FeInst* ref) {
     if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->flags));
     fe_db_writef(db, "%%%u", ref->flags);
+    if (ref->vr_out != FE_VREG_NONE) {
+        // BAD ASSUMPTION
+        if (fe_vreg(f->vregs, ref->vr_out)->real == FE_VREG_REAL_UNASSIGNED) {
+            fe_db_writef(db, "(vr%u)", ref->vr_out);
+        } else {
+            fe_db_writef(db, "(%s)", fe_reg_name(FE_ARCH_XR17032, XR_REGCLASS_REG, fe_vreg(f->vregs, ref->vr_out)->real));
+        }
+    }
     if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
 }
 
-static void print_inst(FeFunction* func, FeDataBuffer* db, FeInst* inst) {
+static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
 
     if (inst->ty != FE_TY_VOID) {
-        fe__print_ref(db, inst);
+        fe__print_ref(f, db, inst);
         fe_db_writef(db, ": ");
         print_inst_ty(db, inst);
         fe_db_writecstr(db, " = ");
@@ -161,6 +169,7 @@ static void print_inst(FeFunction* func, FeDataBuffer* db, FeInst* inst) {
         if (name) fe_db_writecstr(db, name);
         else fe_db_writef(db, "<kind %d>", inst->kind);
     } else if (fe_kind_is_xr(inst->kind)) {
+        fe_db_writecstr(db, "xr.");
         fe_db_writecstr(db, fe_xr_inst_name(inst->kind));
     }
 
@@ -168,12 +177,12 @@ static void print_inst(FeFunction* func, FeDataBuffer* db, FeInst* inst) {
 
     switch (inst->kind) {
     case FE_IADD ... FE_FREM:
-        fe__print_ref(db, fe_extra_T(inst, FeInstBinop)->lhs);
+        fe__print_ref(f, db, fe_extra_T(inst, FeInstBinop)->lhs);
         fe_db_writecstr(db, ", ");
-        fe__print_ref(db, fe_extra_T(inst, FeInstBinop)->rhs);
+        fe__print_ref(f, db, fe_extra_T(inst, FeInstBinop)->rhs);
         break;
     case FE_MOV ... FE_F2I:
-        fe__print_ref(db, fe_extra_T(inst, FeInstUnop)->un);
+        fe__print_ref(f, db, fe_extra_T(inst, FeInstUnop)->un);
         break;
     case FE_PARAM:
         fe_db_writef(db, "%u", fe_extra_T(inst, FeInstParam)->index);
@@ -182,16 +191,16 @@ static void print_inst(FeFunction* func, FeDataBuffer* db, FeInst* inst) {
         FeInstReturn* ret = fe_extra(inst);
         for_n(i, 0, ret->len) {
             if (i != 0) fe_db_writecstr(db, ", ");
-            fe__print_ref(db, fe_return_arg(inst, i));
+            fe__print_ref(f, db, fe_return_arg(inst, i));
         }
         break;
     case FE_BRANCH:
         FeInstBranch* branch = fe_extra(inst);
-        fe__print_ref(db, branch->cond);
+        fe__print_ref(f, db, branch->cond);
         fe_db_writecstr(db, ", ");
-        fe__print_block(db, branch->if_true);
+        fe__print_block(f, db, branch->if_true);
         fe_db_writecstr(db, ", ");
-        fe__print_block(db, branch->if_false);
+        fe__print_block(f, db, branch->if_false);
         break;
     case FE_CONST:
         switch (inst->ty) {
@@ -213,20 +222,20 @@ static void print_inst(FeFunction* func, FeDataBuffer* db, FeInst* inst) {
         for_n(i, 0, dcall->len) {
             FeInst* arg = fe_call_arg(inst, i);
             if (i != 0) fe_db_writecstr(db, ", ");
-            fe__print_ref(db, arg);
+            fe__print_ref(f, db, arg);
             fe_db_writecstr(db, ": ");
             fe_db_writecstr(db, ty_name[arg->ty]);
         }
         break;
     case FE_MACH_REG:
         FeVReg vr = inst->vr_out;
-        FeVirtualReg* vreg = fe_vreg(func->vregs, vr);
+        FeVirtualReg* vreg = fe_vreg(f->vregs, vr);
         u8 class = vreg->class;
         u16 real = vreg->real;
-        fe_db_writecstr(db, fe_reg_name(func->mod->target.arch, class, real));
+        fe_db_writecstr(db, fe_reg_name(f->mod->target.arch, class, real));
         break;
     case _FE_XR_INST_BEGIN ... _FE_XR_INST_END:
-        fe_xr_print_args(db, inst);
+        fe_xr_print_args(f, db, inst);
         break;
     default:
         fe_db_writef(db, "[TODO]");
@@ -234,14 +243,11 @@ static void print_inst(FeFunction* func, FeDataBuffer* db, FeInst* inst) {
     fe_db_writecstr(db, "\n");
 }
 
-void fe_print_func(FeDataBuffer* db, FeFunction* func) {
+void fe_print_func(FeDataBuffer* db, FeFunction* f) {
     // number all instructions and blocks
     u32 inst_counter = 0;
     u32 block_counter = 0;
-    for_n(i, 0, func->sig->param_len) {
-        fe_func_param(func, i)->flags = inst_counter++;
-    }
-    for_blocks(block, func) {
+    for_blocks(block, f) {
         block->flags = block_counter++;
         for_inst(inst, block) {
             if (inst->ty != FE_TY_VOID)
@@ -249,7 +255,7 @@ void fe_print_func(FeDataBuffer* db, FeFunction* func) {
         }
     }
 
-    switch (func->sym->bind) {
+    switch (f->sym->bind) {
     case FE_BIND_GLOBAL: fe_db_writecstr(db, "global "); break;
     case FE_BIND_LOCAL:  fe_db_writecstr(db, "local "); break;
     case FE_BIND_SHARED_EXPORT: fe_db_writecstr(db, "shared_export "); break;
@@ -257,35 +263,55 @@ void fe_print_func(FeDataBuffer* db, FeFunction* func) {
     }
 
     // write function signature
-    fe_db_writef(db, "func \"%.*s\"", func->sym->name_len, func->sym->name);
-    if (func->sig->param_len) {
+    fe_db_writef(db, "func \"%.*s\"", f->sym->name_len, f->sym->name);
+    if (f->sig->param_len) {
         fe_db_writecstr(db, " ");
-        for_n(i, 0, func->sig->param_len) {
+        for_n(i, 0, f->sig->param_len) {
             if (i != 0) fe_db_writecstr(db, ", ");
-            fe__print_ref(db, fe_func_param(func, i));
+            fe__print_ref(f, db, fe_func_param(f, i));
             fe_db_writecstr(db, ": ");
-            fe_db_writecstr(db, ty_name[fe_funcsig_param(func->sig, i)->ty]);
+            fe_db_writecstr(db, ty_name[fe_funcsig_param(f->sig, i)->ty]);
         }
     }
-    if (func->sig->return_len) {
+    if (f->sig->return_len) {
         fe_db_writecstr(db, " -> ");
-        for_n(i, 0, func->sig->return_len) {
+        for_n(i, 0, f->sig->return_len) {
             if (i != 0) fe_db_writecstr(db, ", ");
-            fe_db_writecstr(db, ty_name[fe_funcsig_return(func->sig, i)->ty]);
+            fe_db_writecstr(db, ty_name[fe_funcsig_return(f->sig, i)->ty]);
         }
     }
     // write function body
     fe_db_writecstr(db, " {\n");
-    for_blocks(block, func) {
-        if (block != func->entry_block) {
+    for_blocks(block, f) {
+        if (block != f->entry_block) {
             fe_db_writecstr(db, "  ");
-            fe__print_block(db, block);
+            fe__print_block(f, db, block);
             fe_db_writecstr(db, "\n");
         }
+        
+        // print live-in set if present
+        // if (block->live) {
+        //     fe_db_writecstr(db, "  in ");
+        //     for_n(i, 0, block->live->in_len) {
+        //         FeVReg in = block->live->in[i];
+        //         fe_db_writef(db, "vr%u, ", in);
+        //     }
+        //     fe_db_writecstr(db, "\n");
+        // }
+
         for_inst(inst, block) {
             fe_db_writecstr(db, "    ");
-            print_inst(func, db, inst);
+            print_inst(f, db, inst);
         }
+        // print live-in set if present
+        // if (block->live) {
+        //     fe_db_writecstr(db, "  out ");
+        //     for_n(i, 0, block->live->out_len) {
+        //         FeVReg out = block->live->out[i];
+        //         fe_db_writef(db, "vr%u, ", out);
+        //     }
+        //     fe_db_writecstr(db, "\n");
+        // }
     }
     fe_db_writecstr(db, "}\n");
 }

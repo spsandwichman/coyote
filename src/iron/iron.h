@@ -79,6 +79,7 @@ typedef struct FeInstPool FeInstPool;
 
 typedef u32 FeVReg; // vreg index.
 typedef struct FeVRegBuffer FeVRegBuffer;
+typedef struct FeBlockLiveness FeBlockLiveness;
 
 typedef u8 FeSymbolBinding;
 enum FeSymbolBindingEnum {
@@ -169,6 +170,8 @@ typedef struct FeBlock {
 
     // dominance/cfg info
     FeCFGNode* cfg_node;
+    // liveness info
+    FeBlockLiveness* live;
 } FeBlock;
 
 #define for_funcs(f, modptr) \
@@ -441,6 +444,9 @@ enum FeTraitEnum {
     FE_TRAIT_VEC_INPUT_TYS    = 1u << 10,
     // output type = bool
     FE_TRAIT_BOOL_OUT_TY      = 1u << 11,
+    // reg<-reg move; allocator should hint
+    // the output and input to be the same
+    FE_TRAIT_REG_MOV_HINT     = 1u << 12,
 };
 
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait);
@@ -539,13 +545,31 @@ void fe_opt_algsimp(FeFunction* f);
 
 // ----------------------------- codegen -----------------------------
 
+#define FE_ISEL_GENERATED 0
 #define FE_VREG_REAL_UNASSIGNED UINT16_MAX
+#define FE_VREG_NONE UINT32_MAX
+
+typedef struct FeBlockLiveness {
+    FeBlock* block;
+
+    u16 in_len;
+    u16 in_cap;
+    
+    u16 out_len;
+    u16 out_cap;
+
+    FeVReg* in;
+    FeVReg* out;
+} FeBlockLiveness;
 
 typedef struct FeVirtualReg {
     u8 class;
     u16 real;
-    u16 hint;
+    
+    FeVReg hint;
+
     FeInst* def;
+    FeBlock* def_block;
 } FeVirtualReg;
 
 typedef struct FeVRegBuffer {
@@ -554,11 +578,18 @@ typedef struct FeVRegBuffer {
     u32 cap;
 } FeVRegBuffer;
 
+typedef enum {
+    FE_REG_CALL_CLOBBERED,
+    FE_REG_CALL_PRESERVED,
+    FE_REG_UNUSABLE,
+} FeRegStatus;
+
 void fe_isel(FeFunction* f);
+void fe_regalloc_linear_scan(FeFunction* f);
 char* fe_reg_name(FeArch arch, u8 class, u16 real);
 
 void fe_vrbuf_init(FeVRegBuffer* buf, usize cap);
-FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, u8 class);
+FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class);
 FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr);
 
 // ------------------------------ utils ------------------------------
@@ -592,8 +623,8 @@ usize fe_db_write64(FeDataBuffer* buf, u64 data);
 usize fe_db_writef(FeDataBuffer* buf, const char* fmt, ...);
 
 void fe_print_func(FeDataBuffer* db, FeFunction* f);
-void fe__print_block(FeDataBuffer* db, FeBlock* ref);
-void fe__print_ref(FeDataBuffer* db, FeInst* ref);
+void fe__print_block(FeFunction* f, FeDataBuffer* db, FeBlock* ref);
+void fe__print_ref(FeFunction* f, FeDataBuffer* db, FeInst* ref);
 
 // crash at runtime with a stack trace (if available)
 noreturn void fe_runtime_crash(const char* error, ...);

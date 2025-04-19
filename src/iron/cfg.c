@@ -66,15 +66,15 @@ void fe_calculate_cfg(FeFunction* f) {
     number(f->entry_block->cfg_node, &rpo);
 
     // emit graphviz
-    printf("digraph CFG {\n");
-    for (FeBlock* b = f->entry_block; b != NULL; b = b->list_next) {
-        FeCFGNode* n = b->cfg_node;
+    // printf("digraph CFG {\n");
+    // for (FeBlock* b = f->entry_block; b != NULL; b = b->list_next) {
+    //     FeCFGNode* n = b->cfg_node;
 
-        printf("  B%u -> { ", n->rev_post);
-        for_n(i, 0, n->out_len) {
-            printf("B%u ", fe_cfgn_out(n, i)->rev_post);
-        }
-        printf("}\n");
-    }
-    printf("}\n");
+    //     printf("  B%u -> { ", n->rev_post);
+    //     for_n(i, 0, n->out_len) {
+    //         printf("B%u ", fe_cfgn_out(n, i)->rev_post);
+    //     }
+    //     printf("}\n");
+    // }
+    // printf("}\n");
 }

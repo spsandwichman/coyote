@@ -76,6 +76,7 @@ static FeInst* init_inst(FeInst* inst) {
     inst->ty = FE_TY_VOID;
     inst->next = NULL;
     inst->prev = NULL;
+    inst->vr_out = FE_VREG_NONE;
     return inst;
 }
 
