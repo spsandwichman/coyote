@@ -4,15 +4,7 @@ static FeInst* peephole(FeInst* inst) {
     FeXrRegImm16* reg_imm16 = fe_extra(inst);
     switch (inst->kind) {
     case FE_XR_ADDI:
-        if (reg_imm16->num == 0) {
-            return reg_imm16->reg;
-        }
-        break;
     case FE_XR_SUBI:
-        if (reg_imm16->num == 0) {
-            return reg_imm16->reg;
-        }
-        break;
     case FE_XR_LUI:
         if (reg_imm16->num == 0) {
             return reg_imm16->reg;

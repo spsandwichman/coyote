@@ -94,12 +94,12 @@ FeFunction* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vre
         fe_append_end(entry, fe_inst_branch(fact, eq, if_true, if_false));
     }
     { // if_true block
-        FeInst* const1 = fe_append_end(if_true, fe_inst_const(fact, FE_TY_I32, 0xFFFF0000));
+        FeInst* const1 = fe_append_end(if_true, fe_inst_const(fact, FE_TY_I32, 0xAFFF));
         FeInst* ret = fe_append_end(if_true, fe_inst_return(fact));
         fe_set_return_arg(ret, 0, const1);
     }
     { // if_false block
-        FeInst* const1 = fe_append_end(if_false, fe_inst_const(fact, FE_TY_I32, 0xFFFF));
+        FeInst* const1 = fe_append_end(if_false, fe_inst_const(fact, FE_TY_I32, 0xFF00FFFF));
         FeInst* ret = fe_append_end(if_false, fe_inst_return(fact));
         fe_set_return_arg(ret, 0, const1);
     }

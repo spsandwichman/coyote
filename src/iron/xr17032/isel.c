@@ -8,6 +8,15 @@ static bool can_const_u16(FeInst* inst) {
     return inst->kind == FE_CONST && fe_extra_T(inst, FeInstConst)->val <= UINT16_MAX;
 }
 
+static bool can_subi_const_u16(FeInst* inst) {
+    return inst->kind == FE_CONST && fe_extra_T(inst, FeInstConst)->val >= 0xFFFF0001ull;
+}
+
+static u16 as_subi_const_u16(FeInst* inst) {
+    // imm = -x
+    return (u16)-fe_extra_T(inst, FeInstConst)->val;
+}
+
 static u16 as_u16(FeInst* inst) {
     return (u16)fe_extra_T(inst, FeInstConst)->val;
 }
@@ -32,7 +41,7 @@ FeInstChain fe_xr_isel(FeFunction* f, FeInst* inst) {
 
     switch (inst->kind) {
     case FE_CONST:
-        if (false && can_const_u16(inst)) {
+        if (can_const_u16(inst)) {
             // emit as just an ADDI.
             FeInst* addi = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
             addi->kind = FE_XR_ADDI; addi->ty = FE_TY_I32;
@@ -40,6 +49,16 @@ FeInstChain fe_xr_isel(FeFunction* f, FeInst* inst) {
             fe_extra_T(addi, FeXrRegImm16)->reg = zero;
             fe_extra_T(addi, FeXrRegImm16)->num = as_u16(inst);
             FeInstChain chain = fe_new_chain(addi);
+            chain = fe_chain_append_begin(chain, zero);
+            return chain;
+        } if (can_subi_const_u16(inst)) {
+            // emit as a SUBI.
+            FeInst* subi = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
+            subi->kind = FE_XR_SUBI; subi->ty = FE_TY_I32;
+            FeInst* zero = fake_zero(f);
+            fe_extra_T(subi, FeXrRegImm16)->reg = zero;
+            fe_extra_T(subi, FeXrRegImm16)->num = as_subi_const_u16(inst);
+            FeInstChain chain = fe_new_chain(subi);
             chain = fe_chain_append_begin(chain, zero);
             return chain;
         } else {
@@ -146,10 +165,9 @@ FeInstChain fe_xr_isel(FeFunction* f, FeInst* inst) {
         for_n(i, 0, inst_ret->len) {
             FeInst* mov = fe_ipool_alloc(f->ipool, sizeof(FeInstUnop));
             mov->kind = FE_MOV_VOLATILE;
-            mov->ty = FE_TY_VOID;
+            mov->ty = FE_TY_I32;
             mov->flags = 0;
             fe_extra_T(mov, FeInstUnop)->un = fe_return_arg(inst, i);
-            // fe_insert_before(inst, mov);
             chain = fe_chain_append_begin(chain, mov);
         }
         return chain;

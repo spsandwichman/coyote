@@ -31,7 +31,7 @@ static void worklist_destroy(Worklist* wl) {
     *wl = (Worklist){0};
 }
 
-#define TDCE_DEAD_LMAO 0xDEAD
+#define TDCE_DEAD_LMAO 0xDEADDEAD
 
 void fe_opt_tdce(FeFunction* f) {
     // TODO fuck all these worklists into OUTERED SPACE

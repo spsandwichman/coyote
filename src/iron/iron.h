@@ -124,6 +124,7 @@ typedef struct FeFunction {
     FeFuncSignature* sig;
     FeSymbol* sym;
     FeModule* mod;
+
     FeInstPool* ipool;
     FeVRegBuffer* vregs;
 
@@ -319,36 +320,6 @@ enum FeInstKindEnum {
     _FE_INST_END,
 };
 
-typedef u16 FeTrait;
-enum FeTraitEnum {
-    // x op y == y op x
-    FE_TRAIT_COMMUTATIVE      = 1u << 0,
-    // x op y == y op x trust me vro 💀🙏🥀
-    FE_TRAIT_FAST_COMMUTATIVE = 1u << 1,
-    // (x op y) op z == x op (y op z)
-    FE_TRAIT_ASSOCIATIVE      = 1u << 2,
-    // (x op y) op z == x op (y op z) trust me vro 💀🙏🥀
-    FE_TRAIT_FAST_ASSOCIATIVE = 1u << 3,
-    // cannot be simply removed if result is not used
-    FE_TRAIT_VOLATILE         = 1u << 4,
-    // can only terminate a basic block
-    FE_TRAIT_TERMINATOR       = 1u << 5,
-    // output type = first input type
-    FE_TRAIT_SAME_IN_OUT_TY   = 1u << 6,
-    // all input types must be the same type  
-    FE_TRAIT_SAME_INPUT_TYS   = 1u << 7,
-    // all input types must be integers
-    FE_TRAIT_INT_INPUT_TYS    = 1u << 8,
-    // all input types must be floats
-    FE_TRAIT_FLT_INPUT_TYS    = 1u << 9,
-    // allow vector types
-    FE_TRAIT_VEC_INPUT_TYS    = 1u << 10,
-    // output type = bool
-    FE_TRAIT_BOOL_OUT_TY      = 1u << 11,
-};
-
-bool fe_inst_has_trait(FeInstKind kind, FeTrait trait);
-
 typedef struct FeInst {
     FeInstKind kind;
     FeTy ty;
@@ -443,6 +414,37 @@ typedef struct {
     FeInst* to_call;
     FeFuncSignature* sig;
 } FeInstCallIndirect;
+
+typedef u16 FeTrait;
+enum FeTraitEnum {
+    // x op y == y op x
+    FE_TRAIT_COMMUTATIVE      = 1u << 0,
+    // x op y == y op x trust me vro 💀🙏🥀
+    FE_TRAIT_FAST_COMMUTATIVE = 1u << 1,
+    // (x op y) op z == x op (y op z)
+    FE_TRAIT_ASSOCIATIVE      = 1u << 2,
+    // (x op y) op z == x op (y op z) trust me vro 💀🙏🥀
+    FE_TRAIT_FAST_ASSOCIATIVE = 1u << 3,
+    // cannot be simply removed if result is not used
+    FE_TRAIT_VOLATILE         = 1u << 4,
+    // can only terminate a basic block
+    FE_TRAIT_TERMINATOR       = 1u << 5,
+    // output type = first input type
+    FE_TRAIT_SAME_IN_OUT_TY   = 1u << 6,
+    // all input types must be the same type  
+    FE_TRAIT_SAME_INPUT_TYS   = 1u << 7,
+    // all input types must be integers
+    FE_TRAIT_INT_INPUT_TYS    = 1u << 8,
+    // all input types must be floats
+    FE_TRAIT_FLT_INPUT_TYS    = 1u << 9,
+    // allow vector types
+    FE_TRAIT_VEC_INPUT_TYS    = 1u << 10,
+    // output type = bool
+    FE_TRAIT_BOOL_OUT_TY      = 1u << 11,
+};
+
+bool fe_inst_has_trait(FeInstKind kind, FeTrait trait);
+
 
 usize fe_inst_extra_size(FeInstKind kind);
 usize fe_inst_extra_size_unsafe(FeInstKind kind);
