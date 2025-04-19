@@ -79,7 +79,7 @@ void fe_init_signal_handler() {
     signal(SIGSEGV, signal_handler);
     signal(SIGINT, signal_handler);
     signal(SIGFPE, signal_handler);
-    signal(SIGTERM, signal_handler);
+    signal(SIGTERM, signal_handler); 
 }
 #else
 static void signal_handler(int sig, siginfo_t* info, void* ucontext) {
@@ -93,6 +93,9 @@ static void signal_handler(int sig, siginfo_t* info, void* ucontext) {
         break;
     case SIGFPE:
         fe_runtime_crash("fatal arithmetic exception");
+        break;
+    case SIGABRT:
+        fe_runtime_crash("sigabrt lmao");
         break;
     default:
         fe_runtime_crash("unhandled signal %s caught", strsignal(sig));
@@ -111,6 +114,10 @@ void fe_init_signal_handler() {
     }
     if (sigaction(SIGFPE, &sa, NULL) == -1) {
         printf("sigaction to catch SIGFPE failed.");
+        exit(-1);
+    }
+    if (sigaction(SIGABRT, &sa, NULL) == -1) {
+        printf("sigaction to catch SIGABRT failed.");
         exit(-1);
     }
 }
