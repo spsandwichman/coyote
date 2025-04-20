@@ -503,7 +503,7 @@ FeTy fe_proj_ty(FeInst* tuple, usize index) {
     return FE_TY_VOID;
 }
 
-enum: u16 {
+enum {
     // if something is commutative, it is also fast-commutative.
     COMMU       = FE_TRAIT_COMMUTATIVE | FE_TRAIT_FAST_COMMUTATIVE,
     FAST_COMMU  = FE_TRAIT_FAST_COMMUTATIVE,

@@ -3,7 +3,7 @@
 
 #include "iron/iron.h"
 
-enum: u16 {
+enum {
     // FeXrRegImm16
 
     FE_XR_ADDI = _FE_XR_INST_BEGIN, // out = rb + uimm16
@@ -44,11 +44,11 @@ typedef struct {
     FeBlock* _else; // gets emitted as a secondary jump IF NECESSARY
 } FeXrRegBranch;
 
-enum: u8 {
+enum {
     XR_REGCLASS_REG = 1,
 };
 
-enum: u8 {
+enum {
     XR_REG_ZERO,
 
     // temporary registers (jkl: caller-saved)

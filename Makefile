@@ -17,7 +17,7 @@ LD = gcc
 INCLUDEPATHS = -Isrc/
 DEBUGFLAGS = -lm -pg -g -Wall -Wextra 
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
-CFLAGS = -g -Wall -Wimplicit-fallthrough -fwrapv -Wno-format -MD -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations -Wno-switch
+CFLAGS = -g -Wall -Wimplicit-fallthrough -fwrapv -Wno-format -MD -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
 OPT = -O0
 
 ifeq ($(OS),Windows_NT)
