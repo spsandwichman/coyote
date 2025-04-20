@@ -34,6 +34,8 @@ static void worklist_destroy(Worklist* wl) {
 #define TDCE_DEAD_LMAO 0xDEADDEAD
 
 void fe_opt_tdce(FeFunction* f) {
+    FeTarget* t = f->mod->target;
+
     // TODO fuck all these worklists into OUTERED SPACE
     Worklist wl;
     Worklist dead;
@@ -64,7 +66,7 @@ void fe_opt_tdce(FeFunction* f) {
 
             // decrement all input use counts
             usize len;
-            FeInst** inputs = fe_inst_list_inputs(inst, &len);
+            FeInst** inputs = fe_inst_list_inputs(t, inst, &len);
             for_n (i, 0, len) {
                 if (inputs[i]->flags == TDCE_DEAD_LMAO) {
                     continue;

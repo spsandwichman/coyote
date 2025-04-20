@@ -31,7 +31,9 @@ typedef struct {
     FeInst* from;
 } InstPair;
 
-void fe_isel(FeFunction* f) {
+void fe_codegen(FeFunction* f) {
+    FeTarget* target = f->mod->target;
+
     fe_inst_update_uses(f);
 
     usize START = 1;
@@ -48,7 +50,7 @@ void fe_isel(FeFunction* f) {
 
     for_blocks(block, f) {
         for_inst(inst, block) {
-            FeInstChain sel = fe_xr_isel(f, block, inst);
+            FeInstChain sel = target->isel(f, block, inst);
             isel_map[inst->flags].from = inst;
             isel_map[inst->flags].to = sel;
         }
@@ -63,7 +65,7 @@ void fe_isel(FeFunction* f) {
     for_blocks(block, f) {
         for_inst(inst, block) {
             usize inputs_len = 0;
-            FeInst** inputs = fe_inst_list_inputs(inst, &inputs_len);
+            FeInst** inputs = fe_inst_list_inputs(target, inst, &inputs_len);
             for_n(i, 0, inputs_len) {
                 if (inputs[i]->flags == FE_ISEL_GENERATED) continue;
 
@@ -80,7 +82,7 @@ void fe_isel(FeFunction* f) {
 
     fe_free(isel_map);
 
-    fe_xr_opt(f);
+    target->opt(f);
     fe_opt_tdce(f);
 
     // create virtual registers for instructions that dont have them yet
@@ -88,7 +90,7 @@ void fe_isel(FeFunction* f) {
         for_inst(inst, block) {
             if ((inst->ty != FE_TY_VOID || inst->ty != FE_TY_TUPLE) && inst->vr_out == FE_VREG_NONE) {
                 // TODO choose register class based on architecture and type
-                inst->vr_out = fe_vreg_new(f->vregs, inst, block, XR_REGCLASS_REG);
+                inst->vr_out = fe_vreg_new(f->vregs, inst, block, target->choose_regclass(inst->kind, inst->ty));
             }
         }
     }
@@ -100,10 +102,6 @@ void fe_isel(FeFunction* f) {
     printf("regalloc complete\n");
 }
 
-char* fe_reg_name(FeArch arch, u8 class, u16 real) {
-    switch (arch) {
-    case FE_ARCH_XR17032:
-        return fe_xr_reg_name(real);
-    }
-    return "?unknownarch";
+void fe_emit_asm(FeFunction* f, FeDataBuffer* db) {
+    f->mod->target->emit_asm(f, db);
 }

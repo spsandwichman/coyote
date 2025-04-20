@@ -1,10 +1,9 @@
 #include "iron/iron.h"
 
-FeModule* fe_new_module(FeArch arch) {
+FeModule* fe_new_module(FeArch arch, FeSystem system) {
     FeModule* mod = fe_malloc(sizeof(FeModule));
     memset(mod, 0, sizeof(FeModule));
-    mod->target = fe_malloc(sizeof(FeTarget));
-    mod->target->arch = arch;
+    mod->target = fe_make_target(arch, system);
     return mod;
 }
 
@@ -117,6 +116,8 @@ FeInst* fe_func_param(FeFunction* f, usize index) {
     return f->params[index];
 }
 void fe_inst_update_uses(FeFunction* f) {
+    FeTarget* t = f->mod->target;
+
     for_blocks(block, f) {
         for_inst(inst, block) {
             inst->use_count = 0;
@@ -125,7 +126,7 @@ void fe_inst_update_uses(FeFunction* f) {
     for_blocks(block, f) {
         for_inst(inst, block) {
             usize len;
-            FeInst** inputs = fe_inst_list_inputs(inst, &len);
+            FeInst** inputs = fe_inst_list_inputs(t, inst, &len);
             for_n (i, 0, len) {
                 inputs[i]->use_count++;
             }
@@ -134,9 +135,9 @@ void fe_inst_update_uses(FeFunction* f) {
 }
 
 // jank as FUCK and very likely to break; too bad!
-FeInst** fe_inst_list_inputs(FeInst* inst, usize* len_out) {
-    if (fe_kind_is_xr(inst->kind)) {
-        return fe_xr_list_inputs(inst, len_out);
+FeInst** fe_inst_list_inputs(FeTarget* t, FeInst* inst, usize* len_out) {
+    if (inst->kind > _FE_BASE_INST_END) {
+        return t->list_inputs(inst, len_out);
     }
 
     switch (inst->kind) {
@@ -192,12 +193,12 @@ FeInst** fe_inst_list_inputs(FeInst* inst, usize* len_out) {
     }
 }
 
-FeBlock** fe_inst_term_list_targets(FeInst* term, usize* len_out) {
+FeBlock** fe_inst_term_list_targets(FeTarget* t, FeInst* term, usize* len_out) {
     if (!fe_inst_has_trait(term->kind, FE_TRAIT_TERMINATOR)) {
         fe_runtime_crash("list_targets: inst %d is not a terminator", term->kind);
     }
-    if (fe_kind_is_xr(term->kind)) {
-        return fe_xr_term_list_targets(term, len_out);
+    if (term->kind > _FE_BASE_INST_END) {
+        return t->list_targets(term, len_out);
     }
 
     switch (term->kind) {
@@ -504,26 +505,7 @@ FeTy fe_proj_ty(FeInst* tuple, usize index) {
     return FE_TY_VOID;
 }
 
-enum {
-    // if something is commutative, it is also fast-commutative.
-    COMMU       = FE_TRAIT_COMMUTATIVE | FE_TRAIT_FAST_COMMUTATIVE,
-    FAST_COMMU  = FE_TRAIT_FAST_COMMUTATIVE,
-    // same here.
-    ASSOC       = FE_TRAIT_ASSOCIATIVE | FE_TRAIT_FAST_ASSOCIATIVE,
-    FAST_ASSOC  = FE_TRAIT_FAST_ASSOCIATIVE,
-
-    VOL         = FE_TRAIT_VOLATILE,
-    // term always implies volatile
-    TERM        = FE_TRAIT_TERMINATOR | FE_TRAIT_VOLATILE,
-    SAME_IN_OUT = FE_TRAIT_SAME_IN_OUT_TY,
-    SAME_INS    = FE_TRAIT_SAME_INPUT_TYS,
-    INT_IN      = FE_TRAIT_INT_INPUT_TYS,
-    FLT_IN      = FE_TRAIT_FLT_INPUT_TYS,
-    VEC_IN      = FE_TRAIT_VEC_INPUT_TYS,
-    BOOL_OUT    = FE_TRAIT_BOOL_OUT_TY,
-
-    MOV_HINT    = FE_TRAIT_REG_MOV_HINT,
-};
+#include "short_traits.h"
 
 static FeTrait inst_traits[_FE_INST_END] = {
     [FE_PROJ] = 0,
@@ -580,17 +562,13 @@ static FeTrait inst_traits[_FE_INST_END] = {
     [FE_BRANCH] = TERM,
     [FE_JUMP]   = TERM,
     [FE_RETURN] = TERM,
-
-    [FE_XR_ADDI] = INT_IN | SAME_IN_OUT,
-    [FE_XR_SUBI] = INT_IN | SAME_IN_OUT,
-    [FE_XR_ADD]  = INT_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
-    [FE_XR_SUB]  = INT_IN | SAME_IN_OUT | SAME_INS,
-    [FE_XR_MUL]  = INT_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
-    [FE_XR_BEQ ... FE_XR_BGE] = VOL | TERM,
-    [FE_XR_RET]  = TERM,
 };
 
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait) {
     if (kind > _FE_INST_END) return false;
     return (inst_traits[kind] & trait) != 0;
+}
+
+void fe__load_trait_table(usize start_index, FeTrait* table, usize len) {
+    memcpy(&inst_traits[start_index], table, sizeof(table[0]) * len);
 }

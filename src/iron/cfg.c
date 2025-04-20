@@ -9,6 +9,7 @@ static void number(FeCFGNode* n, usize* rev_post) {
 }
 
 void fe_calculate_cfg(FeFunction* f) {
+    FeTarget* target = f->mod->target;
     {
         usize i = 0;
         for (FeBlock* b = f->entry_block; b != NULL; b = b->list_next) {
@@ -28,7 +29,7 @@ void fe_calculate_cfg(FeFunction* f) {
         FeInst* term = b->bookend->prev;
 
         usize outs_len;
-        FeBlock** outs = fe_inst_term_list_targets(term, &outs_len);
+        FeBlock** outs = fe_inst_term_list_targets(target, term, &outs_len);
         b->cfg_node->out_len = outs_len;
 
         for_n(i, 0, outs_len) {
@@ -42,7 +43,7 @@ void fe_calculate_cfg(FeFunction* f) {
         FeInst* term = b->bookend->prev;
 
         usize outs_len;
-        FeBlock** outs = fe_inst_term_list_targets(term, &outs_len);
+        FeBlock** outs = fe_inst_term_list_targets(target, term, &outs_len);
 
         usize size = sizeof(b->cfg_node->ins[0]) * (b->cfg_node->in_len + outs_len);
         b->cfg_node->ins = malloc(size);

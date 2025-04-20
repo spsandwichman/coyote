@@ -1,47 +1,57 @@
 #include "iron/iron.h"
+#include "xr.h"
 
-usize fe_xr_extra_size_unsafe(FeInstKind kind) {
+#include "../short_traits.h"
+
+#define R(a, b) [a - _FE_XR_INST_BEGIN ... b - _FE_XR_INST_BEGIN]
+#define I(a) [a - _FE_XR_INST_BEGIN]
+    u8 xr_size_table[_FE_XR_INST_END - _FE_XR_INST_BEGIN] = {
+        [0 ... 255] = 255,
+        R(FE_XR_ADDI, FE_XR_SLTI) = sizeof(FeXrRegImm16),
+        R(FE_XR_ADD, FE_XR_MUL)   = sizeof(FeXrRegReg),
+        R(FE_XR_BEQ, FE_XR_BGE)   = sizeof(FeXrRegBranch),
+
+        I(FE_XR_RET)   = 0,
+    };
+    FeTrait xr_trait_table[_FE_XR_INST_END - _FE_XR_INST_BEGIN] = {
+        I(FE_XR_ADDI) = INT_IN | SAME_IN_OUT,
+        I(FE_XR_SUBI) = INT_IN | SAME_IN_OUT,
+        I(FE_XR_ADD)  = INT_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
+        I(FE_XR_SUB)  = INT_IN | SAME_IN_OUT | SAME_INS,
+        I(FE_XR_MUL)  = INT_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
+        R(FE_XR_BEQ, FE_XR_BGE) = VOL | TERM,
+        I(FE_XR_RET)  = TERM,
+    };
+#undef I
+#undef R
+
+char* xr_inst_name(FeInstKind kind, bool ir) {
     switch (kind) {
-    case FE_XR_ADDI:
-    case FE_XR_LUI:
-    case FE_XR_SUBI:
-    case FE_XR_SLTI:
-        return sizeof(FeXrRegImm16);
-    case FE_XR_ADD:
-    case FE_XR_SUB:
-    case FE_XR_MUL:
-        return sizeof(FeXrRegReg);
-    case FE_XR_RET:
-        return 0;
-    default:
-        return 255;
+    case FE_XR_ADDI: return ir ? "xr.addi": "addi";
+    case FE_XR_LUI:  return ir ? "xr.lui" : "lui";
+    case FE_XR_SUBI: return ir ? "xr.subi": "subi";
+    case FE_XR_SLTI: return ir ? "xr.slti": "slti";
+
+    case FE_XR_ADD: return ir ? "xr.add" : "add";
+    case FE_XR_SUB: return ir ? "xr.sub" : "sub";
+    case FE_XR_MUL: return ir ? "xr.mul" : "mul";
+
+    case FE_XR_BEQ: return ir ? "xr.beq" : "beq";
+    case FE_XR_BNE: return ir ? "xr.bne" : "bne";
+    case FE_XR_BLT: return ir ? "xr.blt" : "blt";
+    case FE_XR_BGT: return ir ? "xr.bgt" : "bgt";
+    case FE_XR_BLE: return ir ? "xr.ble" : "ble";
+    case FE_XR_BGE: return ir ? "xr.bge" : "bge";
+
+    case FE_XR_RET: return ir ? "xr.ret" : "ret";
     }
+    return "xr.???";
 }
 
-char* fe_xr_inst_name(FeInstKind kind, bool ir) {
-    switch (kind) {
-    case FE_XR_ADDI: return "addi";
-    case FE_XR_LUI:  return "lui";
-    case FE_XR_SUBI: return "subi";
-    case FE_XR_SLTI: return "slti";
-
-    case FE_XR_ADD: return "add";
-    case FE_XR_SUB: return "sub";
-    case FE_XR_MUL: return "mul";
-
-    case FE_XR_BEQ: return "beq";
-    case FE_XR_BNE: return "bne";
-    case FE_XR_BLT: return "blt";
-    case FE_XR_BGT: return "bgt";
-    case FE_XR_BLE: return "ble";
-    case FE_XR_BGE: return "bge";
-
-    case FE_XR_RET: return "ret";
+char* xr_reg_name(u8 regclass, u16 real) {
+    if (regclass != XR_REGCLASS_REG || real >= XR_REG__COUNT) {
+        return "???";
     }
-    return "???";
-}
-
-char* fe_xr_reg_name(u16 real) {
     switch (real) {
     case XR_REG_ZERO: return "zero";
 
@@ -83,7 +93,12 @@ char* fe_xr_reg_name(u16 real) {
     return "???";
 }
 
-FeRegStatus fe_xr_reg_status(u16 real) {
+FeRegStatus xr_reg_status(u8 cconv, u8 regclass, u16 real) {
+    (void)cconv;
+    if (regclass != XR_REGCLASS_REG) {
+        return FE_REG_UNUSABLE;
+    }
+
     switch (real) {
     case XR_REG_ZERO:
         return FE_REG_UNUSABLE;
@@ -126,7 +141,7 @@ FeRegStatus fe_xr_reg_status(u16 real) {
     }
 }
 
-void fe_xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
+void xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
     switch (inst->kind) {
     case FE_XR_ADDI:
     case FE_XR_LUI:
@@ -162,7 +177,7 @@ void fe_xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
     }
 }
 
-FeInst** fe_xr_list_inputs(FeInst* inst, usize* len_out) {
+FeInst** xr_list_inputs(FeInst* inst, usize* len_out) {
     switch (inst->kind) {
     case FE_XR_ADDI:
     case FE_XR_LUI:
@@ -192,7 +207,7 @@ FeInst** fe_xr_list_inputs(FeInst* inst, usize* len_out) {
     }
 }
 
-FeBlock** fe_xr_term_list_targets(FeInst* term, usize* len_out) {
+FeBlock** xr_term_list_targets(FeInst* term, usize* len_out) {
     switch (term->kind) {
     case FE_XR_BEQ:
     case FE_XR_BNE:
@@ -209,4 +224,8 @@ FeBlock** fe_xr_term_list_targets(FeInst* term, usize* len_out) {
         fe_runtime_crash("xr_list_targets: unknown kind %d", term->kind);
         break;
     }
+}
+
+FeRegclass xr_choose_regclass(FeInstKind kind, FeTy ty) {
+    return XR_REGCLASS_REG; // BAD
 }

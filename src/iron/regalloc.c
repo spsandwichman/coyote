@@ -33,6 +33,8 @@ static bool add_live_out(FeBlockLiveness* lv, FeVReg vr) {
 }
 
 static void calculate_liveness(FeFunction* f) {
+    FeTarget* t = f->mod->target;
+
     // make sure cfg is updated.
     fe_calculate_cfg(f);
 
@@ -56,7 +58,7 @@ static void calculate_liveness(FeFunction* f) {
             if (inst->vr_out == FE_VREG_NONE) continue;
             
             usize inputs_len;
-            FeInst** inputs = fe_inst_list_inputs(inst, &inputs_len);
+            FeInst** inputs = fe_inst_list_inputs(t, inst, &inputs_len);
             for_n(i, 0, inputs_len) {
                 FeInst* input = inputs[i];
                 if (fe_vreg(f->vregs, input->vr_out)->def_block != block) {
@@ -89,6 +91,7 @@ static void calculate_liveness(FeFunction* f) {
 }
 
 void fe_regalloc_linear_scan(FeFunction* f) {
+    FeTarget* target = f->mod->target;
     calculate_liveness(f);
 
     // hints!
@@ -113,8 +116,11 @@ void fe_regalloc_linear_scan(FeFunction* f) {
     memset(vr_live_now, 0, f->vregs->len);
 
     // TODO change assumption that we're on XR
-    bool* real_live_now = fe_malloc(XR_REG__COUNT);
-    memset(real_live_now, 0, XR_REG__COUNT);
+    bool** real_live_now = fe_malloc(sizeof(real_live_now[0]) * (target->max_regclass + 1));
+    // memset(real_live_now, 0, XR_REG__COUNT);
+    for_n(i, 0, target->max_regclass + 1) {
+        real_live_now[i] = fe_malloc(sizeof(real_live_now[0][0]) * target->regclass_lens[i]);
+    }
 
     for_blocks(block, f) {
         // initialize is_live_now from block.live_out
@@ -131,17 +137,19 @@ void fe_regalloc_linear_scan(FeFunction* f) {
                 // see if we can allocate some shit
                 // if we have a hint, try to take it
                 FeVirtualReg* hint_vr = fe_vreg(f->vregs, current_vr->hint);
-                if (hint_vr != NULL && hint_vr->real != FE_VREG_REAL_UNASSIGNED && !real_live_now[hint_vr->real]) {
+                if (hint_vr != NULL && hint_vr->real != FE_VREG_REAL_UNASSIGNED && !real_live_now[hint_vr->class][hint_vr->real]) {
                     current_vr->real = hint_vr->real;
                 } else {
+                    FeRegclass regclass = current_vr->class; 
                     // try to allocate output register to a call_clobbered register first
-                    u16 unused_real_reg = XR_REG_A0;
-                    for (; unused_real_reg != XR_REG__COUNT; unused_real_reg++) {
-                        if (fe_xr_reg_status(unused_real_reg) == FE_REG_CALL_PRESERVED) continue;
-                        if (real_live_now[unused_real_reg]) continue;
+                    u16 unused_real_reg = 0;
+                    for (; unused_real_reg != target->regclass_lens[regclass]; unused_real_reg++) {
+                        if (target->reg_status(f->sig->cconv, regclass, unused_real_reg) != FE_REG_CALL_CLOBBERED) continue;
+                        // skip if its currently live.
+                        if (real_live_now[regclass][unused_real_reg]) continue;
                         break;
                     }
-                    if (unused_real_reg != XR_REG__COUNT) {
+                    if (unused_real_reg != target->regclass_lens[regclass]) {
                         current_vr->real = unused_real_reg;
                     } else {
                         fe_runtime_crash("regalloc wuhhhhhhh");
@@ -155,12 +163,12 @@ void fe_regalloc_linear_scan(FeFunction* f) {
             if (current != FE_VREG_NONE && inst == current_vr->def) {
                 vr_live_now[current] = false;
                 if (current_vr->real != FE_VREG_REAL_UNASSIGNED) {
-                    real_live_now[current_vr->real] = false;
+                    real_live_now[current_vr->class][current_vr->real] = false;
                 }
             }
 
             usize inputs_len;
-            FeInst** inputs = fe_inst_list_inputs(inst, &inputs_len);
+            FeInst** inputs = fe_inst_list_inputs(target, inst, &inputs_len);
             // make inputs live
             for_n(i, 0, inputs_len) {
                 FeInst* inst_input = inputs[i];
@@ -170,18 +178,18 @@ void fe_regalloc_linear_scan(FeFunction* f) {
                 vr_live_now[input] = true;
 
                 if (input_vr->real != FE_VREG_REAL_UNASSIGNED) {
-                    real_live_now[input_vr->real] = true;
+                    real_live_now[input_vr->class][input_vr->real] = true;
                 }
             }
 
         }
 
         // uninitialize is_live_now from block.live_in
-        // for_n(i, 0, block->live->in_len) {
-        //     FeVReg in = block->live->in[i];
-        //     vr_live_now[in] = false;
-        // }
+        for_n(i, 0, block->live->in_len) {
+            FeVReg in = block->live->in[i];
+            vr_live_now[in] = false;
+        }
         memset(vr_live_now, 0, f->vregs->len);
-        memset(real_live_now, 0, XR_REG__COUNT);
+        // memset(real_live_now, 0, XR_REG__COUNT);
     }
 }

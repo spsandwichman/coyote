@@ -67,10 +67,12 @@ static FeInst* identity(FeInst* inst) {
 }
 
 void fe_opt_algsimp(FeFunction* f) {
+    FeTarget* t = f->mod->target;
+
     for_blocks(b, f) {
         for_inst(inst, b) {
             usize len;
-            FeInst** inputs = fe_inst_list_inputs(inst, &len);
+            FeInst** inputs = fe_inst_list_inputs(t, inst, &len);
             for_n (i, 0, len) {
                 inputs[i] = identity(inputs[i]);
             }

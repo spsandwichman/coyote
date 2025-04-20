@@ -1,4 +1,5 @@
 #include "iron/iron.h"
+#include "xr.h"
 
 static bool is_const_zero(FeInst* inst) {
     return inst->kind == FE_CONST && fe_extra_T(inst, FeInstConst)->val == 0;
@@ -66,7 +67,7 @@ static void preassign(FeFunction* f, FeInst* inst, FeBlock* block, u16 real_reg)
 //     fe_vreg(f->vregs, inst->vr_out)->hint = real_reg;
 // }
 
-FeInstChain fe_xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
+FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
     void* extra = fe_extra(inst);
     FeInstBinop* binop = extra;
 

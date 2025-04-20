@@ -62,15 +62,15 @@ typedef u8 FeCallConv;
 enum FeCallConvEnum {
     // pass parameters however iron sees fit
     // likely picks based on target
-    FE_CC_ANY = 0,
+    FE_CCONV_ANY = 0,
 
     // std linux c callconv
-    FE_CC_SYSV,
+    FE_CCONV_SYSV,
     // std windows c callconv
-    FE_CC_STDCALL,
+    FE_CCONV_STDCALL,
 
     // language-specific/esoteric
-    FE_CC_JACKAL, // hi will
+    FE_CCONV_JACKAL, // hi will
 };
 
 typedef u8 FeTy;
@@ -454,12 +454,13 @@ enum FeTraitEnum {
 };
 
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait);
-
+void fe__load_trait_table(usize start_index, FeTrait* table, usize len);
 
 usize fe_inst_extra_size(FeInstKind kind);
 usize fe_inst_extra_size_unsafe(FeInstKind kind);
+void fe__load_extra_size_table(usize start_index, u8* table, usize len);
 
-FeModule* fe_new_module(FeArch arch);
+FeModule* fe_new_module(FeArch arch, FeSystem system);
 FeSymbol* fe_new_symbol(FeModule* m, const char* name, u16 len, FeSymbolBinding bind);
 
 FeFuncSignature* fe_new_funcsig(FeCallConv cconv, u16 param_len, u16 return_len);
@@ -498,8 +499,8 @@ void fe_chain_replace_pos(FeInst* from, FeInstChain to);
 
 void fe_inst_free(FeFunction* f, FeInst* inst);
 void fe_inst_update_uses(FeFunction* f);
-FeInst** fe_inst_list_inputs(FeInst* inst, usize* len_out);
-FeBlock** fe_inst_term_list_targets(FeInst* term, usize* len_out);
+FeInst** fe_inst_list_inputs(FeTarget* t, FeInst* inst, usize* len_out);
+FeBlock** fe_inst_term_list_targets(FeTarget* t, FeInst* term, usize* len_out);
 
 FeInst* fe_inst_const(FeFunction* f, FeTy ty, u64 val);
 FeInst* fe_inst_unop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* val);
@@ -588,7 +589,6 @@ noreturn void fe_runtime_crash(const char* error, ...);
 // in the event of a bad signal
 void fe_init_signal_handler();
 
-
 // ----------------------------- codegen -----------------------------
 
 #define FE_ISEL_GENERATED 0
@@ -632,34 +632,41 @@ typedef enum {
 
 typedef u8 FeRegclass;
 enum {
-    FE_REGCLASS_STACK,
+    FE_REGCLASS_NONE,
 };
 
 typedef struct FeTarget {
     FeArch arch;
     FeSystem system;
 
+    void (*ir_print_args)(FeFunction* f, FeDataBuffer* db, FeInst* inst);
+
     char* (*inst_name)(FeInstKind kind, bool ir);
     FeInst** (*list_inputs)(FeInst* inst, usize* len_out);
     FeBlock** (*list_targets)(FeInst* term, usize* len_out);
 
-    void (*isel)(FeFunction* f);
+    FeInstChain (*isel)(FeFunction* f, FeBlock* block, FeInst* inst);
+    void (*opt)(FeFunction* f);
 
+    FeRegclass (*choose_regclass)(FeInstKind kind, FeTy ty);
     char* (*reg_name)(u8 regclass, u16 real);
     FeRegStatus (*reg_status)(u8 cconv, u8 regclass, u16 real);
     
-    u8 num_regclasses;
-    u16* regclass_lens;
+    u8 max_regclass;
+    const u16* regclass_lens;
+
+    void (*emit_asm)(FeFunction* f, FeDataBuffer* db);
 } FeTarget;
 
-void fe_isel(FeFunction* f);
+const FeTarget* fe_make_target(FeArch arch, FeSystem system);
+
 void fe_regalloc_linear_scan(FeFunction* f);
-char* fe_reg_name(FeArch arch, u8 class, u16 real);
 
 void fe_vrbuf_init(FeVRegBuffer* buf, usize cap);
 FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class);
 FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr);
 
-#include "iron/xr17032/xr.h"
+void fe_codegen(FeFunction* f);
+void fe_emit_asm(FeFunction* f, FeDataBuffer* db);
 
 #endif

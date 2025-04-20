@@ -1,4 +1,5 @@
 #include "iron/iron.h"
+#include "xr.h"
 
 #define DONT_EMIT 1
 
@@ -15,7 +16,7 @@ static char* reg(FeFunction* f, FeInst* inst) {
     if (vr->real == FE_VREG_REAL_UNASSIGNED) {
         return "FE_VREG_REAL_UNASSIGNED";
     }
-    return fe_xr_reg_name(vr->real);
+    return xr_reg_name(vr->class, vr->real);
 }
 
 static void emit_block_name(FeDataBuffer* db, FeBlock* b) {
@@ -23,7 +24,7 @@ static void emit_block_name(FeDataBuffer* db, FeBlock* b) {
 }
 
 static void emit_inst_name(FeDataBuffer* db, u16 kind) {
-    char* name = fe_xr_inst_name(kind, false);
+    char* name = xr_inst_name(kind, false);
     usize len = strlen(name);
 
     fe_db_writecstr(db, "   ");
@@ -124,7 +125,7 @@ static void emit_inst(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst)
     fe_db_writecstr(db, "\n");
 }
 
-void fe_xr_emit_assembly(FeFunction* f, FeDataBuffer* db) {
+void xr_emit_assembly(FeFunction* f, FeDataBuffer* db) {
     // number all instructions and blocks
     u32 block_counter = 0;
     for_blocks(block, f) {

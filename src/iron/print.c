@@ -148,13 +148,15 @@ void fe__print_ref(FeFunction* f, FeDataBuffer* db, FeInst* ref) {
         if (fe_vreg(f->vregs, ref->vr_out)->real == FE_VREG_REAL_UNASSIGNED) {
             fe_db_writef(db, "(vr%u)", ref->vr_out);
         } else {
-            fe_db_writef(db, "(%s)", fe_reg_name(FE_ARCH_XR17032, XR_REGCLASS_REG, fe_vreg(f->vregs, ref->vr_out)->real));
+            FeVirtualReg* vr = fe_vreg(f->vregs, ref->vr_out);
+            fe_db_writef(db, "(%s)", f->mod->target->reg_name(vr->class, vr->real));
         }
     }
     if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
 }
 
 static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
+    FeTarget* target = f->mod->target;
 
     if (inst->ty != FE_TY_VOID) {
         fe__print_ref(f, db, inst);
@@ -168,9 +170,9 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         
         if (name) fe_db_writecstr(db, name);
         else fe_db_writef(db, "<kind %d>", inst->kind);
-    } else if (fe_kind_is_xr(inst->kind)) {
-        fe_db_writecstr(db, "xr.");
-        fe_db_writecstr(db, fe_xr_inst_name(inst->kind, true));
+    } else {
+        fe_db_writecstr(db, target->inst_name(inst->kind, true));
+        
     }
 
     fe_db_writecstr(db, " ");
@@ -232,10 +234,10 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         FeVirtualReg* vreg = fe_vreg(f->vregs, vr);
         u8 class = vreg->class;
         u16 real = vreg->real;
-        fe_db_writecstr(db, fe_reg_name(f->mod->target->arch, class, real));
+        fe_db_writecstr(db, f->mod->target->reg_name(class, real));
         break;
     case _FE_XR_INST_BEGIN ... _FE_XR_INST_END:
-        fe_xr_print_args(f, db, inst);
+        target->ir_print_args(f, db, inst);
         break;
     default:
         fe_db_writef(db, "[TODO]");

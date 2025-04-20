@@ -17,7 +17,7 @@ static void quick_print(FeFunction* f) {
 FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
     // set up function to call
-    FeFuncSignature* fact_sig = fe_new_funcsig(FE_CC_JACKAL, 1, 1);
+    FeFuncSignature* fact_sig = fe_new_funcsig(FE_CCONV_JACKAL, 1, 1);
     fe_funcsig_param(fact_sig, 0)->ty = FE_TY_I32;
     fe_funcsig_return(fact_sig, 0)->ty = FE_TY_I32;
 
@@ -70,7 +70,7 @@ FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs
 FeFunction* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
     // set up function to call
-    FeFuncSignature* f_sig = fe_new_funcsig(FE_CC_JACKAL, 1, 1);
+    FeFuncSignature* f_sig = fe_new_funcsig(FE_CCONV_JACKAL, 1, 1);
     fe_funcsig_param(f_sig, 0)->ty = FE_TY_I32;
     fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
 
@@ -155,18 +155,19 @@ int main(int argc, char** argv) {
     FeVRegBuffer vregs;
     fe_vrbuf_init(&vregs, 2048);
 
-    FeModule* mod = fe_new_module(FE_ARCH_XR17032);
+    FeModule* mod = fe_new_module(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
     FeFunction* func = make_branch_test(mod, &ipool, &vregs);
     
     quick_print(func);
-    fe_isel(func);
+    fe_codegen(func);
     quick_print(func);
 
     printf("------ final assembly ------\n");
 
     FeDataBuffer db; 
     fe_db_init(&db, 2048);
-    fe_xr_emit_assembly(func, &db);
+    fe_emit_asm(func, &db);
+    // fe_xr_emit_assembly(func, &db);
     printf("%.*s", db.len, db.at);
 }

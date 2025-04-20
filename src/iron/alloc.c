@@ -1,8 +1,8 @@
 #include "iron.h"
 
-static const u8 base_extra_size_table[] = {
+static u8 extra_size_table[_FE_INST_END] = {
     // default error value
-    [0 ... _FE_BASE_INST_END - 1] = 255,
+    [0 ... _FE_INST_END - 1] = 255,
 
     [FE_BOOKEND] = sizeof(FeInstBookend),
     [FE_PROJ ... FE_PROJ_VOLATILE] = sizeof(FeInstProj),
@@ -23,13 +23,14 @@ static const u8 base_extra_size_table[] = {
     [FE_CALL_INDIRECT] = sizeof(FeInstCallIndirect),
 };
 
+void fe__load_extra_size_table(usize start_index, u8* table, usize len) {
+    memcpy(&extra_size_table[start_index], table, sizeof(table[0]) * len);
+}
+
 usize fe_inst_extra_size_unsafe(FeInstKind kind) {
     u8 size = 255;
-    if (kind <= _FE_BASE_INST_END) {
-        size = base_extra_size_table[kind];
-    }
-    if (_FE_XR_INST_BEGIN <= kind && kind <= _FE_XR_INST_END) {
-        size = fe_xr_extra_size_unsafe(kind);
+    if (kind < _FE_INST_END) {
+        size = extra_size_table[kind];
     }
 
     return (usize) size;
