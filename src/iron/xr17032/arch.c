@@ -5,6 +5,7 @@ usize fe_xr_extra_size_unsafe(FeInstKind kind) {
     case FE_XR_ADDI:
     case FE_XR_LUI:
     case FE_XR_SUBI:
+    case FE_XR_SLTI:
         return sizeof(FeXrRegImm16);
     case FE_XR_ADD:
     case FE_XR_SUB:
@@ -17,11 +18,12 @@ usize fe_xr_extra_size_unsafe(FeInstKind kind) {
     }
 }
 
-char* fe_xr_inst_name(FeInstKind kind) {
+char* fe_xr_inst_name(FeInstKind kind, bool ir) {
     switch (kind) {
     case FE_XR_ADDI: return "addi";
     case FE_XR_LUI:  return "lui";
     case FE_XR_SUBI: return "subi";
+    case FE_XR_SLTI: return "slti";
 
     case FE_XR_ADD: return "add";
     case FE_XR_SUB: return "sub";
@@ -129,6 +131,7 @@ void fe_xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
     case FE_XR_ADDI:
     case FE_XR_LUI:
     case FE_XR_SUBI:
+    case FE_XR_SLTI:
         fe__print_ref(f, db, fe_extra_T(inst, FeXrRegImm16)->reg);
         fe_db_writef(db, ", 0x%x", (u16)fe_extra_T(inst, FeXrRegImm16)->num);
         break;    
@@ -164,6 +167,7 @@ FeInst** fe_xr_list_inputs(FeInst* inst, usize* len_out) {
     case FE_XR_ADDI:
     case FE_XR_LUI:
     case FE_XR_SUBI:
+    case FE_XR_SLTI:
         *len_out = 1;
         return &fe_extra_T(inst, FeXrRegImm16)->reg;
     case FE_XR_ADD:

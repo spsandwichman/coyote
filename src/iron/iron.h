@@ -53,6 +53,11 @@ enum FeArchEnum {
     FE_ARCH_APHELION,
 };
 
+typedef u8 FeSystem;
+enum FeSystemEnum {
+    FE_SYSTEM_FREESTANDING = 1,
+};
+
 typedef u8 FeCallConv;
 enum FeCallConvEnum {
     // pass parameters however iron sees fit
@@ -75,6 +80,7 @@ typedef struct FeSymbol FeSymbol;
 typedef struct FeFunction FeFunction;
 typedef struct FeFuncSignature FeFuncSignature;
 typedef struct FeModule FeModule;
+typedef struct FeTarget FeTarget;
 typedef struct FeInstPool FeInstPool;
 
 typedef u32 FeVReg; // vreg index.
@@ -138,9 +144,7 @@ typedef struct FeFunction {
 } FeFunction;
 
 typedef struct FeModule {
-    struct {
-        FeArch arch;
-    } target;
+    FeTarget* target;
     struct {
         FeFunction* first;
         FeFunction* last;
@@ -276,7 +280,7 @@ enum FeInstKindEnum {
     
     // Unop
     FE_MOV,
-    FE_MOV_VOLATILE, // mostly for hardcoding register clobbers
+    FE_MACH_MOV, // mostly for hardcoding register clobbers
     FE_NOT,
     FE_NEG,
     FE_TRUNC, // integer downcast
@@ -543,55 +547,6 @@ void fe_calculate_cfg(FeFunction* f);
 void fe_opt_tdce(FeFunction* f);
 void fe_opt_algsimp(FeFunction* f);
 
-// ----------------------------- codegen -----------------------------
-
-#define FE_ISEL_GENERATED 0
-#define FE_VREG_REAL_UNASSIGNED UINT16_MAX
-#define FE_VREG_NONE UINT32_MAX
-
-typedef struct FeBlockLiveness {
-    FeBlock* block;
-
-    u16 in_len;
-    u16 in_cap;
-    
-    u16 out_len;
-    u16 out_cap;
-
-    FeVReg* in;
-    FeVReg* out;
-} FeBlockLiveness;
-
-typedef struct FeVirtualReg {
-    u8 class;
-    u16 real;
-    
-    FeVReg hint;
-
-    FeInst* def;
-    FeBlock* def_block;
-} FeVirtualReg;
-
-typedef struct FeVRegBuffer {
-    FeVirtualReg* at;
-    u32 len;
-    u32 cap;
-} FeVRegBuffer;
-
-typedef enum {
-    FE_REG_CALL_CLOBBERED,
-    FE_REG_CALL_PRESERVED,
-    FE_REG_UNUSABLE,
-} FeRegStatus;
-
-void fe_isel(FeFunction* f);
-void fe_regalloc_linear_scan(FeFunction* f);
-char* fe_reg_name(FeArch arch, u8 class, u16 real);
-
-void fe_vrbuf_init(FeVRegBuffer* buf, usize cap);
-FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class);
-FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr);
-
 // ------------------------------ utils ------------------------------
 
 // like stringbuilder but epic
@@ -633,6 +588,78 @@ noreturn void fe_runtime_crash(const char* error, ...);
 // in the event of a bad signal
 void fe_init_signal_handler();
 
-#include "xr17032/xr.h"
+
+// ----------------------------- codegen -----------------------------
+
+#define FE_ISEL_GENERATED 0
+#define FE_VREG_REAL_UNASSIGNED UINT16_MAX
+#define FE_VREG_NONE UINT32_MAX
+
+typedef struct FeBlockLiveness {
+    FeBlock* block;
+
+    u16 in_len;
+    u16 in_cap;
+    
+    u16 out_len;
+    u16 out_cap;
+
+    FeVReg* in;
+    FeVReg* out;
+} FeBlockLiveness;
+
+typedef struct FeVirtualReg {
+    u8 class;
+    u16 real;
+    
+    FeVReg hint;
+
+    FeInst* def;
+    FeBlock* def_block;
+} FeVirtualReg;
+
+typedef struct FeVRegBuffer {
+    FeVirtualReg* at;
+    u32 len;
+    u32 cap;
+} FeVRegBuffer;
+
+typedef enum {
+    FE_REG_CALL_CLOBBERED,
+    FE_REG_CALL_PRESERVED,
+    FE_REG_UNUSABLE,
+} FeRegStatus;
+
+typedef u8 FeRegclass;
+enum {
+    FE_REGCLASS_STACK,
+};
+
+typedef struct FeTarget {
+    FeArch arch;
+    FeSystem system;
+
+    char* (*inst_name)(FeInstKind kind, bool ir);
+    FeInst** (*list_inputs)(FeInst* inst, usize* len_out);
+    FeBlock** (*list_targets)(FeInst* term, usize* len_out);
+
+    void (*isel)(FeFunction* f);
+
+    char* (*reg_name)(u8 regclass, u16 real);
+    FeRegStatus (*reg_status)(u8 cconv, u8 regclass, u16 real);
+    
+    u8 num_regclasses;
+    u16* regclass_lens;
+} FeTarget;
+
+void fe_isel(FeFunction* f);
+void fe_regalloc_linear_scan(FeFunction* f);
+char* fe_reg_name(FeArch arch, u8 class, u16 real);
+
+void fe_vrbuf_init(FeVRegBuffer* buf, usize cap);
+FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class);
+FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr);
+
+#include "iron/xr17032/xr.h"
 
 #endif

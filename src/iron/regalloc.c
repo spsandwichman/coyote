@@ -109,7 +109,6 @@ void fe_regalloc_linear_scan(FeFunction* f) {
         }
     }
 
-
     bool* vr_live_now = fe_malloc(f->vregs->len);
     memset(vr_live_now, 0, f->vregs->len);
 
@@ -151,6 +150,15 @@ void fe_regalloc_linear_scan(FeFunction* f) {
                 
             }
 
+            // kill output if its canonical definition is the current inst
+            // (for supporting two-address instructions)
+            if (current != FE_VREG_NONE && inst == current_vr->def) {
+                vr_live_now[current] = false;
+                if (current_vr->real != FE_VREG_REAL_UNASSIGNED) {
+                    real_live_now[current_vr->real] = false;
+                }
+            }
+
             usize inputs_len;
             FeInst** inputs = fe_inst_list_inputs(inst, &inputs_len);
             // make inputs live
@@ -166,20 +174,14 @@ void fe_regalloc_linear_scan(FeFunction* f) {
                 }
             }
 
-            // kill output if its canonical definition is the current inst
-            // (for supporting two-address instructions)
-            if (current != FE_VREG_NONE && inst == current_vr->def) {
-                vr_live_now[current] = false;
-                if (current_vr->real != FE_VREG_REAL_UNASSIGNED) {
-                    real_live_now[current_vr->real] = false;
-                }
-            }
         }
 
         // uninitialize is_live_now from block.live_in
-        for_n(i, 0, block->live->in_len) {
-            FeVReg in = block->live->in[i];
-            vr_live_now[in] = false;
-        }
+        // for_n(i, 0, block->live->in_len) {
+        //     FeVReg in = block->live->in[i];
+        //     vr_live_now[in] = false;
+        // }
+        memset(vr_live_now, 0, f->vregs->len);
+        memset(real_live_now, 0, XR_REG__COUNT);
     }
 }

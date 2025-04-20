@@ -9,18 +9,19 @@ enum {
     FE_XR_ADDI = _FE_XR_INST_BEGIN, // out = rb + uimm16
     FE_XR_LUI, // out = rb | (uimm16 << 16)
     FE_XR_SUBI, // out = rb - uimm16
+    FE_XR_SLTI, // out = rb < uimm16
 
     // FeXrRegReg
-    FE_XR_ADD, // out = rb + rc
-    FE_XR_SUB, // out = rb - rc
-    FE_XR_MUL, // out = rb * rc
+    FE_XR_ADD,  // out = rb + rc
+    FE_XR_SUB,  // out = rb - rc
+    FE_XR_MUL,  // out = rb * rc
 
     FE_XR_BEQ,
-    FE_XR_BNE, // cant be isel'd
+    FE_XR_BNE,
     FE_XR_BLT,
-    FE_XR_BGT, // cant be isel'd
+    FE_XR_BGT,
     FE_XR_BLE,
-    FE_XR_BGE, // cant be isel'd
+    FE_XR_BGE,
 
     // void
     FE_XR_RET,
@@ -51,13 +52,13 @@ enum {
 enum {
     XR_REG_ZERO,
 
-    // temporary registers (jkl: caller-saved)
+    // temporary registers (jkl: call-clobbered)
     XR_REG_T0, XR_REG_T1, XR_REG_T2, XR_REG_T3, XR_REG_T4, XR_REG_T5,
 
-    // arguments and returns (jkl: caller-saved)
+    // arguments and returns (jkl: call-clobbered)
     XR_REG_A0, XR_REG_A1, XR_REG_A2, XR_REG_A3,
 
-    // locals (jkl: callee-saved)
+    // locals (jkl: call-preserved)
     XR_REG_S0, XR_REG_S1, XR_REG_S2, XR_REG_S3, XR_REG_S4, XR_REG_S5, XR_REG_S6, XR_REG_S7, XR_REG_S8,
     XR_REG_S9, XR_REG_S10, XR_REG_S11, XR_REG_S12, XR_REG_S13, XR_REG_S14, XR_REG_S15, XR_REG_S16, XR_REG_S17,
 
@@ -71,7 +72,7 @@ enum {
     XR_REG__COUNT,
 };
 
-char* fe_xr_inst_name(FeInstKind kind);
+char* fe_xr_inst_name(FeInstKind kind, bool ir);
 char* fe_xr_reg_name(u16 real);
 FeRegStatus fe_xr_reg_status(u16 real);
 

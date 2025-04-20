@@ -44,8 +44,8 @@ static FeInst* create_mach(FeFunction* f, FeInstKind kind, FeTy ty, usize size) 
     return i;
 }
 
-static FeInst* mov_volatile(FeFunction* f, FeInst* source) {
-    FeInst* i = fe_inst_unop(f, FE_TY_I32, FE_MOV_VOLATILE, source);
+static FeInst* mach_mov(FeFunction* f, FeInst* source) {
+    FeInst* i = fe_inst_unop(f, FE_TY_I32, FE_MACH_MOV, source);
     i->flags = FE_ISEL_GENERATED;
     // i->vr_out = fe_vreg_new(f->vregs, i, XR_REGCLASS_REG);
     i->vr_out = FE_VREG_NONE;
@@ -72,7 +72,7 @@ FeInstChain fe_xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
 
     switch (inst->kind) {
     case FE_PARAM: {
-        // params become a mach_reg and mov_volatile
+        // params become a mach_reg and mach_mov
 
         u16 real_param_reg = XR_REG_ZERO;
         switch (fe_extra_T(inst, FeInstParam)->index) {
@@ -85,7 +85,7 @@ FeInstChain fe_xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         }
 
         FeInst* param_reg = mach_reg(f, block, real_param_reg);
-        FeInst* mov = mov_volatile(f, param_reg);
+        FeInst* mov = mach_mov(f, param_reg);
         // set_hint(f, mov, block, real_param_reg);
         FeInstChain chain = fe_new_chain(param_reg);
         chain = fe_chain_append_end(chain, mov);
@@ -160,6 +160,22 @@ FeInstChain fe_xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         fe_extra_T(mul, FeXrRegReg)->rhs = binop->rhs;
         return fe_new_chain(mul);
     }
+    case FE_EQ: {
+        //  %2 = eq %0, %1
+        // ->
+        //  %2 = xr.sub  %0, %1
+        //  %3 = xr.slti %2, 1
+        FeInst* sub = create_mach(f, FE_XR_SUB, FE_TY_I32, sizeof(FeXrRegReg));
+        fe_extra_T(sub, FeXrRegReg)->lhs = binop->lhs;
+        fe_extra_T(sub, FeXrRegReg)->rhs = binop->rhs;
+        FeInst* slti = create_mach(f, FE_XR_SLTI, FE_TY_I32, sizeof(FeXrRegImm16));
+        fe_extra_T(slti, FeXrRegImm16)->reg = sub;
+        fe_extra_T(slti, FeXrRegImm16)->num = 1;
+
+        FeInstChain chain = fe_new_chain(sub);
+        chain = fe_chain_append_end(chain, slti);
+        return chain;
+    }
     case FE_BRANCH: {
         if (fe_extra_T(inst, FeInstBranch)->cond->kind == FE_EQ) {
             FeInstBinop* cmp_eq = fe_extra(fe_extra_T(inst, FeInstBranch)->cond);
@@ -205,7 +221,7 @@ FeInstChain fe_xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         FeInstChain chain = fe_new_chain(ret);
         for_n(i, 0, inst_ret->len) {
             FeInst* arg = fe_return_arg(inst, i);
-            FeInst* mov = mov_volatile(f, arg);
+            FeInst* mov = mach_mov(f, arg);
             
             u16 real_return_reg = XR_REG_ZERO;
             switch (i) {
@@ -222,6 +238,9 @@ FeInstChain fe_xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         }
         return chain;
     }
+    case FE_MACH_MOV:
+        return fe_new_chain(inst);
     }
+    fe_runtime_crash("xr_isel: unable to select inst kind %u", inst->kind);
     return fe_new_chain(inst);
 }

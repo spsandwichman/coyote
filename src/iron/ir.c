@@ -3,7 +3,8 @@
 FeModule* fe_new_module(FeArch arch) {
     FeModule* mod = fe_malloc(sizeof(FeModule));
     memset(mod, 0, sizeof(FeModule));
-    mod->target.arch = arch;
+    mod->target = fe_malloc(sizeof(FeTarget));
+    mod->target->arch = arch;
     return mod;
 }
 
@@ -557,7 +558,7 @@ static FeTrait inst_traits[_FE_INST_END] = {
     [FE_FREM] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
 
     [FE_MOV]          = SAME_IN_OUT,
-    [FE_MOV_VOLATILE] = VOL | SAME_IN_OUT | MOV_HINT,
+    [FE_MACH_MOV] = VOL | SAME_IN_OUT | MOV_HINT,
     [FE_NOT]   = INT_IN | SAME_IN_OUT,
     [FE_NEG]   = INT_IN | SAME_IN_OUT,
     [FE_TRUNC] = INT_IN,

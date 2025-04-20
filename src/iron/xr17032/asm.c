@@ -23,7 +23,7 @@ static void emit_block_name(FeDataBuffer* db, FeBlock* b) {
 }
 
 static void emit_inst_name(FeDataBuffer* db, u16 kind) {
-    char* name = fe_xr_inst_name(kind);
+    char* name = fe_xr_inst_name(kind, false);
     usize len = strlen(name);
 
     fe_db_writecstr(db, "   ");
@@ -87,7 +87,7 @@ static void emit_branch(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* ins
 
 static void emit_inst(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
     switch (inst->kind) {
-    case FE_MOV_VOLATILE: {
+    case FE_MACH_MOV: {
         FeInst* input = fe_extra_T(inst, FeInstUnop)->un;
         fe_db_writecstr(db, "mov ");
         fe_db_writecstr(db, reg(f, inst));
@@ -98,6 +98,7 @@ static void emit_inst(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst)
     case FE_XR_ADDI:
     case FE_XR_LUI:
     case FE_XR_SUBI:
+    case FE_XR_SLTI:
         emit_reg_imm16(f, db, inst);
         break;
     case FE_XR_ADD:

@@ -79,7 +79,7 @@ static const char* inst_name[_FE_BASE_INST_END] = {
     [FE_FREM] = "frem",
 
     [FE_MOV] = "mov",
-    [FE_MOV_VOLATILE] = "mov_volatile",
+    [FE_MACH_MOV] = "mach_mov",
     [FE_NOT] = "not",
     [FE_NEG] = "neg",
     [FE_TRUNC] = "trunc",
@@ -170,7 +170,7 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         else fe_db_writef(db, "<kind %d>", inst->kind);
     } else if (fe_kind_is_xr(inst->kind)) {
         fe_db_writecstr(db, "xr.");
-        fe_db_writecstr(db, fe_xr_inst_name(inst->kind));
+        fe_db_writecstr(db, fe_xr_inst_name(inst->kind, true));
     }
 
     fe_db_writecstr(db, " ");
@@ -232,7 +232,7 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         FeVirtualReg* vreg = fe_vreg(f->vregs, vr);
         u8 class = vreg->class;
         u16 real = vreg->real;
-        fe_db_writecstr(db, fe_reg_name(f->mod->target.arch, class, real));
+        fe_db_writecstr(db, fe_reg_name(f->mod->target->arch, class, real));
         break;
     case _FE_XR_INST_BEGIN ... _FE_XR_INST_END:
         fe_xr_print_args(f, db, inst);
@@ -290,28 +290,28 @@ void fe_print_func(FeDataBuffer* db, FeFunction* f) {
         }
         
         // print live-in set if present
-        // if (block->live) {
-        //     fe_db_writecstr(db, "  in ");
-        //     for_n(i, 0, block->live->in_len) {
-        //         FeVReg in = block->live->in[i];
-        //         fe_db_writef(db, "vr%u, ", in);
-        //     }
-        //     fe_db_writecstr(db, "\n");
-        // }
+        if (block->live) {
+            fe_db_writecstr(db, "  in ");
+            for_n(i, 0, block->live->in_len) {
+                FeVReg in = block->live->in[i];
+                fe_db_writef(db, "vr%u, ", in);
+            }
+            fe_db_writecstr(db, "\n");
+        }
 
         for_inst(inst, block) {
             fe_db_writecstr(db, "    ");
             print_inst(f, db, inst);
         }
         // print live-in set if present
-        // if (block->live) {
-        //     fe_db_writecstr(db, "  out ");
-        //     for_n(i, 0, block->live->out_len) {
-        //         FeVReg out = block->live->out[i];
-        //         fe_db_writef(db, "vr%u, ", out);
-        //     }
-        //     fe_db_writecstr(db, "\n");
-        // }
+        if (block->live) {
+            fe_db_writecstr(db, "  out ");
+            for_n(i, 0, block->live->out_len) {
+                FeVReg out = block->live->out[i];
+                fe_db_writef(db, "vr%u, ", out);
+            }
+            fe_db_writecstr(db, "\n");
+        }
     }
     fe_db_writecstr(db, "}\n");
 }

@@ -31,13 +31,6 @@ typedef struct {
     FeInst* from;
 } InstPair;
 
-/*
-    %3 = add %1, %2
-->
-    %3 = fox.add %1, %2
-*/
-
-
 void fe_isel(FeFunction* f) {
     fe_inst_update_uses(f);
 

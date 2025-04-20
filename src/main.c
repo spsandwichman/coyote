@@ -94,7 +94,7 @@ FeFunction* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vre
         fe_append_end(entry, fe_inst_branch(f, eq, if_true, if_false));
     }
     { // if_true block
-        FeInst* const1 = fe_append_end(if_true, fe_inst_const(f, FE_TY_I32, 0xAFFF));
+        FeInst* const1 = fe_append_end(if_true, fe_inst_const(f, FE_TY_I32, 0xAFFF0000));
         FeInst* ret = fe_append_end(if_true, fe_inst_return(f));
         fe_set_return_arg(ret, 0, const1);
     }
@@ -162,6 +162,8 @@ int main(int argc, char** argv) {
     quick_print(func);
     fe_isel(func);
     quick_print(func);
+
+    printf("------ final assembly ------\n");
 
     FeDataBuffer db; 
     fe_db_init(&db, 2048);
