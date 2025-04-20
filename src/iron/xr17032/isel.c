@@ -5,6 +5,14 @@ static bool is_const_zero(FeInst* inst) {
     return inst->kind == FE_CONST && fe_extra_T(inst, FeInstConst)->val == 0;
 }
 
+static bool can_const_u5(FeInst* inst) {
+    return inst->kind == FE_CONST && fe_extra_T(inst, FeInstConst)->val <= 0b11111;
+}
+
+static u8 as_const_u5(FeInst* inst) {
+    return fe_extra_T(inst, FeInstConst)->val;
+}
+
 static bool can_const_u16(FeInst* inst) {
     return inst->kind == FE_CONST && fe_extra_T(inst, FeInstConst)->val <= UINT16_MAX;
 }
@@ -37,6 +45,7 @@ static FeInst* mach_reg(FeFunction* f, FeBlock* block, u16 real_reg) {
 
 static FeInst* create_mach(FeFunction* f, FeInstKind kind, FeTy ty, usize size) {
     FeInst* i = fe_ipool_alloc(f->ipool, size);
+    memset(fe_extra(i), 0, size);
     i->kind = kind; 
     i->ty = ty;
     i->flags = FE_ISEL_GENERATED;
@@ -96,18 +105,18 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         if (can_const_u16(inst)) {
             // emit as addi zero.
             FeInst* zero = mach_reg(f, block, XR_REG_ZERO);
-            FeInst* addi = create_mach(f, FE_XR_ADDI, FE_TY_I32, sizeof(FeXrRegImm16));
-            fe_extra_T(addi, FeXrRegImm16)->reg = zero;
-            fe_extra_T(addi, FeXrRegImm16)->num = as_u16(inst);
+            FeInst* addi = create_mach(f, XR_ADDI, FE_TY_I32, sizeof(XrRegImm16));
+            fe_extra_T(addi, XrRegImm16)->reg = zero;
+            fe_extra_T(addi, XrRegImm16)->imm16 = as_u16(inst);
             FeInstChain chain = fe_new_chain(addi);
             chain = fe_chain_append_begin(chain, zero);
             return chain;
         } if (can_subi_const_u16(inst)) {
             // emit as subi zero
-            FeInst* subi = create_mach(f, FE_XR_SUBI, FE_TY_I32, sizeof(FeXrRegImm16));
+            FeInst* subi = create_mach(f, XR_SUBI, FE_TY_I32, sizeof(XrRegImm16));
             FeInst* zero = mach_reg(f, block, XR_REG_ZERO);
-            fe_extra_T(subi, FeXrRegImm16)->reg = zero;
-            fe_extra_T(subi, FeXrRegImm16)->num = as_subi_const_u16(inst);
+            fe_extra_T(subi, XrRegImm16)->reg = zero;
+            fe_extra_T(subi, XrRegImm16)->imm16 = as_subi_const_u16(inst);
             FeInstChain chain = fe_new_chain(subi);
             chain = fe_chain_append_begin(chain, zero);
             return chain;
@@ -115,14 +124,14 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             // lui + addi pair
             FeInst* zero = mach_reg(f, block, XR_REG_ZERO);
 
-            FeInst* lui = create_mach(f, FE_XR_LUI, FE_TY_I32, sizeof(FeXrRegImm16));
+            FeInst* lui = create_mach(f, XR_LUI, FE_TY_I32, sizeof(XrRegImm16));
 
-            fe_extra_T(lui, FeXrRegImm16)->reg = zero;
-            fe_extra_T(lui, FeXrRegImm16)->num = as_hi_u16(inst);
+            fe_extra_T(lui, XrRegImm16)->reg = zero;
+            fe_extra_T(lui, XrRegImm16)->imm16 = as_hi_u16(inst);
 
-            FeInst* addi = create_mach(f, FE_XR_ADDI, FE_TY_I32, sizeof(FeXrRegImm16));
-            fe_extra_T(addi, FeXrRegImm16)->reg = lui;
-            fe_extra_T(addi, FeXrRegImm16)->num = as_u16(inst);
+            FeInst* addi = create_mach(f, XR_ADDI, FE_TY_I32, sizeof(XrRegImm16));
+            fe_extra_T(addi, XrRegImm16)->reg = lui;
+            fe_extra_T(addi, XrRegImm16)->imm16 = as_u16(inst);
 
             FeInstChain chain = fe_new_chain(zero);
             chain = fe_chain_append_end(chain, lui);
@@ -132,46 +141,66 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         return fe_new_chain(inst);
     case FE_IADD:
         if (can_const_u16(binop->rhs)) {
-            FeInst* addi = create_mach(f, FE_XR_ADDI, FE_TY_I32, sizeof(FeXrRegImm16));
-            fe_extra_T(addi, FeXrRegImm16)->reg = binop->lhs;
-            fe_extra_T(addi, FeXrRegImm16)->num = as_u16(binop->rhs);
+            FeInst* addi = create_mach(f, XR_ADDI, FE_TY_I32, sizeof(XrRegImm16));
+            fe_extra_T(addi, XrRegImm16)->reg = binop->lhs;
+            fe_extra_T(addi, XrRegImm16)->imm16 = as_u16(binop->rhs);
             return fe_new_chain(addi);
         } else {
-            FeInst* add = create_mach(f, FE_XR_ADD, FE_TY_I32, sizeof(FeXrRegReg));
-            fe_extra_T(add, FeXrRegReg)->lhs = binop->lhs;
-            fe_extra_T(add, FeXrRegReg)->rhs = binop->rhs;
+            FeInst* add = create_mach(f, XR_ADD, FE_TY_I32, sizeof(XrRegReg));
+            fe_extra_T(add, XrRegReg)->r1 = binop->lhs;
+            fe_extra_T(add, XrRegReg)->r2 = binop->rhs;
             return fe_new_chain(add);
         }
         break;
     case FE_ISUB:
         if (can_const_u16(binop->rhs)) {
-            FeInst* sub = create_mach(f, FE_XR_SUBI, FE_TY_I32, sizeof(FeXrRegImm16));
-            fe_extra_T(sub, FeXrRegImm16)->reg = binop->lhs;
-            fe_extra_T(sub, FeXrRegImm16)->num = as_u16(binop->rhs);
+            FeInst* sub = create_mach(f, XR_SUBI, FE_TY_I32, sizeof(XrRegImm16));
+            fe_extra_T(sub, XrRegImm16)->reg = binop->lhs;
+            fe_extra_T(sub, XrRegImm16)->imm16 = as_u16(binop->rhs);
             return fe_new_chain(sub);
         } else {
-            FeInst* sub = create_mach(f, FE_XR_SUB, FE_TY_I32, sizeof(FeXrRegReg));
-            fe_extra_T(sub, FeXrRegReg)->lhs = binop->lhs;
-            fe_extra_T(sub, FeXrRegReg)->rhs = binop->rhs;
+            FeInst* sub = create_mach(f, XR_SUB, FE_TY_I32, sizeof(XrRegReg));
+            fe_extra_T(sub, XrRegReg)->r1 = binop->lhs;
+            fe_extra_T(sub, XrRegReg)->r2 = binop->rhs;
             return fe_new_chain(sub);
         }
     case FE_IMUL: {
-        FeInst* mul = create_mach(f, FE_XR_MUL, FE_TY_I32, sizeof(FeXrRegReg));
-        fe_extra_T(mul, FeXrRegReg)->lhs = binop->lhs;
-        fe_extra_T(mul, FeXrRegReg)->rhs = binop->rhs;
+        FeInst* mul = create_mach(f, XR_MUL, FE_TY_I32, sizeof(XrRegReg));
+        fe_extra_T(mul, XrRegReg)->r1 = binop->lhs;
+        fe_extra_T(mul, XrRegReg)->r2 = binop->rhs;
         return fe_new_chain(mul);
     }
+    case FE_SHL:
+        if (can_const_u5(binop->rhs)) {
+            // xr.add zero, %1 lsh <const>
+            FeInst* zero = mach_reg(f, block, XR_REG_ZERO);
+            FeInst* add = create_mach(f, XR_ADD, FE_TY_I32, sizeof(XrRegReg));
+            fe_extra_T(add, XrRegReg)->r1 = zero;
+            fe_extra_T(add, XrRegReg)->r2 = binop->lhs;
+            fe_extra_T(add, XrRegReg)->shift_kind = XR_SHIFT_LSH;
+            fe_extra_T(add, XrRegReg)->imm5 = as_const_u5(binop->rhs);
+
+            FeInstChain chain = fe_new_chain(zero);
+            chain = fe_chain_append_end(chain, add);
+            return chain;
+        } else {
+            FeInst* shift = create_mach(f, XR_SHIFT, FE_TY_I32, sizeof(XrRegReg));
+            fe_extra_T(shift, XrRegReg)->r1 = binop->lhs;
+            fe_extra_T(shift, XrRegReg)->r2 = binop->rhs;
+            fe_extra_T(shift, XrRegReg)->shift_kind = XR_SHIFT_LSH;
+            return fe_new_chain(shift);
+        }
     case FE_EQ: {
         //  %2 = eq %0, %1
         // ->
         //  %2 = xr.sub  %0, %1
         //  %3 = xr.slti %2, 1
-        FeInst* sub = create_mach(f, FE_XR_SUB, FE_TY_I32, sizeof(FeXrRegReg));
-        fe_extra_T(sub, FeXrRegReg)->lhs = binop->lhs;
-        fe_extra_T(sub, FeXrRegReg)->rhs = binop->rhs;
-        FeInst* slti = create_mach(f, FE_XR_SLTI, FE_TY_I32, sizeof(FeXrRegImm16));
-        fe_extra_T(slti, FeXrRegImm16)->reg = sub;
-        fe_extra_T(slti, FeXrRegImm16)->num = 1;
+        FeInst* sub = create_mach(f, XR_SUB, FE_TY_I32, sizeof(XrRegReg));
+        fe_extra_T(sub, XrRegReg)->r1 = binop->lhs;
+        fe_extra_T(sub, XrRegReg)->r2 = binop->rhs;
+        FeInst* slti = create_mach(f, XR_SLTI, FE_TY_I32, sizeof(XrRegImm16));
+        fe_extra_T(slti, XrRegImm16)->reg = sub;
+        fe_extra_T(slti, XrRegImm16)->imm16 = 1;
 
         FeInstChain chain = fe_new_chain(sub);
         chain = fe_chain_append_end(chain, slti);
@@ -181,7 +210,7 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         if (fe_extra_T(inst, FeInstBranch)->cond->kind == FE_EQ) {
             FeInstBinop* cmp_eq = fe_extra(fe_extra_T(inst, FeInstBranch)->cond);
 
-            FeInst* beq = create_mach(f, FE_XR_BEQ, FE_TY_VOID, sizeof(FeXrRegBranch));
+            FeInst* beq = create_mach(f, XR_BEQ, FE_TY_VOID, sizeof(XrRegBranch));
             FeInstChain chain = fe_new_chain(beq);
 
             FeInst* result;
@@ -191,24 +220,24 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             } else if (can_const_u16(cmp_eq->rhs)) {
                 //  %2: i32 = xr.subi %0, CONST16
                 //  xr.beq %2, 1:, 2:
-                result = fe_ipool_alloc(f->ipool, sizeof(FeXrRegImm16));
-                result->kind = FE_XR_SUBI; result->ty = FE_TY_I32;
-                fe_extra_T(result, FeXrRegImm16)->reg = cmp_eq->lhs;
-                fe_extra_T(result, FeXrRegImm16)->num = as_u16(cmp_eq->rhs);
+                result = fe_ipool_alloc(f->ipool, sizeof(XrRegImm16));
+                result->kind = XR_SUBI; result->ty = FE_TY_I32;
+                fe_extra_T(result, XrRegImm16)->reg = cmp_eq->lhs;
+                fe_extra_T(result, XrRegImm16)->imm16 = as_u16(cmp_eq->rhs);
                 chain = fe_chain_append_begin(chain, result);
             } else {
                 //  %2: i32 = xr.sub %0, %1
                 //  xr.beq %2, 1:, 2:
-                result = fe_ipool_alloc(f->ipool, sizeof(FeXrRegReg));
-                result->kind = FE_XR_SUB; result->ty = FE_TY_I32;
-                fe_extra_T(result, FeXrRegReg)->lhs = cmp_eq->lhs;
-                fe_extra_T(result, FeXrRegReg)->rhs = cmp_eq->rhs;
+                result = fe_ipool_alloc(f->ipool, sizeof(XrRegReg));
+                result->kind = XR_SUB; result->ty = FE_TY_I32;
+                fe_extra_T(result, XrRegReg)->r1 = cmp_eq->lhs;
+                fe_extra_T(result, XrRegReg)->r2 = cmp_eq->rhs;
                 chain = fe_chain_append_begin(chain, result);
             }
 
-            fe_extra_T(beq, FeXrRegBranch)->reg = result;
-            fe_extra_T(beq, FeXrRegBranch)->dest = fe_extra_T(inst, FeInstBranch)->if_true;
-            fe_extra_T(beq, FeXrRegBranch)->_else = fe_extra_T(inst, FeInstBranch)->if_false;
+            fe_extra_T(beq, XrRegBranch)->reg = result;
+            fe_extra_T(beq, XrRegBranch)->dest = fe_extra_T(inst, FeInstBranch)->if_true;
+            fe_extra_T(beq, XrRegBranch)->_else = fe_extra_T(inst, FeInstBranch)->if_false;
 
             return chain;
         }
@@ -217,7 +246,7 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
     case FE_RETURN: {
         FeInstReturn* inst_ret = extra;
         FeInst* ret = fe_ipool_alloc(f->ipool, 0);
-        ret->kind = FE_XR_RET;
+        ret->kind = XR_RET;
         ret->ty = FE_TY_VOID;
         FeInstChain chain = fe_new_chain(ret);
         for_n(i, 0, inst_ret->len) {

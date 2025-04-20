@@ -4,47 +4,115 @@
 #include "iron/iron.h"
 
 enum {
-    // FeXrRegImm16
+    // XrRegImm16
+    XR_ADDI = _FE_XR_INST_BEGIN,     
+                    // out = reg + uimm16
+    XR_SUBI,        // out = reg - uimm16
+    XR_SLTI,        // out = reg < uimm16
+    XR_SLTI_SIGNED, // out = signed reg < simm16
+    XR_ANDI,        // out = reg & uimm16
+    XR_XORI,        // out = reg ^ uimm16
+    XR_ORI,         // out = reg | uimm16
+    XR_LUI,         // out = reg | (uimm16 << 16)
 
-    FE_XR_ADDI = _FE_XR_INST_BEGIN, // out = rb + uimm16
-    FE_XR_LUI, // out = rb | (uimm16 << 16)
-    FE_XR_SUBI, // out = rb - uimm16
-    FE_XR_SLTI, // out = rb < uimm16
+    XR_LOAD8_IMM,   // out = mem[reg + uimm16]
+    XR_LOAD16_IMM,  // out = mem[reg + uimm16]
+    XR_LOAD32_IMM,  // out = mem[reg + uimm16]
 
-    // FeXrRegReg
-    FE_XR_ADD,  // out = rb + rc
-    FE_XR_SUB,  // out = rb - rc
-    FE_XR_MUL,  // out = rb * rc
+    // XrRegRegImm16
+    XR_STORE8_IMM,  // mem[r1 + uimm16] = r2
+    XR_STORE16_IMM, // mem[r1 + uimm16] = r2
+    XR_STORE32_IMM, // mem[r1 + uimm16] = r2
 
-    // FeXrRegBranch
-    FE_XR_BEQ,
-    FE_XR_BNE,
-    FE_XR_BLT,
-    FE_XR_BGT,
-    FE_XR_BLE,
-    FE_XR_BGE,
+    // XrRegImm16Imm5
+    XR_STORE8_CONST,  // mem[reg + uimm16] = simm5
+    XR_STORE16_CONST, // mem[reg + uimm16] = simm5
+    XR_STORE32_CONST, // mem[reg + uimm16] = simm5
+
+    // XrRegReg
+    XR_SHIFT,      // out = r1 SHIFT r2
+    XR_ADD,        // out = r1 + r2 SHIFT uimm5
+    XR_SUB,        // out = r1 - r2 SHIFT uimm5
+    XR_SLT,        // out = r1 < r2 SHIFT uimm5
+    XR_SLT_SIGNED, // out = signed r1 < r2 SHIFT uimm5
+    XR_AND,        // out = r1 < r2 SHIFT uimm5
+    XR_XOR,        // out = r1 < r2 SHIFT uimm5
+    XR_OR,         // out = r1 < r2 SHIFT uimm5
+    XR_NOR,        // out = r1 < r2 SHIFT uimm5
+    XR_MUL,        // out = r1 * r2
+    XR_DIV,        // out = r1 / r2
+    XR_DIV_SIGNED, // out = signed r1 / r2
+    XR_MOD,        // out = r1 % r2
+    XR_LOAD8_REG,  // out = mem[r1 + r2 SHIFT uimm5]
+    XR_LOAD16_REG, // out = mem[r1 + r2 SHIFT uimm5]
+    XR_LOAD32_REG, // out = mem[r1 + r2 SHIFT uimm5]
+
+    // XrRegRegReg
+    XR_STORE8_REG,  // mem[r1 + r2 SHIFT uimm5] = r3
+    XR_STORE16_REG, // mem[r1 + r2 SHIFT uimm5] = r3
+    XR_STORE32_REG, // mem[r1 + r2 SHIFT uimm5] = r3
+
+    // XrRegBranch
+    XR_BEQ,
+    XR_BNE,
+    XR_BLT,
+    XR_BGT,
+    XR_BLE,
+    XR_BGE,
 
     // void
-    FE_XR_RET,
+    XR_RET,
 };
 
 // #define fe_kind_is_xr(kind) (_FE_XR_INST_BEGIN <= (kind) && (kind) <= _FE_XR_INST_END)
 
 typedef struct {
     FeInst* reg;
-    u16 num;
-} FeXrRegImm16;
+    u16 imm16;
+} XrRegImm16;
 
 typedef struct {
-    FeInst* lhs;
-    FeInst* rhs;
-} FeXrRegReg;
+    FeInst* r1;
+    FeInst* r2;
+    u16 imm16;
+} XrRegRegImm16;
+
+typedef struct {
+    FeInst* reg;
+    u16 imm16;
+    u8 imm5;
+} XrRegImm16Imm5;
+
+typedef u8 XrShiftKind;
+enum XrShiftKindEnum {
+    XR_SHIFT_LSH,
+    XR_SHIFT_RSH,
+    XR_SHIFT_ASH,
+    XR_SHIFT_ROR,
+};
+
+typedef struct {
+    FeInst* r1;
+    FeInst* r2;
+
+    u8 imm5;
+    XrShiftKind shift_kind;
+} XrRegReg;
+
+typedef struct {
+    FeInst* r1;
+    FeInst* r2;
+    FeInst* r3;
+
+    u8 imm5;
+    XrShiftKind shift_kind;
+} XrRegRegReg;
 
 typedef struct {
     FeInst* reg;
     FeBlock* dest;
     FeBlock* _else; // gets emitted as a secondary jump IF NECESSARY
-} FeXrRegBranch;
+} XrRegBranch;
 
 enum {
     XR_REGCLASS_REG = 1,

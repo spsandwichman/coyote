@@ -268,6 +268,7 @@ enum FeInstKindEnum {
     FE_XOR,
     FE_SHL,
     FE_USR, FE_ISR,
+    
     FE_ILT, FE_ULT,
     FE_ILE, FE_ULE,
     FE_EQ,
@@ -300,10 +301,17 @@ enum FeInstKindEnum {
     FE_STORE_UNIQUE,
     FE_STORE_VOLATILE,
 
-    // (none)
+    // (void)
     FE_CASCADE_UNIQUE,
     FE_CASCADE_VOLATILE,
     FE_MACH_REG,
+    FE_MACH_STACK_BEGIN,  // set up the stack frame.
+    FE_MACH_STACK_END,    // destroy the stack frame.
+
+    // FeMachStackSpill
+    FE_MACH_STACK_SPILL,  // spill something to the stack.
+    // FeMachStackReload
+    FE_MACH_STACK_RELOAD, // reload it from the stack
 
     // Branch
     FE_BRANCH,
@@ -422,35 +430,43 @@ typedef struct {
     FeFuncSignature* sig;
 } FeInstCallIndirect;
 
+typedef struct {
+    FeInst* src;
+    u16 size;
+    u16 align;
+} FeMachStackSpill;
+
+typedef struct {
+    FeInst* spill;
+} FeMachStackReload;
+
 typedef u16 FeTrait;
 enum FeTraitEnum {
     // x op y == y op x
     FE_TRAIT_COMMUTATIVE      = 1u << 0,
-    // x op y == y op x trust me vro 💀🙏🥀
-    FE_TRAIT_FAST_COMMUTATIVE = 1u << 1,
     // (x op y) op z == x op (y op z)
-    FE_TRAIT_ASSOCIATIVE      = 1u << 2,
+    FE_TRAIT_ASSOCIATIVE      = 1u << 1,
     // (x op y) op z == x op (y op z) trust me vro 💀🙏🥀
-    FE_TRAIT_FAST_ASSOCIATIVE = 1u << 3,
+    FE_TRAIT_FAST_ASSOCIATIVE = 1u << 2,
     // cannot be simply removed if result is not used
-    FE_TRAIT_VOLATILE         = 1u << 4,
+    FE_TRAIT_VOLATILE         = 1u << 3,
     // can only terminate a basic block
-    FE_TRAIT_TERMINATOR       = 1u << 5,
+    FE_TRAIT_TERMINATOR       = 1u << 4,
     // output type = first input type
-    FE_TRAIT_SAME_IN_OUT_TY   = 1u << 6,
+    FE_TRAIT_SAME_IN_OUT_TY   = 1u << 5,
     // all input types must be the same type  
-    FE_TRAIT_SAME_INPUT_TYS   = 1u << 7,
+    FE_TRAIT_SAME_INPUT_TYS   = 1u << 6,
     // all input types must be integers
-    FE_TRAIT_INT_INPUT_TYS    = 1u << 8,
+    FE_TRAIT_INT_INPUT_TYS    = 1u << 7,
     // all input types must be floats
-    FE_TRAIT_FLT_INPUT_TYS    = 1u << 9,
+    FE_TRAIT_FLT_INPUT_TYS    = 1u << 8,
     // allow vector types
-    FE_TRAIT_VEC_INPUT_TYS    = 1u << 10,
+    FE_TRAIT_VEC_INPUT_TYS    = 1u << 9,
     // output type = bool
-    FE_TRAIT_BOOL_OUT_TY      = 1u << 11,
+    FE_TRAIT_BOOL_OUT_TY      = 1u << 10,
     // reg<-reg move; allocator should hint
     // the output and input to be the same
-    FE_TRAIT_REG_MOV_HINT     = 1u << 12,
+    FE_TRAIT_REG_MOV_HINT     = 1u << 11,
 };
 
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait);

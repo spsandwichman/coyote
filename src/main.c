@@ -13,7 +13,6 @@ static void quick_print(FeFunction* f) {
     printf("%.*s", db.len, db.at);
 }
 
-
 FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
     // set up function to call
@@ -66,7 +65,6 @@ FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs
     return fact;
 }
 
-
 FeFunction* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
     // set up function to call
@@ -100,9 +98,9 @@ FeFunction* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vre
     }
     { // if_false block
         FeInst* add = fe_append_end(if_false, fe_inst_binop(f, 
-            FE_TY_I32, FE_IADD, 
+            FE_TY_I32, FE_ISUB, 
             param,
-            fe_append_end(if_false, fe_inst_const(f, FE_TY_I32, 0xFF))
+            fe_append_end(if_false, fe_inst_const(f, FE_TY_I32, 0))
         ));
         FeInst* ret = fe_append_end(if_false, fe_inst_return(f));
         fe_set_return_arg(ret, 0, add);
@@ -168,6 +166,5 @@ int main(int argc, char** argv) {
     FeDataBuffer db; 
     fe_db_init(&db, 2048);
     fe_emit_asm(func, &db);
-    // fe_xr_emit_assembly(func, &db);
     printf("%.*s", db.len, db.at);
 }

@@ -2,12 +2,12 @@
 #include "xr.h"
 
 static FeInst* peephole(FeInst* inst) {
-    FeXrRegImm16* reg_imm16 = fe_extra(inst);
+    XrRegImm16* reg_imm16 = fe_extra(inst);
     switch (inst->kind) {
-    case FE_XR_ADDI:
-    case FE_XR_SUBI:
-    case FE_XR_LUI:
-        if (reg_imm16->num == 0) {
+    case XR_ADDI:
+    case XR_SUBI:
+    case XR_LUI:
+        if (reg_imm16->imm16 == 0) {
             return reg_imm16->reg;
         }
         break;
