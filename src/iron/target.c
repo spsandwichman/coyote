@@ -2,11 +2,6 @@
 
 #include "iron/xr17032/xr.h"
 
-static const u16 xr_regclass_lens[] = {
-    [0] = 0,
-    [XR_REGCLASS_REG] = XR_REG__COUNT,
-};
-
 // target construction.
 const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
     FeTarget* t = fe_malloc(sizeof(*t));

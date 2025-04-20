@@ -25,6 +25,11 @@
 #undef I
 #undef R
 
+u16 xr_regclass_lens[] = {
+    [0] = 0,
+    [XR_REGCLASS_REG] = XR_REG__COUNT,
+};
+
 char* xr_inst_name(FeInstKind kind, bool ir) {
     switch (kind) {
     case FE_XR_ADDI: return ir ? "xr.addi": "addi";

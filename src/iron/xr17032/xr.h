@@ -74,6 +74,7 @@ enum {
     XR_REG__COUNT,
 };
 
+extern u16 xr_regclass_lens[];
 extern u8 xr_size_table[];
 extern FeTrait xr_trait_table[];
 
