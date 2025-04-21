@@ -73,7 +73,7 @@ FeBlock* fe_new_block(FeFunction* f) {
 
 FeFunction* fe_new_function(FeModule* mod, FeSymbol* sym, FeFuncSignature* sig, FeInstPool* ipool, FeVRegBuffer* vregs) {
     FeFunction* f = fe_malloc(sizeof(FeFunction));
-    memset(f, 0, sizeof(FeFunction));
+    memset(f, 0, sizeof(*f));
     f->sig = sig;
     f->mod = mod;
     f->ipool = ipool;
@@ -177,7 +177,9 @@ FeInst** fe_inst_list_inputs(FeTarget* t, FeInst* inst, usize* len_out) {
         } else {
             return ret->multi;
         }
-        break;
+    case FE_MACH_STACK_SPILL:
+        *len_out = 1;
+        return &fe_extra_T(inst, FeMachStackSpill)->val;
     case FE_BOOKEND:
     case FE_PARAM:
     case FE_CONST:
@@ -185,6 +187,7 @@ FeInst** fe_inst_list_inputs(FeTarget* t, FeInst* inst, usize* len_out) {
     case FE_CASCADE_VOLATILE:
     case FE_JUMP:
     case FE_MACH_REG:
+    case FE_MACH_STACK_RELOAD:
         *len_out = 0;
         return NULL;
     default:

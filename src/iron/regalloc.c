@@ -149,13 +149,13 @@ void fe_regalloc_linear_scan(FeFunction* f) {
                         if (real_live_now[regclass][unused_real_reg]) continue;
                         break;
                     }
+
                     if (unused_real_reg != target->regclass_lens[regclass]) {
                         current_vr->real = unused_real_reg;
                     } else {
                         fe_runtime_crash("regalloc wuhhhhhhh");
                     }
                 }
-                
             }
 
             // kill output if its canonical definition is the current inst

@@ -46,6 +46,7 @@ char* xr_inst_name(FeInstKind kind, bool ir) {
     case XR_XORI: return ir ? "xr.xori": "xori";
     case XR_ORI:  return ir ? "xr.ori" : "ori";
     case XR_LUI:  return ir ? "xr.lui" : "lui";
+    case XR_MOV:  return ir ? "xr.mov" : "mov";
     case XR_LOAD8_IMM:  return ir ? "xr.load8_imm"  : "mov";
     case XR_LOAD16_IMM: return ir ? "xr.load16_imm" : "mov";
     case XR_LOAD32_IMM: return ir ? "xr.load32_imm" : "mov";
@@ -185,10 +186,11 @@ FeRegStatus xr_reg_status(u8 cconv, u8 regclass, u16 real) {
 }
 
 void xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
-    switch (inst->kind) {
+    switch (inst->kind) {  
     case XR_ADDI ... XR_LOAD32_IMM:
         fe__print_ref(f, db, fe_extra_T(inst, XrRegImm16)->reg);
-        fe_db_writef(db, ", 0x%x", (u16)fe_extra_T(inst, XrRegImm16)->imm16);
+        if (inst->kind != XR_MOV) 
+            fe_db_writef(db, ", 0x%x", (u16)fe_extra_T(inst, XrRegImm16)->imm16);
         break;    
     case XR_SHIFT ... XR_LOAD32_REG:
         fe__print_ref(f, db, fe_extra_T(inst, XrRegReg)->r1);
@@ -210,6 +212,12 @@ void xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         fe_db_writecstr(db, " (else ");
         fe__print_block(f, db, fe_extra_T(inst, XrRegBranch)->_else);
         fe_db_writecstr(db, ")");
+        break;
+    case XR_STORE8_IMM ... XR_STORE32_IMM:
+        fe__print_ref(f, db, fe_extra_T(inst, XrRegRegImm16)->r1);
+        fe_db_writecstr(db, ", ");
+        fe__print_ref(f, db, fe_extra_T(inst, XrRegRegImm16)->r2);
+        fe_db_writef(db, ", 0x%x", (u16)fe_extra_T(inst, XrRegRegImm16)->imm16);
         break;
     case XR_STORE8_REG ... XR_STORE32_REG:
         fe__print_ref(f, db, fe_extra_T(inst, XrRegRegReg)->r1);

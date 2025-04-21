@@ -3,10 +3,10 @@
 
 #define DONT_EMIT 1
 
-static u16 reg_num(FeFunction* f, FeInst* inst) {
-    FeVirtualReg* vr = fe_vreg(f->vregs, inst->vr_out);
-    return vr->real;
-}
+// static u16 reg_num(FeFunction* f, FeInst* inst) {
+//     FeVirtualReg* vr = fe_vreg(f->vregs, inst->vr_out);
+//     return vr->real;
+// }
 
 static char* reg(FeFunction* f, FeInst* inst) {
     if (inst->vr_out == FE_VREG_NONE) {
@@ -127,7 +127,7 @@ static void emit_mem_operand(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
     u8 shamt;
 
     switch (inst->kind) {
-    case XR_SHIFT ... XR_LOAD32_REG:
+    case XR_LOAD8_REG ... XR_LOAD32_REG:
         base = fe_extra_T(inst, XrRegReg)->r1;
         shifted = fe_extra_T(inst, XrRegReg)->r2;
         shift = fe_extra_T(inst, XrRegReg)->shift_kind;
@@ -161,12 +161,12 @@ static void emit_mem_operand(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
 
 static void emit_inst(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
     switch (inst->kind) {
-    case FE_MACH_MOV: {
-        FeInst* input = fe_extra_T(inst, FeInstUnop)->un;
-        fe_db_writecstr(db, "    mov ");
+    case XR_MOV: {
+        emit_inst_name(db, inst->kind);
         fe_db_writecstr(db, reg(f, inst));
         fe_db_writecstr(db, ", ");
-        fe_db_writecstr(db, reg(f, input));
+        XrRegImm16* ri = fe_extra(inst);
+        fe_db_writecstr(db, reg(f, ri->reg));
         break;
     }
     case XR_ADDI ... XR_LUI:
@@ -176,6 +176,35 @@ static void emit_inst(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst)
         emit_reg_reg(f, db, inst);
         emit_shift_group(db, fe_extra_T(inst, XrRegReg)->shift_kind, fe_extra_T(inst, XrRegReg)->imm5);
         break;
+    case XR_STORE8_IMM ... XR_STORE32_IMM:
+        emit_inst_name(db, inst->kind);
+        fe_db_writef(db, "%s [%s",
+            mem_operand_size(inst->kind),
+            reg(f, fe_extra_T(inst, XrRegRegImm16)->r1)
+        );
+        if (fe_extra_T(inst, XrRegRegImm16)->imm16 != 0) {
+            fe_db_writef(db, " + %u",
+                fe_extra_T(inst, XrRegRegImm16)->imm16
+            );
+        }
+        fe_db_writef(db, "], %s",
+            reg(f, fe_extra_T(inst, XrRegRegImm16)->r2)
+        );
+        break;
+    case XR_LOAD8_IMM ... XR_LOAD32_IMM:
+        emit_inst_name(db, inst->kind);
+        fe_db_writef(db, "%s, %s [%s",
+            reg(f, inst),
+            mem_operand_size(inst->kind),
+            reg(f, fe_extra_T(inst, XrRegImm16)->reg)
+        );
+        if (fe_extra_T(inst, XrRegImm16)->imm16 != 0) {
+            fe_db_writef(db, " + %u",
+                fe_extra_T(inst, XrRegImm16)->imm16
+            );
+        }
+        fe_db_writecstr(db, "]");
+        break;
     case XR_BEQ ... XR_BGE:
         emit_branch(f, b, db, inst);
         break;
@@ -183,7 +212,7 @@ static void emit_inst(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst)
         emit_inst_name(db, inst->kind);
         break;
     default:
-        fe_db_writecstr(db, "???");
+        fe_db_writef(db, "    ??? %d", inst->kind);
         break;
     }
     fe_db_writecstr(db, "\n");
@@ -196,15 +225,6 @@ void xr_emit_assembly(FeFunction* f, FeDataBuffer* db) {
         block->flags = block_counter++;
         for_inst(inst, block) {
             inst->flags = 0;
-            if (inst->kind == FE_MACH_REG) {
-                inst->flags = DONT_EMIT;
-            }
-            if (fe_inst_has_trait(inst->kind, FE_TRAIT_REG_MOV_HINT)) {
-                FeInst* input = fe_extra_T(inst, FeInstUnop)->un;
-                if (reg_num(f, inst) == reg_num(f, input)) {
-                    inst->flags = DONT_EMIT;
-                }
-            }
         }
     }
 

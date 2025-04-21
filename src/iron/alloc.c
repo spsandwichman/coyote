@@ -21,6 +21,9 @@ static u8 extra_size_table[_FE_INST_END] = {
     
     [FE_CALL_DIRECT] = sizeof(FeInstCallDirect),
     [FE_CALL_INDIRECT] = sizeof(FeInstCallIndirect),
+
+    [FE_MACH_STACK_SPILL] = sizeof(FeMachStackSpill),
+    [FE_MACH_STACK_RELOAD] = sizeof(FeMachStackReload),
 };
 
 void fe__load_extra_size_table(usize start_index, u8* table, usize len) {

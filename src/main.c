@@ -100,7 +100,7 @@ FeFunction* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vre
         FeInst* add = fe_append_end(if_false, fe_inst_binop(f, 
             FE_TY_I32, FE_ISUB, 
             param,
-            fe_append_end(if_false, fe_inst_const(f, FE_TY_I32, 0))
+            fe_append_end(if_false, fe_inst_const(f, FE_TY_I32, 10))
         ));
         FeInst* ret = fe_append_end(if_false, fe_inst_return(f));
         fe_set_return_arg(ret, 0, add);
@@ -130,22 +130,6 @@ int main(int argc, char** argv) {
     Vec(Token) tokens = lex_entrypoint(&f);
     (void)tokens;
     // printf("%zu chars -> %zu tokens (%zuB used, %zuB capacity)\n", file->size, tokens.len, sizeof(Token)*tokens.len, sizeof(Token)*tokens.cap);
-
-    // for_vec(Token* t, &tokens) {
-    //     if (_TOK_PREPROC_BEGIN < t->kind && t->kind < _TOK_PREPROC_END) {
-    //         printf("%s ", token_kind[t->kind]);
-    //         continue;
-    //     }
-    //     if (t->kind == TOK_STRING) {
-    //         printf("\"");
-    //     }
-    //     printf(str_fmt, str_arg(tok_span(*t)));
-    //     if (t->kind == TOK_STRING) {
-    //         printf("\"");
-    //     }
-    //     printf(" ");
-    // }
-    // printf("\n");
 
     fe_init_signal_handler();
     FeInstPool ipool;

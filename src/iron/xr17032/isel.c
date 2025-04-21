@@ -274,3 +274,107 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
     fe_runtime_crash("xr_isel: unable to select inst kind %u", inst->kind);
     return fe_new_chain(inst);
 }
+
+static u16 reg_num(FeFunction* f, FeInst* inst) {
+    FeVirtualReg* vr = fe_vreg(f->vregs, inst->vr_out);
+    return vr->real;
+}
+
+// final, post-regalloc touchups begin.
+// after this, the function is not necessarily valid SSA
+// nor valid IR at all.
+// here be dragons!!!!!
+void xr_final_touchups(FeFunction* f) {
+    // if this function contains a call, push the link register to the top of the stack frame.
+    FeStackItem* lr_slot = fe_new_stack_item(4, 4);
+    fe_stack_append_top(f, lr_slot);
+
+    fe_stack_append_bottom(f, fe_new_stack_item(4, 4));
+    fe_stack_append_bottom(f, fe_new_stack_item(4, 4));
+    fe_stack_append_bottom(f, fe_new_stack_item(4, 4));
+    fe_stack_append_bottom(f, fe_new_stack_item(4, 4));
+    fe_stack_append_bottom(f, fe_new_stack_item(4, 4));
+
+    u32 stack_size = fe_calculate_stack_size(f);
+
+    // set up the stack
+    FeInst* sp = mach_reg(f, f->entry_block, XR_REG_SP);
+    FeInst* stack_setup = create_mach(f, XR_SUBI, FE_TY_I32, sizeof(XrRegImm16));
+    preassign(f, stack_setup, f->entry_block, XR_REG_SP);
+    fe_extra_T(stack_setup, XrRegImm16)->reg = sp;
+    fe_extra_T(stack_setup, XrRegImm16)->imm16 = stack_size;
+
+
+    // add stack spill at the beginning
+    FeInst* lr = mach_reg(f, f->entry_block, XR_REG_LR);
+    FeInst* spill_lr = fe_ipool_alloc(f->ipool, sizeof(FeMachStackSpill));
+    spill_lr->ty = FE_TY_VOID; spill_lr->kind = FE_MACH_STACK_SPILL;
+    fe_extra_T(spill_lr, FeMachStackSpill)->val = lr;
+    fe_extra_T(spill_lr, FeMachStackSpill)->item = lr_slot;
+    
+    // append to the entry block.
+    fe_append_begin(f->entry_block, spill_lr);
+    fe_append_begin(f->entry_block, stack_setup);
+
+    // restore lr and sp at returns.
+    for_blocks(block, f) {
+        FeInst* ret = block->bookend->prev;
+        if (ret->kind != XR_RET) continue;
+
+        FeInst* reload_lr = fe_ipool_alloc(f->ipool, sizeof(FeMachStackReload));
+        reload_lr->ty = FE_TY_I32; reload_lr->kind = FE_MACH_STACK_RELOAD;
+        fe_extra_T(reload_lr, FeMachStackReload)->item = lr_slot;
+        preassign(f, reload_lr, block, XR_REG_LR);
+
+        FeInst* stack_destroy = create_mach(f, XR_ADDI, FE_TY_I32, sizeof(XrRegImm16));
+        preassign(f, stack_destroy, f->entry_block, XR_REG_SP);
+        fe_extra_T(stack_destroy, XrRegImm16)->reg = sp;
+        fe_extra_T(stack_destroy, XrRegImm16)->imm16 = stack_size;
+
+        fe_insert_before(ret, reload_lr);
+        fe_insert_before(ret, stack_destroy);
+    }
+
+    // time to normalize.
+    for_blocks(block, f) {
+        for_inst(inst, block) {
+            FeInstUnop* unop = fe_extra(inst);
+
+            switch (inst->kind) {
+            case FE_MACH_MOV:
+                if (reg_num(f, inst) == reg_num(f, unop->un)) {
+                    fe_inst_remove(inst);
+                } else {
+                    // turn it into a regular XR mov
+                    FeInst* addi = create_mach(f, XR_MOV, FE_TY_I32, sizeof(XrRegImm16));
+                    fe_extra_T(addi, XrRegImm16)->reg = unop->un;
+                    addi->vr_out = inst->vr_out;
+                    fe_inst_replace_pos(inst, addi);
+                }
+                break;
+            case FE_MACH_REG:
+                fe_inst_remove(inst);
+                break;
+            case FE_MACH_STACK_SPILL:
+                // turn it into a store to sp
+                FeInst* spill = create_mach(f, XR_STORE32_IMM, inst->ty, sizeof(XrRegRegImm16));
+                // reload->vr_out = inst->vr_out;
+                fe_extra_T(spill, XrRegRegImm16)->r1 = sp;
+                fe_extra_T(spill, XrRegRegImm16)->imm16 = fe_extra_T(inst, FeMachStackSpill)->item->_offset;
+                fe_extra_T(spill, XrRegRegImm16)->r2 = fe_extra_T(inst, FeMachStackSpill)->val;
+                fe_inst_replace_pos(inst, spill);
+                break;
+            case FE_MACH_STACK_RELOAD:
+                // turn it into a load from sp
+                FeInst* reload = create_mach(f, XR_LOAD32_IMM, inst->ty, sizeof(XrRegImm16));
+                reload->vr_out = inst->vr_out;
+                fe_extra_T(reload, XrRegImm16)->reg = sp;
+                fe_extra_T(reload, XrRegImm16)->imm16 = fe_extra_T(inst, FeMachStackReload)->item->_offset;
+                fe_inst_replace_pos(inst, reload);
+                break;
+            default: 
+                continue;
+            }
+        }
+    }
+}

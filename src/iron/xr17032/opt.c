@@ -15,7 +15,7 @@ static FeInst* peephole(FeInst* inst) {
     return inst;
 }
 
-void xr_opt(FeFunction* f) {
+void xr_pre_regalloc_opt(FeFunction* f) {
     FeTarget* t = f->mod->target;
 
     for_blocks(b, f) {

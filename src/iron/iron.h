@@ -81,6 +81,7 @@ typedef struct FeFunction FeFunction;
 typedef struct FeFuncSignature FeFuncSignature;
 typedef struct FeModule FeModule;
 typedef struct FeTarget FeTarget;
+typedef struct FeStackItem FeStackItem;
 typedef struct FeInstPool FeInstPool;
 
 typedef u32 FeVReg; // vreg index.
@@ -139,8 +140,13 @@ typedef struct FeFunction {
 
     FeBlock* entry_block;
     FeBlock* last_block;
+    
     FeFunction* list_next;
     FeFunction* list_prev;
+
+    FeStackItem* stack_top; // most-positive offset from stack pointer
+    FeStackItem* stack_bottom;
+
 } FeFunction;
 
 typedef struct FeModule {
@@ -305,13 +311,11 @@ enum FeInstKindEnum {
     FE_CASCADE_UNIQUE,
     FE_CASCADE_VOLATILE,
     FE_MACH_REG,
-    FE_MACH_STACK_BEGIN,  // set up the stack frame.
-    FE_MACH_STACK_END,    // destroy the stack frame.
 
     // FeMachStackSpill
-    FE_MACH_STACK_SPILL,  // spill something to the stack.
+    FE_MACH_STACK_SPILL,
     // FeMachStackReload
-    FE_MACH_STACK_RELOAD, // reload it from the stack
+    FE_MACH_STACK_RELOAD,
 
     // Branch
     FE_BRANCH,
@@ -431,14 +435,30 @@ typedef struct {
 } FeInstCallIndirect;
 
 typedef struct {
-    FeInst* src;
-    u16 size;
-    u16 align;
+    FeInst* val;
+    FeStackItem* item;
 } FeMachStackSpill;
 
 typedef struct {
-    FeInst* spill;
+    FeStackItem* item;
 } FeMachStackReload;
+
+#define FE_STACK_OFFSET_UNDEF UINT32_MAX
+
+typedef struct FeStackItem {
+    FeStackItem* next; // points to top
+    FeStackItem* prev; // points to bottom
+
+    u16 size;
+    u16 align;
+
+    u32 _offset;
+} FeStackItem;
+
+FeStackItem* fe_new_stack_item(u16 size, u16 align);
+FeStackItem* fe_stack_append_bottom(FeFunction* f, FeStackItem* item);
+FeStackItem* fe_stack_append_top(FeFunction* f, FeStackItem* item);
+u32 fe_calculate_stack_size(FeFunction* f);
 
 typedef u16 FeTrait;
 enum FeTraitEnum {
@@ -662,7 +682,11 @@ typedef struct FeTarget {
     FeBlock** (*list_targets)(FeInst* term, usize* len_out);
 
     FeInstChain (*isel)(FeFunction* f, FeBlock* block, FeInst* inst);
-    void (*opt)(FeFunction* f);
+    void (*pre_regalloc_opt)(FeFunction* f);
+    void (*final_touchups)(FeFunction* f);
+
+
+    // void (*opt)(FeFunction* f);
 
     FeRegclass (*choose_regclass)(FeInstKind kind, FeTy ty);
     char* (*reg_name)(u8 regclass, u16 real);
@@ -670,6 +694,8 @@ typedef struct FeTarget {
     
     u8 max_regclass;
     const u16* regclass_lens;
+
+    u64 stack_pointer_align;
 
     void (*emit_asm)(FeFunction* f, FeDataBuffer* db);
 } FeTarget;

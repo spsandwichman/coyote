@@ -22,7 +22,9 @@ const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
         t->regclass_lens = xr_regclass_lens;
         t->emit_asm = xr_emit_assembly;
         t->choose_regclass = xr_choose_regclass;
-        t->opt = xr_opt;
+        t->pre_regalloc_opt = xr_pre_regalloc_opt;
+        t->final_touchups = xr_final_touchups;
+        t->stack_pointer_align = 4;
 
         fe__load_extra_size_table(_FE_XR_INST_BEGIN, xr_size_table, _FE_XR_INST_END - _FE_XR_INST_BEGIN);
         fe__load_trait_table(_FE_XR_INST_BEGIN, xr_trait_table, _FE_XR_INST_END - _FE_XR_INST_BEGIN);

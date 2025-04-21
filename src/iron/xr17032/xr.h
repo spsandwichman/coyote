@@ -5,7 +5,7 @@
 
 enum {
     // XrRegImm16
-    XR_ADDI = _FE_XR_INST_BEGIN,     
+    XR_ADDI = _FE_XR_INST_BEGIN, 
                     // out = reg + uimm16
     XR_SUBI,        // out = reg - uimm16
     XR_SLTI,        // out = reg < uimm16
@@ -14,6 +14,7 @@ enum {
     XR_XORI,        // out = reg ^ uimm16
     XR_ORI,         // out = reg | uimm16
     XR_LUI,         // out = reg | (uimm16 << 16)
+    XR_MOV,         // out = reg
 
     XR_LOAD8_IMM,   // out = mem[reg + uimm16]
     XR_LOAD16_IMM,  // out = mem[reg + uimm16]
@@ -155,7 +156,8 @@ FeInst** xr_list_inputs(FeInst* inst, usize* len_out);
 FeBlock** xr_term_list_targets(FeInst* term, usize* len_out);
 
 FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst);
-void xr_opt(FeFunction* f);
+void xr_pre_regalloc_opt(FeFunction* f);
+void xr_final_touchups(FeFunction* f);
 
 void xr_emit_assembly(FeFunction* f, FeDataBuffer* db);
 
