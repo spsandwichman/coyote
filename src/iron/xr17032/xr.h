@@ -146,8 +146,8 @@ extern u16 xr_regclass_lens[];
 extern u8 xr_size_table[];
 extern FeTrait xr_trait_table[];
 
-char* xr_inst_name(FeInstKind kind, bool ir);
-char* xr_reg_name(u8 regclass, u16 real);
+const char* xr_inst_name(FeInstKind kind, bool ir);
+const char* xr_reg_name(u8 regclass, u16 real);
 FeRegStatus xr_reg_status(u8 cconv, u8 regclass, u16 real);
 
 void xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst);

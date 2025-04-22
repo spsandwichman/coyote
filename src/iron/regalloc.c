@@ -1,3 +1,4 @@
+#include "iron.h"
 #include "iron/iron.h"
 
 static bool add_live_in(FeBlockLiveness* lv, FeVReg vr) {
@@ -90,7 +91,35 @@ static void calculate_liveness(FeFunction* f) {
     }
 }
 
+typedef struct {
+    bool shutthefuckupclang;
+    bool* reg_live[];
+} LiveSet;
+
+LiveSet* liveset_new(const FeTarget* target) {
+    LiveSet* lvset = fe_malloc(sizeof(lvset->reg_live[0]) * target->max_regclass);
+    for_n(i, 0, target->max_regclass + 1) {
+        usize regclass_size = sizeof(lvset->reg_live[0][0]) * target->regclass_lens[i];
+        lvset->reg_live[i] = fe_malloc(regclass_size);
+        memset(lvset->reg_live[i], 0, regclass_size);
+    }
+    return lvset;
+}
+
+void liveset_add(LiveSet* lvset, u8 regclass, u16 reg) {
+    lvset->reg_live[regclass][reg] = true;
+}
+
+void liveset_remove(LiveSet* lvset, u8 regclass, u16 reg) {
+    lvset->reg_live[regclass][reg] = false;
+}
+
+bool is_live(LiveSet* lvset, u8 regclass, u16 reg) {
+    return lvset->reg_live[regclass][reg];
+}
+
 void fe_regalloc_linear_scan(FeFunction* f) {
+    FeVRegBuffer* vbuf = f->vregs;
     const FeTarget* target = f->mod->target;
     calculate_liveness(f);
 
@@ -112,82 +141,77 @@ void fe_regalloc_linear_scan(FeFunction* f) {
         }
     }
 
-    bool* vr_live_now = fe_malloc(f->vregs->len);
-    memset(vr_live_now, 0, f->vregs->len);
-
-    bool** real_live_now = fe_malloc(sizeof(real_live_now[0]) * (target->max_regclass + 1));
-    for_n(i, 0, target->max_regclass + 1) {
-        real_live_now[i] = fe_malloc(sizeof(real_live_now[0][0]) * target->regclass_lens[i]);
-    }
+    LiveSet* lvset = liveset_new(target);
 
     for_blocks(block, f) {
-        // initialize is_live_now from block.live_out
+        // make everything in live_out live now
         for_n(i, 0, block->live->out_len) {
-            FeVReg out = block->live->out[i];
-            vr_live_now[out] = true;
+            FeVirtualReg* vr = fe_vreg(vbuf, block->live->out[i]);
+            liveset_add(lvset, vr->class, vr->real);
         }
 
         for_inst_reverse(inst, block) {
-            FeVReg current = inst->vr_out;
-            FeVirtualReg* current_vr = fe_vreg(f->vregs, current);
-
-            if (current != FE_VREG_NONE && current_vr->real == FE_VREG_REAL_UNASSIGNED) {
-                // see if we can allocate some shit
-                // if we have a hint, try to take it
-                FeVirtualReg* hint_vr = fe_vreg(f->vregs, current_vr->hint);
-                if (hint_vr != nullptr && hint_vr->real != FE_VREG_REAL_UNASSIGNED && !real_live_now[hint_vr->class][hint_vr->real]) {
-                    current_vr->real = hint_vr->real;
-                } else {
-                    FeRegclass regclass = current_vr->class; 
-                    // try to allocate output register to a call_clobbered register first
-                    u16 unused_real_reg = 0;
-                    for (; unused_real_reg != target->regclass_lens[regclass]; unused_real_reg++) {
-                        if (target->reg_status(f->sig->cconv, regclass, unused_real_reg) != FE_REG_CALL_CLOBBERED) continue;
-                        // skip if its currently live.
-                        if (real_live_now[regclass][unused_real_reg]) continue;
-                        break;
-                    }
-
-                    if (unused_real_reg != target->regclass_lens[regclass]) {
-                        current_vr->real = unused_real_reg;
-                    } else {
-                        fe_runtime_crash("regalloc wuhhhhhhh");
-                    }
+            if (inst->vr_out != FE_VREG_NONE) {
+                // this instruction defines a virtual register
+                FeVirtualReg* inst_out = fe_vreg(vbuf, inst->vr_out);
+                
+                // if this instruction is the "canonical" definition
+                // of the virtual register, KILL IT TO DEATH
+                if (inst_out->def == inst && inst_out->real != FE_VREG_REAL_UNASSIGNED) {
+                    liveset_remove(lvset, inst_out->class, inst_out->real);
                 }
             }
 
-            // kill output if its canonical definition is the current inst
-            // (for supporting two-address instructions)
-            if (current != FE_VREG_NONE && inst == current_vr->def) {
-                vr_live_now[current] = false;
-                if (current_vr->real != FE_VREG_REAL_UNASSIGNED) {
-                    real_live_now[current_vr->class][current_vr->real] = false;
-                }
-            }
+            usize inst_inputs_len = 0;
+            FeInst** inst_inputs = fe_inst_list_inputs(target, inst, &inst_inputs_len);
+            for_n(i, 0, inst_inputs_len) {
+                FeInst* input = inst_inputs[i];
+                FeVirtualReg* input_vr = fe_vreg(vbuf, input->vr_out);
 
-            usize inputs_len;
-            FeInst** inputs = fe_inst_list_inputs(target, inst, &inputs_len);
-            // make inputs live
-            for_n(i, 0, inputs_len) {
-                FeInst* inst_input = inputs[i];
-                FeVReg input = inst_input->vr_out;
-                FeVirtualReg* input_vr = fe_vreg(f->vregs, input);
-
-                vr_live_now[input] = true;
-
+                // if this vreg has already been allocated, skip past it
                 if (input_vr->real != FE_VREG_REAL_UNASSIGNED) {
-                    real_live_now[input_vr->class][input_vr->real] = true;
+                    continue;
                 }
+
+                // allocate this virtual register a real one!!
+                
+                // try to take a hint lmao
+                u16 real = 0;
+                if (input_vr->hint != FE_VREG_NONE) {
+                    FeVirtualReg* hint_vr = fe_vreg(vbuf, input_vr->hint);
+                    if (hint_vr->real != FE_VREG_REAL_UNASSIGNED && !is_live(lvset, hint_vr->class, hint_vr->real)) {
+                        real = hint_vr->real;
+                    }
+                }
+
+                // iterate through all the real registers
+                if (!real) for (; real < target->regclass_lens[input_vr->class]; ++real) {
+                    // right now, only consider call-clobbered registers. no spilling rn.
+                    if (target->reg_status(f->sig->cconv, input_vr->class, real) != FE_REG_CALL_CLOBBERED) {
+                        continue;
+                    }
+                    // if this real register is already used, skip past it.
+                    if (is_live(lvset, input_vr->class, real)) {
+                        continue;
+                    }
+
+                    // we've found a register we can use here!
+                    break;
+                }
+                if (real >= target->regclass_lens[input_vr->class]) {
+                    fe_runtime_crash("unable to allocate");
+                }
+
+                // assign real register to virtual register
+                input_vr->real = real;
+                liveset_add(lvset, input_vr->class, input_vr->real);
             }
-
         }
 
-        // uninitialize is_live_now from block.live_in
+        // unlive everything that is live_in
         for_n(i, 0, block->live->in_len) {
-            FeVReg in = block->live->in[i];
-            vr_live_now[in] = false;
+            FeVirtualReg* vr = fe_vreg(vbuf, block->live->in[i]);
+            liveset_remove(lvset, vr->class, vr->real);
         }
-        memset(vr_live_now, 0, f->vregs->len);
-        // memset(real_live_now, 0, XR_REG__COUNT);
     }
 }

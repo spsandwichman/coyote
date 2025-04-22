@@ -36,7 +36,7 @@ u16 xr_regclass_lens[] = {
     [XR_REGCLASS_REG] = XR_REG__COUNT,
 };
 
-char* xr_inst_name(FeInstKind kind, bool ir) {
+const char* xr_inst_name(FeInstKind kind, bool ir) {
     XrInstKind xrkind = (XrInstKind) kind;
     switch (xrkind) {
     case XR_ADDI: return ir ? "xr.addi": "addi";
@@ -94,7 +94,7 @@ char* xr_inst_name(FeInstKind kind, bool ir) {
     }
 }
 
-char* xr_reg_name(u8 regclass, u16 real) {
+const char* xr_reg_name(u8 regclass, u16 real) {
     if (regclass != XR_REGCLASS_REG || real >= XR_REG__COUNT) {
         return "???";
     }
@@ -135,8 +135,10 @@ char* xr_reg_name(u8 regclass, u16 real) {
     case XR_REG_TP: return "tp";
     case XR_REG_SP: return "sp";
     case XR_REG_LR: return "lr";
+    default:
+        return "???";
     }
-    return "???";
+    
 }
 
 FeRegStatus xr_reg_status(u8 cconv, u8 regclass, u16 real) {

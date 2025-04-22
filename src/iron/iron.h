@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include <stdalign.h>
 
-#if __STDC_VERSION__ <= 201710L
-    #error "iron is a C23 library!"
+#if __STDC_VERSION__ <= 201710L 
+    #error "Iron is a C23 library!"
 #endif
 
 // feel free to make iron use your own heap-like allocator.
@@ -670,7 +670,7 @@ typedef struct FeTarget {
 
     void (*ir_print_args)(FeFunction* f, FeDataBuffer* db, FeInst* inst);
 
-    char* (*inst_name)(FeInstKind kind, bool ir);
+    const char* (*inst_name)(FeInstKind kind, bool ir);
     FeInst** (*list_inputs)(FeInst* inst, usize* len_out);
     FeBlock** (*list_targets)(FeInst* term, usize* len_out);
 
@@ -682,7 +682,7 @@ typedef struct FeTarget {
     // void (*opt)(FeFunction* f);
 
     FeRegclass (*choose_regclass)(FeInstKind kind, FeTy ty);
-    char* (*reg_name)(u8 regclass, u16 real);
+    const char* (*reg_name)(u8 regclass, u16 real);
     FeRegStatus (*reg_status)(u8 cconv, u8 regclass, u16 real);
     
     u8 max_regclass;
