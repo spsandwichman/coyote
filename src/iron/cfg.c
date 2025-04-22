@@ -9,7 +9,7 @@ static void number(FeCFGNode* n, usize* rev_post) {
 }
 
 void fe_calculate_cfg(FeFunction* f) {
-    FeTarget* target = f->mod->target;
+    const FeTarget* target = f->mod->target;
     {
         usize i = 0;
         for (FeBlock* b = f->entry_block; b != NULL; b = b->list_next) {

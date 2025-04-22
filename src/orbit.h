@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdarg.h>
-#include <sys/time.h>
 #include <stdatomic.h>
 #include <assert.h>
 #include <limits.h>

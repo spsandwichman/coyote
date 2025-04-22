@@ -116,7 +116,7 @@ FeInst* fe_func_param(FeFunction* f, usize index) {
     return f->params[index];
 }
 void fe_inst_update_uses(FeFunction* f) {
-    FeTarget* t = f->mod->target;
+    const FeTarget* t = f->mod->target;
 
     for_blocks(block, f) {
         for_inst(inst, block) {
@@ -135,7 +135,7 @@ void fe_inst_update_uses(FeFunction* f) {
 }
 
 // jank as FUCK and very likely to break; too bad!
-FeInst** fe_inst_list_inputs(FeTarget* t, FeInst* inst, usize* len_out) {
+FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
     if (inst->kind > _FE_BASE_INST_END) {
         return t->list_inputs(inst, len_out);
     }
@@ -196,7 +196,7 @@ FeInst** fe_inst_list_inputs(FeTarget* t, FeInst* inst, usize* len_out) {
     }
 }
 
-FeBlock** fe_inst_term_list_targets(FeTarget* t, FeInst* term, usize* len_out) {
+FeBlock** fe_inst_term_list_targets(const FeTarget* t, FeInst* term, usize* len_out) {
     if (!fe_inst_has_trait(term->kind, FE_TRAIT_TERMINATOR)) {
         fe_runtime_crash("list_targets: inst %d is not a terminator", term->kind);
     }

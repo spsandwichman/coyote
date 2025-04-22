@@ -4,3 +4,4 @@
 coyote
 .vscode
 gmon.out
+.clangd

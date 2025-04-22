@@ -1,7 +1,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <signal.h>
 #ifdef __linux__
     #include <sys/types.h>

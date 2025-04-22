@@ -156,7 +156,7 @@ void fe__print_ref(FeFunction* f, FeDataBuffer* db, FeInst* ref) {
 }
 
 static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
-    FeTarget* target = f->mod->target;
+    const FeTarget* target = f->mod->target;
 
     if (inst->ty != FE_TY_VOID) {
         fe__print_ref(f, db, inst);
@@ -166,7 +166,7 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
     }
 
     if (inst->kind < _FE_BASE_INST_END) {
-        char* name = inst_name[inst->kind];
+        const char* name = inst_name[inst->kind];
         
         if (name) fe_db_writecstr(db, name);
         else fe_db_writef(db, "<kind %d>", inst->kind);

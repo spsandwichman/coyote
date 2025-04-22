@@ -1,6 +1,7 @@
 #ifndef ORBIT_TYPES_H
 #define ORBIT_TYPES_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef uint64_t u64;
@@ -20,9 +21,5 @@ typedef uintptr_t usize;
 typedef double   f64;
 typedef float    f32;
 typedef _Float16 f16;
-
-typedef _Bool bool;
-#define false (bool)0
-#define true (bool)1
 
 #endif // ORBIT_TYPES_H

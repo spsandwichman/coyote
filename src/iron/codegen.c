@@ -1,4 +1,4 @@
-#include "iron/iron.h"
+#include "iron.h"
 
 void fe_vrbuf_init(FeVRegBuffer* buf, usize cap) {
     buf->len = 0;
@@ -32,7 +32,7 @@ typedef struct {
 } InstPair;
 
 void fe_codegen(FeFunction* f) {
-    FeTarget* target = f->mod->target;
+    const FeTarget* target = f->mod->target;
 
     fe_inst_update_uses(f);
 

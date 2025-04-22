@@ -4,10 +4,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <stdbool.h>
 #include <string.h>
 #include <stdalign.h>
 #include <stdnoreturn.h>
+
+#if __STDC_VERSION__ <= 201710L
+    #error "iron is a C23 library!"
+#endif
 
 // feel free to make iron use your own heap-like allocator.
 #ifndef FE_CUSTOM_ALLOCATOR
@@ -150,7 +153,7 @@ typedef struct FeFunction {
 } FeFunction;
 
 typedef struct FeModule {
-    FeTarget* target;
+    const FeTarget* target;
     struct {
         FeFunction* first;
         FeFunction* last;
@@ -535,8 +538,8 @@ void fe_chain_replace_pos(FeInst* from, FeInstChain to);
 
 void fe_inst_free(FeFunction* f, FeInst* inst);
 void fe_inst_update_uses(FeFunction* f);
-FeInst** fe_inst_list_inputs(FeTarget* t, FeInst* inst, usize* len_out);
-FeBlock** fe_inst_term_list_targets(FeTarget* t, FeInst* term, usize* len_out);
+FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out);
+FeBlock** fe_inst_term_list_targets(const FeTarget* t, FeInst* term, usize* len_out);
 
 FeInst* fe_inst_const(FeFunction* f, FeTy ty, u64 val);
 FeInst* fe_inst_unop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* val);

@@ -33,7 +33,7 @@ static bool add_live_out(FeBlockLiveness* lv, FeVReg vr) {
 }
 
 static void calculate_liveness(FeFunction* f) {
-    FeTarget* t = f->mod->target;
+    const FeTarget* t = f->mod->target;
 
     // make sure cfg is updated.
     fe_calculate_cfg(f);
@@ -91,7 +91,7 @@ static void calculate_liveness(FeFunction* f) {
 }
 
 void fe_regalloc_linear_scan(FeFunction* f) {
-    FeTarget* target = f->mod->target;
+    const FeTarget* target = f->mod->target;
     calculate_liveness(f);
 
     // hints!
