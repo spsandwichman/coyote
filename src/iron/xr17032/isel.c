@@ -285,54 +285,61 @@ static u16 reg_num(FeFunction* f, FeInst* inst) {
 // nor valid IR at all.
 // here be dragons!!!!!
 void xr_final_touchups(FeFunction* f) {
-    // if this function contains a call, push the link register to the top of the stack frame.
-    FeStackItem* lr_slot = fe_new_stack_item(4, 4);
-    fe_stack_append_top(f, lr_slot);
 
-    fe_stack_append_bottom(f, fe_new_stack_item(4, 4));
-    fe_stack_append_bottom(f, fe_new_stack_item(4, 4));
-    fe_stack_append_bottom(f, fe_new_stack_item(4, 4));
-    fe_stack_append_bottom(f, fe_new_stack_item(4, 4));
-    fe_stack_append_bottom(f, fe_new_stack_item(4, 4));
+    bool should_push_lr = false;
+
+    // if this function contains a call, push the link register to the top of the stack frame.
+    FeStackItem* lr_slot = NULL;
+    if (should_push_lr) {
+        lr_slot = fe_new_stack_item(4, 4);
+        fe_stack_append_top(f, lr_slot);
+    }
 
     u32 stack_size = fe_calculate_stack_size(f);
 
-    // set up the stack
-    FeInst* sp = mach_reg(f, f->entry_block, XR_REG_SP);
-    FeInst* stack_setup = create_mach(f, XR_SUBI, FE_TY_I32, sizeof(XrRegImm16));
-    preassign(f, stack_setup, f->entry_block, XR_REG_SP);
-    fe_extra_T(stack_setup, XrRegImm16)->reg = sp;
-    fe_extra_T(stack_setup, XrRegImm16)->imm16 = stack_size;
-
-
     // add stack spill at the beginning
     FeInst* lr = mach_reg(f, f->entry_block, XR_REG_LR);
-    FeInst* spill_lr = fe_ipool_alloc(f->ipool, sizeof(FeMachStackSpill));
-    spill_lr->ty = FE_TY_VOID; spill_lr->kind = FE_MACH_STACK_SPILL;
-    fe_extra_T(spill_lr, FeMachStackSpill)->val = lr;
-    fe_extra_T(spill_lr, FeMachStackSpill)->item = lr_slot;
-    
-    // append to the entry block.
-    fe_append_begin(f->entry_block, spill_lr);
-    fe_append_begin(f->entry_block, stack_setup);
+    if (should_push_lr) {
+        FeInst* spill_lr = fe_ipool_alloc(f->ipool, sizeof(FeMachStackSpill));
+        spill_lr->ty = FE_TY_VOID; spill_lr->kind = FE_MACH_STACK_SPILL;
+        fe_extra_T(spill_lr, FeMachStackSpill)->val = lr;
+        fe_extra_T(spill_lr, FeMachStackSpill)->item = lr_slot;
+        fe_append_begin(f->entry_block, spill_lr);
+    }
+
+
+    // set up the stack
+    FeInst* sp = mach_reg(f, f->entry_block, XR_REG_SP);
+    if (stack_size != 0) {
+        FeInst* stack_setup = create_mach(f, XR_SUBI, FE_TY_I32, sizeof(XrRegImm16));
+        preassign(f, stack_setup, f->entry_block, XR_REG_SP);
+        fe_extra_T(stack_setup, XrRegImm16)->reg = sp;
+        fe_extra_T(stack_setup, XrRegImm16)->imm16 = stack_size;
+        fe_append_begin(f->entry_block, stack_setup);
+
+    }    
 
     // restore lr and sp at returns.
     for_blocks(block, f) {
         FeInst* ret = block->bookend->prev;
         if (ret->kind != XR_RET) continue;
 
-        FeInst* reload_lr = fe_ipool_alloc(f->ipool, sizeof(FeMachStackReload));
-        reload_lr->ty = FE_TY_I32; reload_lr->kind = FE_MACH_STACK_RELOAD;
-        fe_extra_T(reload_lr, FeMachStackReload)->item = lr_slot;
-        preassign(f, reload_lr, block, XR_REG_LR);
+        FeInst* reload_lr = NULL;
+        if (should_push_lr) {
+            reload_lr = fe_ipool_alloc(f->ipool, sizeof(FeMachStackReload));
+            reload_lr->ty = FE_TY_I32; reload_lr->kind = FE_MACH_STACK_RELOAD;
+            fe_extra_T(reload_lr, FeMachStackReload)->item = lr_slot;
+            preassign(f, reload_lr, block, XR_REG_LR);
+            fe_insert_before(ret, reload_lr);
+        }
 
-        FeInst* stack_destroy = create_mach(f, XR_ADDI, FE_TY_I32, sizeof(XrRegImm16));
-        preassign(f, stack_destroy, f->entry_block, XR_REG_SP);
-        fe_extra_T(stack_destroy, XrRegImm16)->reg = sp;
-        fe_extra_T(stack_destroy, XrRegImm16)->imm16 = stack_size;
-
-        fe_insert_before(ret, reload_lr);
-        fe_insert_before(ret, stack_destroy);
+        if (stack_size != 0) {
+            FeInst* stack_destroy = create_mach(f, XR_ADDI, FE_TY_I32, sizeof(XrRegImm16));
+            preassign(f, stack_destroy, f->entry_block, XR_REG_SP);
+            fe_extra_T(stack_destroy, XrRegImm16)->reg = sp;
+            fe_extra_T(stack_destroy, XrRegImm16)->imm16 = stack_size;
+            fe_insert_before(ret, stack_destroy);
+        }
     }
 
     // time to normalize.
