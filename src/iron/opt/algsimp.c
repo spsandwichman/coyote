@@ -61,13 +61,15 @@ static FeInst* identity(FeInst* inst) {
             return inst_bin->lhs;
         }
         break;
+    default:
+        break;
     }
 
     return inst;
 }
 
 void fe_opt_algsimp(FeFunction* f) {
-    FeTarget* t = f->mod->target;
+    const FeTarget* t = f->mod->target;
 
     for_blocks(b, f) {
         for_inst(inst, b) {

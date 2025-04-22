@@ -22,7 +22,7 @@ FeStackItem* fe_new_stack_item(u16 size, u16 align) {
 }
 
 FeStackItem* fe_stack_append_bottom(FeFunction* f, FeStackItem* item) {
-    if (f->stack_bottom == NULL) {
+    if (f->stack_bottom == nullptr) {
         f->stack_bottom = item;
         f->stack_top = item;
         return item;
@@ -35,7 +35,7 @@ FeStackItem* fe_stack_append_bottom(FeFunction* f, FeStackItem* item) {
 }
 
 FeStackItem* fe_stack_append_top(FeFunction* f, FeStackItem* item) {
-    if (f->stack_top == NULL) {
+    if (f->stack_top == nullptr) {
         f->stack_bottom = item;
         f->stack_top = item;
         return item;
@@ -51,7 +51,7 @@ u32 fe_calculate_stack_size(FeFunction* f) {
     u32 stack_size = 0;
 
     FeStackItem* item = f->stack_bottom;
-    while (item != NULL) {
+    while (item != nullptr) {
         item->_offset = stack_size;
         stack_size = align_forward_p2(stack_size, item->align);
         stack_size += item->size;

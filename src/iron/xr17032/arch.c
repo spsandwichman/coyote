@@ -37,7 +37,8 @@ u16 xr_regclass_lens[] = {
 };
 
 char* xr_inst_name(FeInstKind kind, bool ir) {
-    switch (kind) {
+    XrInstKind xrkind = (XrInstKind) kind;
+    switch (xrkind) {
     case XR_ADDI: return ir ? "xr.addi": "addi";
     case XR_SUBI: return ir ? "xr.subi": "subi";
     case XR_SLTI: return ir ? "xr.slti": "slti";
@@ -88,8 +89,9 @@ char* xr_inst_name(FeInstKind kind, bool ir) {
     case XR_BGE: return ir ? "xr.bge" : "bge";
 
     case XR_RET: return ir ? "xr.ret" : "ret";
+    default:
+        return "xr.???";
     }
-    return "xr.???";
 }
 
 char* xr_reg_name(u8 regclass, u16 real) {
@@ -186,7 +188,7 @@ FeRegStatus xr_reg_status(u8 cconv, u8 regclass, u16 real) {
 }
 
 void xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
-    switch (inst->kind) {  
+    switch ((XrInstKind)inst->kind) {  
     case XR_ADDI ... XR_LOAD32_IMM:
         fe__print_ref(f, db, fe_extra_T(inst, XrRegImm16)->reg);
         if (inst->kind != XR_MOV) 
@@ -242,7 +244,7 @@ void xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
 }
 
 FeInst** xr_list_inputs(FeInst* inst, usize* len_out) {
-    switch (inst->kind) {
+    switch ((XrInstKind)inst->kind) {
     case XR_ADDI ... XR_LOAD32_IMM:
         *len_out = 1;
         return &fe_extra_T(inst, XrRegImm16)->reg;
@@ -257,7 +259,7 @@ FeInst** xr_list_inputs(FeInst* inst, usize* len_out) {
         return &fe_extra_T(inst, XrRegBranch)->reg;
     case XR_RET:
         *len_out = 0;
-        return NULL;
+        return nullptr;
     default:
         fe_runtime_crash("xr_list_inputs: unknown kind %d", inst->kind);
         break;
@@ -276,7 +278,7 @@ FeBlock** xr_term_list_targets(FeInst* term, usize* len_out) {
         return &fe_extra_T(term, XrRegBranch)->dest;
     case XR_RET:
         *len_out = 0;
-        return NULL;
+        return nullptr;
     default:
         fe_runtime_crash("xr_list_targets: unknown kind %d", term->kind);
         break;

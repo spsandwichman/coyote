@@ -289,7 +289,7 @@ void xr_final_touchups(FeFunction* f) {
     bool should_push_lr = false;
 
     // if this function contains a call, push the link register to the top of the stack frame.
-    FeStackItem* lr_slot = NULL;
+    FeStackItem* lr_slot = nullptr;
     if (should_push_lr) {
         lr_slot = fe_new_stack_item(4, 4);
         fe_stack_append_top(f, lr_slot);
@@ -324,7 +324,7 @@ void xr_final_touchups(FeFunction* f) {
         FeInst* ret = block->bookend->prev;
         if (ret->kind != XR_RET) continue;
 
-        FeInst* reload_lr = NULL;
+        FeInst* reload_lr = nullptr;
         if (should_push_lr) {
             reload_lr = fe_ipool_alloc(f->ipool, sizeof(FeMachStackReload));
             reload_lr->ty = FE_TY_I32; reload_lr->kind = FE_MACH_STACK_RELOAD;

@@ -25,7 +25,7 @@ FsFile* fs_open(const char* path, bool create, bool overwrite) {
         f->handle = open(path, O_RDONLY);
     }
     
-    if (f->handle == -1) return NULL;
+    if (f->handle == -1) return nullptr;
 
     struct stat info;
     fstat(f->handle, &info);
@@ -60,19 +60,19 @@ void fs_destroy(FsFile* f) {
     free(f);
 }
 
-// returns contents. if contents == NULL, return a newly allocated vec.
+// returns contents. if contents == nullptr, return a newly allocated vec.
 Vec(string) fs_dir_contents(const char* path, Vec(string)* _contents) {
     DIR* d = opendir(path);
 
     Vec(string) contents = {0};
-    if (_contents == NULL) {
+    if (_contents == nullptr) {
         contents = vec_new(string, 16);
     } else {
         contents = *_contents;
     }
     
     struct dirent* dirent;
-    while ((dirent = readdir(d)) != NULL) {
+    while ((dirent = readdir(d)) != nullptr) {
         if (strcmp(dirent->d_name, ".") == 0) continue;
         if (strcmp(dirent->d_name, "..") == 0) continue;
         vec_append(&contents, string_clone(str(dirent->d_name)));

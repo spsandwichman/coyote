@@ -2,11 +2,9 @@
 #define IRON_H
 
 #include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
 #include <string.h>
+#include <stdint.h>
 #include <stdalign.h>
-#include <stdnoreturn.h>
 
 #if __STDC_VERSION__ <= 201710L
     #error "iron is a C23 library!"
@@ -46,23 +44,71 @@ typedef _Float16 f16;
     #define for_n(iterator, start, end) for (usize iterator = (start); iterator < (end); ++iterator)
 #endif
 
-typedef u8 FeArch;
-enum FeArchEnum {
+#define FE_TY_VEC(vecty, elemty) (vecty + elemty)
+#define FE_TY_VEC_ELEM(ty) (ty & 0b1111)
+#define FE_TY_VEC_SIZETY(ty) (ty & 0b110000)
+#define FE_TY_IS_VEC(ty) (ty > FE_TY_V128)
+
+typedef enum: u8 {
+    FE_TY_VOID,
+
+    FE_TY_BOOL,
+
+    FE_TY_I8,
+    FE_TY_I16,
+    FE_TY_I32,
+    FE_TY_I64,
+
+    FE_TY_F16,
+    FE_TY_F32,
+    FE_TY_F64,
+
+    // member types dependent on source inst
+    FE_TY_TUPLE,
+
+    FE_TY_V128 = 0b010000,
+    FE_TY_V256 = 0b100000,
+    FE_TY_V512 = 0b110000,
+
+    FE_TY_I8x16 = FE_TY_VEC(FE_TY_V128, FE_TY_I8),
+    FE_TY_I16x8 = FE_TY_VEC(FE_TY_V128, FE_TY_I16),
+    FE_TY_I32x4 = FE_TY_VEC(FE_TY_V128, FE_TY_I32),
+    FE_TY_I64x2 = FE_TY_VEC(FE_TY_V128, FE_TY_I64),
+    FE_TY_F16x8 = FE_TY_VEC(FE_TY_V128, FE_TY_F16),
+    FE_TY_F32x4 = FE_TY_VEC(FE_TY_V128, FE_TY_F32),
+    FE_TY_F64x2 = FE_TY_VEC(FE_TY_V128, FE_TY_F64),
+
+    FE_TY_I8x32  = FE_TY_VEC(FE_TY_V256, FE_TY_I8),
+    FE_TY_I16x16 = FE_TY_VEC(FE_TY_V256, FE_TY_I16),
+    FE_TY_I32x8  = FE_TY_VEC(FE_TY_V256, FE_TY_I32),
+    FE_TY_I64x4  = FE_TY_VEC(FE_TY_V256, FE_TY_I64),
+    FE_TY_F16x16 = FE_TY_VEC(FE_TY_V256, FE_TY_F16),
+    FE_TY_F32x8  = FE_TY_VEC(FE_TY_V256, FE_TY_F32),
+    FE_TY_F64x4  = FE_TY_VEC(FE_TY_V256, FE_TY_F64),
+    
+    FE_TY_I8x64  = FE_TY_VEC(FE_TY_V512, FE_TY_I8),
+    FE_TY_I16x32 = FE_TY_VEC(FE_TY_V512, FE_TY_I16),
+    FE_TY_I32x16 = FE_TY_VEC(FE_TY_V512, FE_TY_I32),
+    FE_TY_I64x8  = FE_TY_VEC(FE_TY_V512, FE_TY_I64),
+    FE_TY_F16x32 = FE_TY_VEC(FE_TY_V512, FE_TY_F16),
+    FE_TY_F32x16 = FE_TY_VEC(FE_TY_V512, FE_TY_F32),
+    FE_TY_F64x8  = FE_TY_VEC(FE_TY_V512, FE_TY_F64),
+} FeTy;
+
+typedef enum: u8 {
     FE_ARCH_X86_64 = 1,
 
     // esoteric
     FE_ARCH_XR17032,
     FE_ARCH_FOX32,
     FE_ARCH_APHELION,
-};
+} FeArch;
 
-typedef u8 FeSystem;
-enum FeSystemEnum {
+typedef enum: u8 {
     FE_SYSTEM_FREESTANDING = 1,
-};
+} FeSystem;
 
-typedef u8 FeCallConv;
-enum FeCallConvEnum {
+typedef enum: u8 {
     // pass parameters however iron sees fit
     // likely picks based on target
     FE_CCONV_ANY = 0,
@@ -74,9 +120,8 @@ enum FeCallConvEnum {
 
     // language-specific/esoteric
     FE_CCONV_JACKAL, // hi will
-};
+} FeCallConv;
 
-typedef u8 FeTy;
 typedef struct FeInst FeInst;
 typedef struct FeBlock FeBlock;
 typedef struct FeSymbol FeSymbol;
@@ -91,22 +136,20 @@ typedef u32 FeVReg; // vreg index.
 typedef struct FeVRegBuffer FeVRegBuffer;
 typedef struct FeBlockLiveness FeBlockLiveness;
 
-typedef u8 FeSymbolBinding;
-enum FeSymbolBindingEnum {
+typedef enum: u8 {
     FE_BIND_LOCAL = 1,
     FE_BIND_GLOBAL,
 
     // shared libary stuff
     FE_BIND_SHARED_EXPORT,
     FE_BIND_SHARED_IMPORT,
-};
+} FeSymbolBinding;
 
-typedef u8 FeSymbolKind;
-enum FeSymbolKindEnum {
+typedef enum: u8 {
     FE_SYMKIND_FUNC = 1,
     FE_SYMKIND_DATA,
     FE_SYMKIND_EXTERN, // not defined in this unit
-};
+} FeSymbolKind;
 
 typedef struct FeSymbol {
     const char* name;
@@ -188,10 +231,10 @@ typedef struct FeBlock {
 } FeBlock;
 
 #define for_funcs(f, modptr) \
-    for (FeFunction* f = (modptr)->funcs.first; f != NULL; f = f->list_next)
+    for (FeFunction* f = (modptr)->funcs.first; f != nullptr; f = f->list_next)
 
 #define for_blocks(block, funcptr) \
-    for (FeBlock* block = (funcptr)->entry_block; block != NULL; block = block->list_next)
+    for (FeBlock* block = (funcptr)->entry_block; block != nullptr; block = block->list_next)
 
 #define for_inst(inst, blockptr) \
     for (FeInst* inst = (blockptr)->bookend->next, *_prev_ = inst->next; inst->kind != FE_BOOKEND; inst = _prev_, _prev_ = _prev_->next)
@@ -199,60 +242,8 @@ typedef struct FeBlock {
 #define for_inst_reverse(inst, blockptr) \
     for (FeInst* inst = (blockptr)->bookend->prev, *_next_ = inst->prev; inst->kind != FE_BOOKEND; inst = _next_, _next_ = _next_->prev)
 
-
-#define FE_TY_VEC(vecty, elemty) (vecty + elemty)
-#define FE_TY_VEC_ELEM(ty) (ty & 0b1111)
-#define FE_TY_VEC_SIZETY(ty) (ty & 0b110000)
-#define FE_TY_IS_VEC(ty) (ty > FE_TY_V128)
-
-enum FeTyEnum {
-    FE_TY_VOID,
-
-    FE_TY_BOOL,
-
-    FE_TY_I8,
-    FE_TY_I16,
-    FE_TY_I32,
-    FE_TY_I64,
-
-    FE_TY_F16,
-    FE_TY_F32,
-    FE_TY_F64,
-
-    // member types dependent on source inst
-    FE_TY_TUPLE,
-
-    FE_TY_V128 = 0b010000,
-    FE_TY_V256 = 0b100000,
-    FE_TY_V512 = 0b110000,
-
-    FE_TY_I8x16 = FE_TY_VEC(FE_TY_V128, FE_TY_I8),
-    FE_TY_I16x8 = FE_TY_VEC(FE_TY_V128, FE_TY_I16),
-    FE_TY_I32x4 = FE_TY_VEC(FE_TY_V128, FE_TY_I32),
-    FE_TY_I64x2 = FE_TY_VEC(FE_TY_V128, FE_TY_I64),
-    FE_TY_F16x8 = FE_TY_VEC(FE_TY_V128, FE_TY_F16),
-    FE_TY_F32x4 = FE_TY_VEC(FE_TY_V128, FE_TY_F32),
-    FE_TY_F64x2 = FE_TY_VEC(FE_TY_V128, FE_TY_F64),
-
-    FE_TY_I8x32  = FE_TY_VEC(FE_TY_V256, FE_TY_I8),
-    FE_TY_I16x16 = FE_TY_VEC(FE_TY_V256, FE_TY_I16),
-    FE_TY_I32x8  = FE_TY_VEC(FE_TY_V256, FE_TY_I32),
-    FE_TY_I64x4  = FE_TY_VEC(FE_TY_V256, FE_TY_I64),
-    FE_TY_F16x16 = FE_TY_VEC(FE_TY_V256, FE_TY_F16),
-    FE_TY_F32x8  = FE_TY_VEC(FE_TY_V256, FE_TY_F32),
-    FE_TY_F64x4  = FE_TY_VEC(FE_TY_V256, FE_TY_F64),
-    
-    FE_TY_I8x64  = FE_TY_VEC(FE_TY_V512, FE_TY_I8),
-    FE_TY_I16x32 = FE_TY_VEC(FE_TY_V512, FE_TY_I16),
-    FE_TY_I32x16 = FE_TY_VEC(FE_TY_V512, FE_TY_I32),
-    FE_TY_I64x8  = FE_TY_VEC(FE_TY_V512, FE_TY_I64),
-    FE_TY_F16x32 = FE_TY_VEC(FE_TY_V512, FE_TY_F16),
-    FE_TY_F32x16 = FE_TY_VEC(FE_TY_V512, FE_TY_F32),
-    FE_TY_F64x8  = FE_TY_VEC(FE_TY_V512, FE_TY_F64),
-};
-
 typedef u16 FeInstKind;
-enum FeInstKindEnum {
+typedef enum: FeInstKind {
     // Bookend
     FE_BOOKEND = 1,
 
@@ -340,7 +331,7 @@ enum FeInstKindEnum {
     _FE_XR_INST_END = _FE_XR_INST_BEGIN + 256,
 
     _FE_INST_END,
-};
+} FeInstKindGeneric;
 
 typedef struct FeInst {
     FeInstKind kind;
@@ -463,8 +454,7 @@ FeStackItem* fe_stack_append_bottom(FeFunction* f, FeStackItem* item);
 FeStackItem* fe_stack_append_top(FeFunction* f, FeStackItem* item);
 u32 fe_calculate_stack_size(FeFunction* f);
 
-typedef u16 FeTrait;
-enum FeTraitEnum {
+typedef enum : u16 {
     // x op y == y op x
     FE_TRAIT_COMMUTATIVE      = 1u << 0,
     // (x op y) op z == x op (y op z)
@@ -487,10 +477,10 @@ enum FeTraitEnum {
     FE_TRAIT_VEC_INPUT_TYS    = 1u << 9,
     // output type = bool
     FE_TRAIT_BOOL_OUT_TY      = 1u << 10,
-    // reg<-reg move; allocator should hint
+    // reg->reg move; allocator should hint
     // the output and input to be the same
     FE_TRAIT_REG_MOV_HINT     = 1u << 11,
-};
+} FeTrait;
 
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait);
 void fe__load_trait_table(usize start_index, FeTrait* table, usize len);
@@ -622,7 +612,7 @@ void fe__print_block(FeFunction* f, FeDataBuffer* db, FeBlock* ref);
 void fe__print_ref(FeFunction* f, FeDataBuffer* db, FeInst* ref);
 
 // crash at runtime with a stack trace (if available)
-noreturn void fe_runtime_crash(const char* error, ...);
+[[noreturn]] void fe_runtime_crash(const char* error, ...);
 
 // initialize signal handler that calls fe_runtime_crash
 // in the event of a bad signal

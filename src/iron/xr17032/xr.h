@@ -3,7 +3,7 @@
 
 #include "iron/iron.h"
 
-enum {
+typedef enum: FeInstKind {
     // XrRegImm16
     XR_ADDI = _FE_XR_INST_BEGIN, 
                     // out = reg + uimm16
@@ -63,7 +63,7 @@ enum {
 
     // void
     XR_RET,
-};
+} XrInstKind;
 
 // #define fe_kind_is_xr(kind) (_FE_XR_INST_BEGIN <= (kind) && (kind) <= _FE_XR_INST_END)
 
@@ -84,13 +84,12 @@ typedef struct {
     u8 imm5;
 } XrRegImm16Imm5;
 
-typedef u8 XrShiftKind;
-enum XrShiftKindEnum {
+typedef enum : u8 {
     XR_SHIFT_LSH,
     XR_SHIFT_RSH,
     XR_SHIFT_ASH,
     XR_SHIFT_ROR,
-};
+} XrShiftKind;
 
 typedef struct {
     FeInst* r1;

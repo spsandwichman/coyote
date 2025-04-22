@@ -49,8 +49,8 @@ FeFuncParam* fe_funcsig_return(FeFuncSignature* sig, usize index) {
 FeBlock* fe_new_block(FeFunction* f) {
     FeBlock* block = fe_malloc(sizeof(FeBlock));
     memset(block, 0, sizeof(*block));
-    block->list_next = NULL;
-    block->list_prev = NULL;
+    block->list_next = nullptr;
+    block->list_prev = nullptr;
     
     // adds initial bookend instruction to block
     FeInst* bookend = fe_ipool_alloc(f->ipool, sizeof(FeInstBookend));
@@ -96,8 +96,8 @@ FeFunction* fe_new_function(FeModule* mod, FeSymbol* sym, FeFuncSignature* sig, 
     // adds parameter instructions
     for_n(i, 0, sig->param_len) {
         FeInst* param = fe_ipool_alloc(ipool, sizeof(FeInstParam));
-        param->prev = NULL;
-        param->next = NULL;
+        param->prev = nullptr;
+        param->next = nullptr;
         if (i != 0) {
             param->prev = f->params[i - 1];
             param->prev->next = param;
@@ -189,7 +189,7 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
     case FE_MACH_REG:
     case FE_MACH_STACK_RELOAD:
         *len_out = 0;
-        return NULL;
+        return nullptr;
     default:
         fe_runtime_crash("list_inputs: unknown kind %d", inst->kind);
         break;
@@ -214,7 +214,7 @@ FeBlock** fe_inst_term_list_targets(const FeTarget* t, FeInst* term, usize* len_
     case FE_RETURN:
     default:
         *len_out = 0;
-        return NULL;
+        return nullptr;
     }
 }
 
@@ -225,8 +225,8 @@ void fe_inst_free(FeFunction* f, FeInst* inst) {
 FeInst* fe_inst_remove(FeInst* inst) {
     inst->next->prev = inst->prev;
     inst->prev->next = inst->next;
-    inst->next = NULL;
-    inst->prev = NULL;
+    inst->next = nullptr;
+    inst->prev = nullptr;
     return inst;
 }
 
@@ -489,7 +489,7 @@ void fe_set_call_arg(FeInst* call, usize index, FeInst* arg) {
 
 FeTy fe_proj_ty(FeInst* tuple, usize index) {
     if (tuple->ty != FE_TY_TUPLE) {
-        return FE_TY_VOID;
+        fe_runtime_crash("projection on non-tuple");
     }
     switch (tuple->kind) {
     case FE_CALL_DIRECT:
@@ -497,15 +497,16 @@ FeTy fe_proj_ty(FeInst* tuple, usize index) {
         if (index < dcall->to_call->sig->return_len) {
             return fe_funcsig_return(dcall->to_call->sig, index)->ty;
         }
-        break;
+        fe_runtime_crash("index %zu out of bounds for [0, %u)", dcall->to_call->sig->return_len);
     case FE_CALL_INDIRECT:
         FeInstCallIndirect* icall = fe_extra(tuple);
         if (index < icall->sig->return_len) {
             return fe_funcsig_return(icall->sig, index)->ty;
         }
-        break;
+        fe_runtime_crash("index %zu out of bounds for [0, %u)", icall->sig->return_len);
+    default:
+        fe_runtime_crash("unknown inst kind %u", tuple->kind);
     }
-    return FE_TY_VOID;
 }
 
 #include "short_traits.h"

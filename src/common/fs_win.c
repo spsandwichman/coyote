@@ -3,7 +3,7 @@
 #ifdef OS_WINDOWS
 
 bool fs_real_path(const char* path, FsPath* out) {
-    if (GetFullPathNameA(path, PATH_MAX, out->raw, NULL) == 0) {
+    if (GetFullPathNameA(path, PATH_MAX, out->raw, nullptr) == 0) {
         return false;
     }
     out->len = strlen(out->raw);
@@ -22,20 +22,20 @@ FsFile* fs_open(const char* path, bool create, bool overwrite) {
     FsFile* f = malloc(sizeof(FsFile));
     if (create) {
         f->handle = (isize) CreateFileA(
-            path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, 
+            path, GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, 
             overwrite ? CREATE_ALWAYS : CREATE_NEW,
             0, 0
         );
     } else {
         f->handle = (isize) CreateFileA(
-            path, GENERIC_READ, FILE_SHARE_READ, NULL, 
+            path, GENERIC_READ, FILE_SHARE_READ, nullptr, 
             overwrite ? OPEN_ALWAYS : OPEN_EXISTING,
             0, 0
         );
     }
 
     if ((void*) f->handle == INVALID_HANDLE_VALUE) {
-        return NULL;
+        return nullptr;
     }
 
     BY_HANDLE_FILE_INFORMATION info;
@@ -63,14 +63,14 @@ FsFile* fs_open(const char* path, bool create, bool overwrite) {
 // returns how much was /actually/ read.
 usize fs_read(FsFile* f, void* buf, usize len) {
     DWORD num_read = 0;
-    ReadFile((HANDLE)f->handle, buf, len, &num_read, NULL);
+    ReadFile((HANDLE)f->handle, buf, len, &num_read, nullptr);
     return num_read;
 }
 
 string fs_read_entire(FsFile* f) {
     string buf = string_alloc(f->size);
     DWORD num_read;
-    ReadFile((HANDLE)f->handle, buf.raw, buf.len, &num_read, NULL);
+    ReadFile((HANDLE)f->handle, buf.raw, buf.len, &num_read, nullptr);
     return buf;
 }
 
@@ -97,7 +97,7 @@ Vec(string) fs_dir_contents(const char* path, Vec(string)* _contents) {
     search_path[path_len + 1] = '*';
     search_path[path_len + 2] = 0;
 
-    if (_contents == NULL) {
+    if (_contents == nullptr) {
         contents = vec_new(string, 16);
     } else {
         contents = *_contents;
@@ -122,7 +122,7 @@ Vec(string) fs_dir_contents(const char* path, Vec(string)* _contents) {
 }
 
 char* fs_get_current_dir() {
-    usize required = GetCurrentDirectoryA(0, NULL);
+    usize required = GetCurrentDirectoryA(0, nullptr);
     char* current_dir = malloc(required + 1);
     current_dir[required] = 0;
     GetCurrentDirectoryA(required, current_dir);

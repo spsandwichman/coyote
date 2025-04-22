@@ -12,7 +12,7 @@ void fe_calculate_cfg(FeFunction* f) {
     const FeTarget* target = f->mod->target;
     {
         usize i = 0;
-        for (FeBlock* b = f->entry_block; b != NULL; b = b->list_next) {
+        for (FeBlock* b = f->entry_block; b != nullptr; b = b->list_next) {
             b->flags = i++;
             FeCFGNode* cfgn = fe_malloc(sizeof(FeCFGNode));
             b->cfg_node = cfgn;
@@ -20,12 +20,12 @@ void fe_calculate_cfg(FeFunction* f) {
             cfgn->in_len = 0;
             cfgn->out_len = 0;
             cfgn->rev_post = 0;
-            cfgn->ins = NULL;
+            cfgn->ins = nullptr;
         }
     }
 
     // set node outgoing and incoming len
-    for (FeBlock* b = f->entry_block; b != NULL; b = b->list_next) {
+    for (FeBlock* b = f->entry_block; b != nullptr; b = b->list_next) {
         FeInst* term = b->bookend->prev;
 
         usize outs_len;
@@ -39,7 +39,7 @@ void fe_calculate_cfg(FeFunction* f) {
     }
 
     // set node outgoing values
-    for (FeBlock* b = f->entry_block; b != NULL; b = b->list_next) {
+    for (FeBlock* b = f->entry_block; b != nullptr; b = b->list_next) {
         FeInst* term = b->bookend->prev;
 
         usize outs_len;
@@ -54,11 +54,11 @@ void fe_calculate_cfg(FeFunction* f) {
     }
 
     // set node incoming values
-    for (FeBlock* b = f->entry_block; b != NULL; b = b->list_next) {
+    for (FeBlock* b = f->entry_block; b != nullptr; b = b->list_next) {
         for_n(i, 0, b->cfg_node->out_len) {
             FeCFGNode* out = fe_cfgn_out(b->cfg_node, i);
             usize ii = 0;
-            while(out->ins[ii] != NULL) ++ii;
+            while(out->ins[ii] != nullptr) ++ii;
             fe_cfgn_in(out, ii) = b->cfg_node;
         }
     }
@@ -68,7 +68,7 @@ void fe_calculate_cfg(FeFunction* f) {
 
     // emit graphviz
     // printf("digraph CFG {\n");
-    // for (FeBlock* b = f->entry_block; b != NULL; b = b->list_next) {
+    // for (FeBlock* b = f->entry_block; b != nullptr; b = b->list_next) {
     //     FeCFGNode* n = b->cfg_node;
 
     //     printf("  B%u -> { ", n->rev_post);

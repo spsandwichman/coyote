@@ -48,7 +48,7 @@ char* fs_get_current_dir();
 bool fs_set_current_dir(const char* dir);
 
 Vec_typedef(string);
-// returns contents. if contents == NULL, return a newly allocated vec.
+// returns contents. if contents == nullptr, return a newly allocated vec.
 Vec(string) fs_dir_contents(const char* path, Vec(string)* contents);
 
 #endif // ORBIT_NEWFS_H

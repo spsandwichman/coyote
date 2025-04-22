@@ -395,12 +395,12 @@ static bool replacement_exists_immediate(string key, PreprocScope* scope) {
 
 static bool replacement_exists(string key, PreprocScope* scope) {
     return replacement_exists_immediate(key, scope) 
-        || (scope->parent != NULL && replacement_exists(key, scope->parent));
+        || (scope->parent != nullptr && replacement_exists(key, scope->parent));
 }
 
 static void remove_replacement(string key, PreprocScope* scope) {
     strmap_remove(&scope->map, key);
-    if (scope->parent != NULL) {
+    if (scope->parent != nullptr) {
         remove_replacement(key, scope->parent);
     }
 }
@@ -408,7 +408,7 @@ static void remove_replacement(string key, PreprocScope* scope) {
 static PreprocVal get_replacement_value(string key, PreprocScope* scope) {
     usize val = (usize)strmap_get(&scope->map, key);
     if (val == (usize)STRMAP_NOT_FOUND) {
-        if (scope->parent != NULL) {
+        if (scope->parent != nullptr) {
             return get_replacement_value(key, scope->parent);
         }
         return (PreprocVal){.kind = PPVAL_NONE};
@@ -735,7 +735,7 @@ static void emit_preproc_val(PreprocVal val, Vec(Token)* tokens, PreprocScope* s
     case PPVAL_COMPLEX_STRING:
         Lexer local_lexer = lexer_from_string(from_compact(val.string));
         PreprocScope* local_scope = &local_scopes[emit_depth - 1];
-        if (local_scope->map.keys == NULL) {
+        if (local_scope->map.keys == nullptr) {
             strmap_init(&local_scope->map, 4);
             local_scope->parent =  &global_scope;
         } else {
@@ -793,7 +793,7 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
     assert(macro.kind == PPVAL_MACRO);
 
     PreprocScope* local_scope = &local_scopes[emit_depth - 1];
-    if (local_scope->map.keys == NULL) {
+    if (local_scope->map.keys == nullptr) {
         strmap_init(&local_scope->map, 4);
         local_scope->parent =  &global_scope;
     } else {

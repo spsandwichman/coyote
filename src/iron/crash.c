@@ -11,7 +11,7 @@
 
 #include "iron.h"
 
-noreturn void fe_runtime_crash(const char* error, ...) {
+[[noreturn]] void fe_runtime_crash(const char* error, ...) {
     fflush(stdout);
 
     printf("\niron runtime crash: ");
@@ -31,7 +31,7 @@ noreturn void fe_runtime_crash(const char* error, ...) {
     size = backtrace(array, 256);
     strings = backtrace_symbols(array, size);
 
-    if (strings != NULL) {
+    if (strings != nullptr) {
         printf("obtained %d stack frames\n", size);
         for (int i = 0; i < size; i++) {
             char* output_str = strings[i];
@@ -107,15 +107,15 @@ void fe_init_signal_handler() {
     sa.sa_flags = SA_SIGINFO;
     sa.sa_sigaction = signal_handler;
     sigfillset(&sa.sa_mask);
-    if (sigaction(SIGSEGV, &sa, NULL) == -1) {
+    if (sigaction(SIGSEGV, &sa, nullptr) == -1) {
         printf("sigaction to catch SIGSEGV failed.");
         exit(-1);
     }
-    if (sigaction(SIGFPE, &sa, NULL) == -1) {
+    if (sigaction(SIGFPE, &sa, nullptr) == -1) {
         printf("sigaction to catch SIGFPE failed.");
         exit(-1);
     }
-    if (sigaction(SIGABRT, &sa, NULL) == -1) {
+    if (sigaction(SIGABRT, &sa, nullptr) == -1) {
         printf("sigaction to catch SIGABRT failed.");
         exit(-1);
     }

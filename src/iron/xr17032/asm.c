@@ -96,7 +96,8 @@ static void emit_branch(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* ins
 }
 
 static char* mem_operand_size(FeInstKind kind) {
-    switch (kind) {
+    auto xr_kind = (XrInstKind)kind;
+    switch (xr_kind) {
     case XR_LOAD8_IMM:
     case XR_LOAD8_REG:
     case XR_STORE8_CONST:
@@ -126,7 +127,7 @@ static void emit_mem_operand(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
     XrShiftKind shift;
     u8 shamt;
 
-    switch (inst->kind) {
+    switch ((XrInstKind)inst->kind) {
     case XR_LOAD8_REG ... XR_LOAD32_REG:
         base = fe_extra_T(inst, XrRegReg)->r1;
         shifted = fe_extra_T(inst, XrRegReg)->r2;
@@ -139,6 +140,8 @@ static void emit_mem_operand(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         shift = fe_extra_T(inst, XrRegRegReg)->shift_kind;
         shamt = fe_extra_T(inst, XrRegRegReg)->imm5;
         break;
+    default:
+        fe_runtime_crash("incorrect inst type for emit_mem_operand");
     }
     FeVirtualReg* base_vr = fe_vreg(f->vregs, base->vr_out);
     FeVirtualReg* shifted_vr = fe_vreg(f->vregs, shifted->vr_out);
@@ -160,7 +163,7 @@ static void emit_mem_operand(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
 }
 
 static void emit_inst(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
-    switch (inst->kind) {
+    switch ((XrInstKind)inst->kind) {
     case XR_MOV: {
         emit_inst_name(db, inst->kind);
         fe_db_writecstr(db, reg(f, inst));

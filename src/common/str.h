@@ -14,8 +14,8 @@ typedef struct string_s {
     size_t len;
 } string;
 
-#define NULL_STR ((string){NULL, 0})
-#define is_null_str(str) ((str).raw == NULL)
+#define NULL_STR ((string){nullptr, 0})
+#define is_null_str(str) ((str).raw == nullptr)
 
 #define str_fmt "%.*s"
 #define str_arg(str) (int)(str).len, (str).raw
@@ -84,7 +84,7 @@ string string_alloc(size_t len) {
     char* raw = malloc(len);
     #endif
 
-    if (raw == NULL) return NULL_STR;
+    if (raw == nullptr) return NULL_STR;
 
     memset(raw, '\0', len);
 
@@ -116,7 +116,7 @@ char* clone_to_cstring(string str) {
     if (is_null_str(str)) return "";
 
     char* cstr = malloc(str.len + 1);
-    if (cstr == NULL) return NULL;
+    if (cstr == nullptr) return nullptr;
     memcpy(cstr, str.raw, str.len);
     cstr[str.len] = '\0';
     return cstr;

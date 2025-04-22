@@ -1,3 +1,6 @@
+#include <stdlib.h>
+#include <string.h>
+
 #include "iron.h"
 
 static u8 extra_size_table[_FE_INST_END] = {
@@ -70,7 +73,7 @@ static FeInstPoolChunk* ipool_new_chunk() {
 void fe_ipool_init(FeInstPool* pool) {
     pool->top = ipool_new_chunk();
     for_n(i, 0, FE_IPOOL_FREE_SPACES_LEN) {
-        pool->free_spaces[i] = NULL;
+        pool->free_spaces[i] = nullptr;
     }
 }
 
@@ -78,8 +81,8 @@ static FeInst* init_inst(FeInst* inst) {
     inst->kind = 0xFF;
     inst->flags = 0;
     inst->ty = FE_TY_VOID;
-    inst->next = NULL;
-    inst->prev = NULL;
+    inst->next = nullptr;
+    inst->prev = nullptr;
     inst->vr_out = FE_VREG_NONE;
     return inst;
 }
@@ -95,7 +98,7 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
     // check if there's any reusable slots.
     // THE VOICESSSSSS
     for_n(i, extra_slots, FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1) {
-        if (pool->free_spaces[i] != NULL) {
+        if (pool->free_spaces[i] != nullptr) {
             // pop from slot list
             FeInst* inst = (FeInst*)pool->free_spaces[i];
             pool->free_spaces[i] = pool->free_spaces[i]->next;
@@ -160,7 +163,7 @@ usize fe_ipool_free_manual(FeInstPool* pool, FeInst* inst) {
 
 void fe_ipool_destroy(FeInstPool* pool) {
     FeInstPoolChunk* top = pool->top;
-    while (top != NULL) {
+    while (top != nullptr) {
         FeInstPoolChunk* this = top;
         top = top->next;
         free(this);

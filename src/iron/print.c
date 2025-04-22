@@ -1,4 +1,4 @@
-#include "iron.h"
+#include "iron/iron.h"
 
 static const char* ty_name[] = {
     [FE_TY_VOID] = "void",

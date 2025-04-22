@@ -115,9 +115,7 @@ void fe_regalloc_linear_scan(FeFunction* f) {
     bool* vr_live_now = fe_malloc(f->vregs->len);
     memset(vr_live_now, 0, f->vregs->len);
 
-    // TODO change assumption that we're on XR
     bool** real_live_now = fe_malloc(sizeof(real_live_now[0]) * (target->max_regclass + 1));
-    // memset(real_live_now, 0, XR_REG__COUNT);
     for_n(i, 0, target->max_regclass + 1) {
         real_live_now[i] = fe_malloc(sizeof(real_live_now[0][0]) * target->regclass_lens[i]);
     }
@@ -137,7 +135,7 @@ void fe_regalloc_linear_scan(FeFunction* f) {
                 // see if we can allocate some shit
                 // if we have a hint, try to take it
                 FeVirtualReg* hint_vr = fe_vreg(f->vregs, current_vr->hint);
-                if (hint_vr != NULL && hint_vr->real != FE_VREG_REAL_UNASSIGNED && !real_live_now[hint_vr->class][hint_vr->real]) {
+                if (hint_vr != nullptr && hint_vr->real != FE_VREG_REAL_UNASSIGNED && !real_live_now[hint_vr->class][hint_vr->real]) {
                     current_vr->real = hint_vr->real;
                 } else {
                     FeRegclass regclass = current_vr->class; 

@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
     char* filepath = argv[1];
 
     FsFile* file = fs_open(filepath, false, false);
-    if (file == NULL) {
+    if (file == nullptr) {
         printf("cannot open file %s\n", filepath);
         return 1;
     }

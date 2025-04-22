@@ -1,7 +1,8 @@
 #ifndef IRON_SHORT_TRAITS_H
 #define IRON_SHORT_TRAITS_H
 
-#include "iron.h"
+#include "iron/iron.h"
+
 enum {
     COMMU       = FE_TRAIT_COMMUTATIVE,
     // if something is associative, it is also fast-associative.

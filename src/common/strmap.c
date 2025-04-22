@@ -29,12 +29,12 @@ void strmap_destroy(StrMap* hm) {
 }
 
 void strmap_put(StrMap* hm, string key, void* val) {
-    if (hm == NULL) return;
+    if (hm == nullptr) return;
     if (is_null_str(key)) return;
     size_t hash_index = FNV_1a(key) % hm->cap;
 
     // free slot
-    if (hm->keys[hash_index].raw == NULL || string_eq(hm->keys[hash_index], key)) {
+    if (hm->keys[hash_index].raw == nullptr || string_eq(hm->keys[hash_index], key)) {
         hm->keys[hash_index] = key;
         hm->vals[hash_index] = val;
         return;
@@ -43,7 +43,7 @@ void strmap_put(StrMap* hm, string key, void* val) {
     // search for nearby free slot
     for_n(index, 1, min(MAX_SEARCH, hm->cap)) {
         size_t i = (index + hash_index) % hm->cap;
-        if ((hm->keys[i].raw == NULL) || string_eq(hm->keys[i], key)) {
+        if ((hm->keys[i].raw == nullptr) || string_eq(hm->keys[i], key)) {
             hm->keys[i] = key;
             hm->vals[i] = val;
             return;
@@ -56,7 +56,7 @@ void strmap_put(StrMap* hm, string key, void* val) {
 
     // copy all the old entries into the new hashmap
     for (size_t i = 0; i < hm->cap; i++) {
-        if (hm->keys[i].raw == NULL) continue;
+        if (hm->keys[i].raw == nullptr) continue;
         strmap_put(&new_hm, hm->keys[i], hm->vals[i]);
     }
     strmap_put(&new_hm, key, val);
@@ -79,7 +79,7 @@ void* strmap_get(StrMap* hm, string key) {
     // linear search next slots
     for_n(index, 1, min(MAX_SEARCH, hm->cap)) {
         size_t i = (index + hash_index) % hm->cap;
-        if (hm->keys[i].raw == NULL) return STRMAP_NOT_FOUND;
+        if (hm->keys[i].raw == nullptr) return STRMAP_NOT_FOUND;
         if (string_eq(hm->keys[i], key)) return hm->vals[i];
     }
 
@@ -93,17 +93,17 @@ void strmap_remove(StrMap* hm, string key) {
     // key found in first slot
     if (string_eq(hm->keys[hash_index], key)) {
         hm->keys[hash_index] = NULL_STR;
-        hm->vals[hash_index] = NULL;
+        hm->vals[hash_index] = nullptr;
         return;
     }
 
     // linear search next slots
     for_n(index, 1, min(MAX_SEARCH, hm->cap)) {
         size_t i = (index + hash_index) % hm->cap;
-        if (hm->keys[i].raw == NULL) return;
+        if (hm->keys[i].raw == nullptr) return;
         if (string_eq(hm->keys[i], key)) {
             hm->keys[hash_index] = NULL_STR;
-            hm->vals[hash_index] = NULL;
+            hm->vals[hash_index] = nullptr;
             return;
         }
     }

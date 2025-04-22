@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "iron.h"
 
 void fe_vrbuf_init(FeVRegBuffer* buf, usize cap) {
@@ -22,7 +24,7 @@ FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class)
 }
 
 FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr) {
-    if (vr == FE_VREG_NONE) return NULL;
+    if (vr == FE_VREG_NONE) return nullptr;
     return &buf->at[vr];
 }
 
