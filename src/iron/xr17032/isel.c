@@ -364,6 +364,7 @@ void xr_final_touchups(FeFunction* f) {
                 break;
             case FE_MACH_STACK_SPILL:
                 // turn it into a store to sp
+                ;
                 FeInst* spill = create_mach(f, XR_STORE32_IMM, inst->ty, sizeof(XrRegRegImm16));
                 // reload->vr_out = inst->vr_out;
                 fe_extra_T(spill, XrRegRegImm16)->r1 = sp;
@@ -373,6 +374,7 @@ void xr_final_touchups(FeFunction* f) {
                 break;
             case FE_MACH_STACK_RELOAD:
                 // turn it into a load from sp
+                ;
                 FeInst* reload = create_mach(f, XR_LOAD32_IMM, inst->ty, sizeof(XrRegImm16));
                 reload->vr_out = inst->vr_out;
                 fe_extra_T(reload, XrRegImm16)->reg = sp;

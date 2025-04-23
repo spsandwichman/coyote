@@ -49,7 +49,7 @@ static const char* inst_name[_FE_BASE_INST_END] = {
     [FE_PARAM] = "param",
 
     [FE_PROJ] = "proj",
-    [FE_PROJ_VOLATILE] = "proj_volatile",
+    [FE_MACH_PROJ] = "proj_volatile",
 
     [FE_IADD] = "iadd",
     [FE_ISUB] = "isub",
@@ -74,7 +74,7 @@ static const char* inst_name[_FE_BASE_INST_END] = {
 
     [FE_FADD] = "fadd",
     [FE_FSUB] = "fsub",
-    [FE_FSUB] = "fmul",
+    [FE_FMUL] = "fmul",
     [FE_FDIV] = "fdiv",
     [FE_FREM] = "frem",
 
@@ -190,6 +190,7 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         fe_db_writef(db, "%u", fe_extra_T(inst, FeInstParam)->index);
         break;
     case FE_RETURN:
+        ;
         FeInstReturn* ret = fe_extra(inst);
         for_n(i, 0, ret->len) {
             if (i != 0) fe_db_writecstr(db, ", ");
@@ -197,6 +198,7 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         }
         break;
     case FE_BRANCH:
+        ;
         FeInstBranch* branch = fe_extra(inst);
         fe__print_ref(f, db, branch->cond);
         fe_db_writecstr(db, ", ");
@@ -217,6 +219,7 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         }
         break;
     case FE_CALL_DIRECT:
+        ;
         FeInstCallDirect* dcall = fe_extra(inst);
         fe_db_writecstr(db, "\"");
         fe_db_write(db, dcall->to_call->sym->name, dcall->to_call->sym->name_len);
@@ -230,6 +233,7 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         }
         break;
     case FE_MACH_REG:
+        ;
         FeVReg vr = inst->vr_out;
         FeVirtualReg* vreg = fe_vreg(f->vregs, vr);
         u8 class = vreg->class;
@@ -261,7 +265,7 @@ void fe_print_func(FeDataBuffer* db, FeFunction* f) {
     case FE_BIND_GLOBAL: fe_db_writecstr(db, "global "); break;
     case FE_BIND_LOCAL:  fe_db_writecstr(db, "local "); break;
     case FE_BIND_SHARED_EXPORT: fe_db_writecstr(db, "shared_export "); break;
-    case FE_BIND_SHARED_IMPORT: fe_runtime_crash("function cannot have shared_import binding");
+    case FE_BIND_SHARED_IMPORT: fe_runtime_crash("function cannot have shared_import binding"); break;
     }
 
     // write function signature

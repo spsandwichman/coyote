@@ -142,7 +142,7 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
 
     switch (inst->kind) {
     case FE_PROJ:
-    case FE_PROJ_VOLATILE:
+    case FE_MACH_PROJ:
         *len_out = 1;
         return &fe_extra_T(inst, FeInstProj)->val;
     case FE_IADD ... FE_FREM:
@@ -162,6 +162,7 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
         return &fe_extra_T(inst, FeInstBranch)->cond;
     case FE_CALL_DIRECT:  
     case FE_CALL_INDIRECT:
+        ;
         FeInstCallDirect* call = fe_extra(inst);
         *len_out = call->len;
         if (call->cap == 0) {
@@ -170,6 +171,7 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
             return call->multi_arg;
         }
     case FE_RETURN:
+        ;
         FeInstReturn* ret = fe_extra(inst);
         *len_out = ret->len;
         if (ret->cap == 0) {
@@ -493,12 +495,14 @@ FeTy fe_proj_ty(FeInst* tuple, usize index) {
     }
     switch (tuple->kind) {
     case FE_CALL_DIRECT:
+        ;
         FeInstCallDirect* dcall = fe_extra(tuple);
         if (index < dcall->to_call->sig->return_len) {
             return fe_funcsig_return(dcall->to_call->sig, index)->ty;
         }
         fe_runtime_crash("index %zu out of bounds for [0, %u)", dcall->to_call->sig->return_len);
     case FE_CALL_INDIRECT:
+        ;
         FeInstCallIndirect* icall = fe_extra(tuple);
         if (index < icall->sig->return_len) {
             return fe_funcsig_return(icall->sig, index)->ty;
@@ -513,7 +517,7 @@ FeTy fe_proj_ty(FeInst* tuple, usize index) {
 
 static FeTrait inst_traits[_FE_INST_END] = {
     [FE_PROJ] = 0,
-    [FE_PROJ_VOLATILE] = VOL,
+    [FE_MACH_PROJ] = VOL,
     [FE_PARAM] = VOL,
     [FE_CONST] = 0,
 

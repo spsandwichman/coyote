@@ -252,7 +252,7 @@ typedef enum: FeInstKind {
 
     // Proj
     FE_PROJ,
-    FE_PROJ_VOLATILE, // mostly for hardcoding register clobbers
+    FE_MACH_PROJ, // mostly for hardcoding register clobbers
 
     // Const
     FE_CONST,

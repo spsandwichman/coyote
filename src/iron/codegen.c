@@ -99,13 +99,13 @@ void fe_codegen(FeFunction* f) {
 
     printf("isel complete\n");
 
-    // fe_regalloc_linear_scan(f);
+    fe_regalloc_linear_scan(f);
 
-    // printf("regalloc complete\n");
+    printf("regalloc complete\n");
 
-    // f->mod->target->final_touchups(f);
+    f->mod->target->final_touchups(f);
 
-    // printf("codegen complete\n");
+    printf("codegen complete\n");
 }
 
 void fe_emit_asm(FeFunction* f, FeDataBuffer* db) {

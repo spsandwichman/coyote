@@ -8,7 +8,7 @@ static u8 extra_size_table[_FE_INST_END] = {
     [0 ... _FE_INST_END - 1] = 255,
 
     [FE_BOOKEND] = sizeof(FeInstBookend),
-    [FE_PROJ ... FE_PROJ_VOLATILE] = sizeof(FeInstProj),
+    [FE_PROJ ... FE_MACH_PROJ] = sizeof(FeInstProj),
     [FE_CONST] = sizeof(FeInstConst),
     [FE_PARAM] = sizeof(FeInstParam),
     [FE_IADD ... FE_FREM] = sizeof(FeInstBinop),

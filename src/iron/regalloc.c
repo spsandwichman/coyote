@@ -177,12 +177,15 @@ void fe_regalloc_linear_scan(FeFunction* f) {
                 
                 // try to take a hint lmao
                 u16 real = 0;
-                if (input_vr->hint != FE_VREG_NONE) {
-                    FeVirtualReg* hint_vr = fe_vreg(vbuf, input_vr->hint);
-                    if (hint_vr->real != FE_VREG_REAL_UNASSIGNED && !is_live(lvset, hint_vr->class, hint_vr->real)) {
-                        real = hint_vr->real;
-                    }
-                }
+                // TODO only try to take hints AFTER the entire regalloc is done.
+                // taking hints early can clobber pre-colored registers
+
+                // if (input_vr->hint != FE_VREG_NONE) {
+                //     FeVirtualReg* hint_vr = fe_vreg(vbuf, input_vr->hint);
+                //     if (hint_vr->real != FE_VREG_REAL_UNASSIGNED && !is_live(lvset, hint_vr->class, hint_vr->real)) {
+                //         real = hint_vr->real;
+                //     }
+                // }
 
                 // iterate through all the real registers
                 if (!real) for (; real < target->regclass_lens[input_vr->class]; ++real) {
