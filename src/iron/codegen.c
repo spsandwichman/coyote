@@ -84,7 +84,7 @@ void fe_codegen(FeFunction* f) {
 
     fe_free(isel_map);
 
-    target->pre_regalloc_opt(f);
+    // target->pre_regalloc_opt(f);
     fe_opt_tdce(f);
 
     // create virtual registers for instructions that dont have them yet
@@ -99,13 +99,13 @@ void fe_codegen(FeFunction* f) {
 
     printf("isel complete\n");
 
-    fe_regalloc_linear_scan(f);
+    // fe_regalloc_linear_scan(f);
 
-    printf("regalloc complete\n");
+    // printf("regalloc complete\n");
 
-    f->mod->target->final_touchups(f);
+    // f->mod->target->final_touchups(f);
 
-    printf("codegen complete\n");
+    // printf("codegen complete\n");
 }
 
 void fe_emit_asm(FeFunction* f, FeDataBuffer* db) {

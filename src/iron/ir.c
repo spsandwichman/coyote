@@ -363,7 +363,7 @@ FeInst* fe_return_arg(FeInst* ret, usize index) {
     if (index >= r->len) {
         fe_runtime_crash("index >= ret->len");
     }
-    if (r->len <= 1) {
+    if (r->cap == 0) {
         return r->single;
     } else {
         return r->multi[index];
@@ -378,7 +378,7 @@ void fe_set_return_arg(FeInst* ret, usize index, FeInst* arg) {
     
     // arg->use_count++; // since we dont do it earlier...
 
-    if (r->len <= 1) {
+    if (r->cap == 0) {
         r->single = arg;
     } else {
         r->multi[index] = arg;

@@ -55,9 +55,9 @@ void fe_opt_tdce(FeFunction* f) {
 
     while (wl.len != 0) {
         FeInst* inst = worklist_pop(&wl);
-        if (inst->kind == FE_PARAM) {
-            continue;
-        }
+        // if (inst->kind == FE_PARAM) {
+            // continue;
+        // }
 
         if (inst->use_count == 0 && !fe_inst_has_trait(inst->kind, FE_TRAIT_VOLATILE)) {
             // get rid of it!!!!!!!!!!!!

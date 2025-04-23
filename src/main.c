@@ -111,9 +111,9 @@ FeFunction* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vre
 FeFunction* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
     // set up function to call
-    FeFuncSignature* f_sig = fe_new_funcsig(FE_CCONV_JACKAL, 2, 1);
+    FeFuncSignature* f_sig = fe_new_funcsig(FE_CCONV_JACKAL, 1, 1);
     fe_funcsig_param(f_sig, 0)->ty = FE_TY_I32;
-    fe_funcsig_param(f_sig, 1)->ty = FE_TY_I32;
+    // fe_funcsig_param(f_sig, 1)->ty = FE_TY_I32;
     fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
 
     // make the function and its symbol
@@ -123,28 +123,28 @@ FeFunction* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* v
     // construct the function's body
     FeBlock* entry = f->entry_block;
     FeInst* param1 = fe_func_param(f, 0);
-    FeInst* param2 = fe_func_param(f, 1);
+    // FeInst* param2 = fe_func_param(f, 1);
 
     { // entry block
         FeInst* add1 = fe_append_end(entry, fe_inst_binop(f, 
             FE_TY_I32, FE_IADD,
             param1,
-            param2
+            param1
         ));
         FeInst* add2 = fe_append_end(entry, fe_inst_binop(f, 
             FE_TY_I32, FE_IADD,
             add1,
-            param1
+            add1
         ));
         FeInst* add3 = fe_append_end(entry, fe_inst_binop(f, 
             FE_TY_I32, FE_IADD,
             add1,
-            add2
+            param1
         ));
         FeInst* add4 = fe_append_end(entry, fe_inst_binop(f, 
             FE_TY_I32, FE_IADD,
-            add2,
-            add3
+            add3,
+            add1
         ));
         FeInst* add5 = fe_append_end(entry, fe_inst_binop(f, 
             FE_TY_I32, FE_IADD,
@@ -153,11 +153,21 @@ FeFunction* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* v
         ));
         FeInst* add6 = fe_append_end(entry, fe_inst_binop(f, 
             FE_TY_I32, FE_IADD,
+            add5,
+            add1
+        ));
+        FeInst* add7 = fe_append_end(entry, fe_inst_binop(f, 
+            FE_TY_I32, FE_IADD,
             add1,
-            add5
+            add4
+        ));
+        FeInst* add8 = fe_append_end(entry, fe_inst_binop(f, 
+            FE_TY_I32, FE_IADD,
+            add7,
+            add4
         ));
         FeInst* ret = fe_append_end(entry, fe_inst_return(f));
-        fe_set_return_arg(ret, 0, add6);
+        fe_set_return_arg(ret, 0, add8);
     }
     return f;
 }
