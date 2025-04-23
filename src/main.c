@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
 
     FeModule* mod = fe_new_module(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunction* func = make_regalloc_test(mod, &ipool, &vregs);
+    FeFunction* func = make_branch_test(mod, &ipool, &vregs);
     
     quick_print(func);
     fe_codegen(func);

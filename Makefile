@@ -35,7 +35,7 @@ FILE_NUM = 0
 build/%.o: src/%.c
 	$(eval FILE_NUM=$(shell echo $$(($(FILE_NUM)+1))))
 	$(shell $(ECHO) 1>&2 -e "\e[0m[\e[32m$(FILE_NUM)/$(words $(SRC))\e[0m]\t Compiling \e[1m$<\e[0m")
-
+	
 	@$(CC) -c -o $@ $< $(INCLUDEPATHS) $(CFLAGS) $(OPT)
 
 build: $(OBJECTS)

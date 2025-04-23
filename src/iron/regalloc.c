@@ -147,7 +147,9 @@ void fe_regalloc_linear_scan(FeFunction* f) {
         // make everything in live_out live now
         for_n(i, 0, block->live->out_len) {
             FeVirtualReg* vr = fe_vreg(vbuf, block->live->out[i]);
-            liveset_add(lvset, vr->class, vr->real);
+            if (vr->real != FE_VREG_REAL_UNASSIGNED) {
+                liveset_add(lvset, vr->class, vr->real);
+            }
         }
 
         for_inst_reverse(inst, block) {
