@@ -18,7 +18,6 @@ CC = gcc
 LD = gcc
 
 INCLUDEPATHS = -Isrc/
-DEBUGFLAGS = -lm -pg -g -Wall -Wextra 
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
 CFLAGS = -std=gnu2x -g -Wall -Wimplicit-fallthrough -fwrapv -MD -Wno-enum-compare -Wno-format -Wno-enum-conversion -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
 OPT = -O0
@@ -41,15 +40,9 @@ build/%.o: src/%.c
 build: $(OBJECTS)
 	@$(LD) $(OBJECTS) -o $(EXECUTABLE_NAME) $(CFLAGS)
 
-debug: CFLAGS += $(DEBUGFLAGS)
-debug: OPT = -Og
-debug: build
-
 clean:
 	@rm -rf build/
 	@mkdir build/
 	@mkdir -p $(dir $(OBJECTS))
-
-cleanbuild: clean build
 
 -include $(OBJECTS:.o=.d)

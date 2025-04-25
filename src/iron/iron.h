@@ -192,7 +192,6 @@ typedef struct FeFunction {
 
     FeStackItem* stack_top; // most-positive offset from stack pointer
     FeStackItem* stack_bottom;
-
 } FeFunction;
 
 typedef struct FeModule {
@@ -320,6 +319,9 @@ typedef enum: FeInstKind {
     // Return
     FE_RETURN,
 
+    // Phi
+    FE_PHI,
+
     // CallDirect
     FE_CALL_DIRECT,
     // CallIndirect
@@ -395,6 +397,17 @@ typedef struct {
 typedef struct {
     FeBlock* to;
 } FeInstJump;
+
+typedef struct {
+    FeInst* val;
+    FeBlock* block;
+} FePhiSrc;
+
+typedef struct {
+    u16 len;
+    u16 cap;
+    FePhiSrc* srcs;
+} FeInstPhi;
 
 typedef struct {
     u16 len;
@@ -531,6 +544,8 @@ void fe_inst_update_uses(FeFunction* f);
 FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out);
 FeBlock** fe_inst_term_list_targets(const FeTarget* t, FeInst* term, usize* len_out);
 
+FeTy fe_proj_ty(FeInst* tuple, usize index);
+
 FeInst* fe_inst_const(FeFunction* f, FeTy ty, u64 val);
 FeInst* fe_inst_unop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* val);
 FeInst* fe_inst_binop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs);
@@ -546,7 +561,11 @@ void fe_set_return_arg(FeInst* ret, usize index, FeInst* arg);
 FeInst* fe_inst_branch(FeFunction* f, FeInst* cond, FeBlock* if_true, FeBlock* if_false);
 FeInst* fe_inst_jump(FeFunction* f, FeBlock* to);
 
-FeTy fe_proj_ty(FeInst* tuple, usize index);
+FeInst* fe_inst_phi(FeFunction* f, FeTy ty, u16 num_srcs);
+FePhiSrc fe_phi_get_src(FeInst* inst, u16 index);
+void fe_phi_set_src(FeInst* inst, u16 index, FeInst* val, FeBlock* block);
+void fe_phi_append_src(FeInst* inst, FeInst* val, FeBlock* block);
+void fe_phi_remove_src_unordered(FeInst* inst, u16 index);
 
 #define fe_extra(instptr) ((void*)&(instptr)->extra[0])
 #define fe_extra_T(instptr, T) ((T*)&(instptr)->extra[0])
@@ -554,9 +573,9 @@ FeTy fe_proj_ty(FeInst* tuple, usize index);
 
 // check this assumption with some sort
 // with a runtime init function
-#define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstBranch)
+#define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstCallIndirect)
 
-#define FE_IPOOL_FREE_SPACES_LEN FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1
+#define FE_IPOOL_FREE_SPACES_LEN (FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1)
 typedef struct FeInstPoolChunk FeInstPoolChunk;
 typedef struct FeInstPoolFreeSpace FeInstPoolFreeSpace;
 typedef struct FeInstPool {
@@ -653,7 +672,7 @@ typedef struct FeVRegBuffer {
     u32 cap;
 } FeVRegBuffer;
 
-typedef enum {
+typedef enum : u8 {
     FE_REG_CALL_CLOBBERED,
     FE_REG_CALL_PRESERVED,
     FE_REG_UNUSABLE,
@@ -677,9 +696,6 @@ typedef struct FeTarget {
     FeInstChain (*isel)(FeFunction* f, FeBlock* block, FeInst* inst);
     void (*pre_regalloc_opt)(FeFunction* f);
     void (*final_touchups)(FeFunction* f);
-
-
-    // void (*opt)(FeFunction* f);
 
     FeRegclass (*choose_regclass)(FeInstKind kind, FeTy ty);
     const char* (*reg_name)(u8 regclass, u16 real);

@@ -1,16 +1,16 @@
-#define ORBIT_IMPLEMENTATION
 #include <stdio.h>
+
+#define ORBIT_IMPLEMENTATION
 #include "orbit.h"
 
 #include "lex.h"
-
 #include "iron/iron.h"
 
 static void quick_print(FeFunction* f) {
     FeDataBuffer db;
     fe_db_init(&db, 512);
     fe_print_func(&db, f);
-    printf("%.*s", db.len, db.at);
+    printf("%.*s", (int)db.len, db.at);
 }
 
 FeFunction* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
@@ -142,6 +142,33 @@ FeFunction* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* v
     return f;
 }
 
+FeFunction* make_phi_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
+    
+    FeFuncSignature* f_sig = fe_new_funcsig(FE_CCONV_JACKAL, 1, 1);
+    fe_funcsig_param(f_sig, 0)->ty = FE_TY_BOOL;
+    fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
+
+    FeSymbol* f_sym = fe_new_symbol(mod, "phi_test", 0, FE_BIND_GLOBAL);
+    FeFunction* f = fe_new_function(mod, f_sym, f_sig, ipool, vregs);
+
+    FeBlock* entry = f->entry_block;
+    FeBlock* if_true = fe_new_block(f);
+    FeBlock* if_false = fe_new_block(f);
+    FeBlock* phi_block = fe_new_block(f);
+
+    {
+        FeInst* branch = fe_append_end(entry, fe_inst_branch(f, f->params[0], if_true, if_false));
+    }
+    {
+        FeInst* c = fe_append_end(if_true, fe_inst_const(f, FE_TY_I32, 10));
+    }
+    {
+        FeInst* c = fe_append_end(if_false, fe_inst_const(f, FE_TY_I32, 3));
+    }
+
+    return f;
+}
+
 int main(int argc, char** argv) {
     if (argc == 1) {
         printf("no file provided\n");
@@ -163,7 +190,6 @@ int main(int argc, char** argv) {
 
     Vec(Token) tokens = lex_entrypoint(&f);
     (void)tokens;
-    // printf("%zu chars -> %zu tokens (%zuB used, %zuB capacity)\n", file->size, tokens.len, sizeof(Token)*tokens.len, sizeof(Token)*tokens.cap);
 
     fe_init_signal_handler();
     FeInstPool ipool;
@@ -173,7 +199,7 @@ int main(int argc, char** argv) {
 
     FeModule* mod = fe_new_module(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunction* func = make_branch_test(mod, &ipool, &vregs);
+    FeFunction* func = make_factorial(mod, &ipool, &vregs);
     
     quick_print(func);
     fe_codegen(func);
@@ -184,5 +210,5 @@ int main(int argc, char** argv) {
     FeDataBuffer db; 
     fe_db_init(&db, 2048);
     fe_emit_asm(func, &db);
-    printf("%.*s", db.len, db.at);
+    printf("%.*s", (int)db.len, db.at);
 }

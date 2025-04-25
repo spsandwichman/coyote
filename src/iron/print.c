@@ -209,7 +209,7 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
     case FE_CONST:
         switch (inst->ty) {
         case FE_TY_BOOL: fe_db_writef(db, "%s", fe_extra_T(inst, FeInstConst)->val ? "true" : "false"); break;
-        case FE_TY_I64:  fe_db_writef(db, "0x%llx", fe_extra_T(inst, FeInstConst)->val); break;
+        case FE_TY_I64:  fe_db_writef(db, "0x%llx", (u64)fe_extra_T(inst, FeInstConst)->val); break;
         case FE_TY_I32:  fe_db_writef(db, "0x%llx", (u64)(u32)fe_extra_T(inst, FeInstConst)->val); break;
         case FE_TY_I16:  fe_db_writef(db, "0x%llx", (u64)(u16)fe_extra_T(inst, FeInstConst)->val); break;
         case FE_TY_I8:   fe_db_writef(db, "0x%llx", (u64)(u8)fe_extra_T(inst, FeInstConst)->val); break;
@@ -244,15 +244,15 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         target->ir_print_args(f, db, inst);
         break;
     default:
-        fe_db_writef(db, "[TODO]");
+        fe_db_writef(db, "[TODO LMFAO]");
     }
     fe_db_writecstr(db, "\n");
 }
 
 void fe_print_func(FeDataBuffer* db, FeFunction* f) {
     // number all instructions and blocks
-    u32 inst_counter = 0;
-    u32 block_counter = 0;
+    u32 inst_counter = 1;
+    u32 block_counter = 1;
     for_blocks(block, f) {
         block->flags = block_counter++;
         for_inst(inst, block) {
@@ -274,8 +274,8 @@ void fe_print_func(FeDataBuffer* db, FeFunction* f) {
         fe_db_writecstr(db, " ");
         for_n(i, 0, f->sig->param_len) {
             if (i != 0) fe_db_writecstr(db, ", ");
-            fe__print_ref(f, db, fe_func_param(f, i));
-            fe_db_writecstr(db, ": ");
+            // fe__print_ref(f, db, fe_func_param(f, i));
+            // fe_db_writecstr(db, ": ");
             fe_db_writecstr(db, ty_name[fe_funcsig_param(f->sig, i)->ty]);
         }
     }

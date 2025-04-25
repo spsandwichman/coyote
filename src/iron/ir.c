@@ -1,3 +1,4 @@
+#include "iron.h"
 #include "iron/iron.h"
 
 FeModule* fe_new_module(FeArch arch, FeSystem system) {
@@ -403,6 +404,53 @@ FeInst* fe_inst_jump(FeFunction* f, FeBlock* to) {
     FeInstJump* jump = fe_extra(inst);
     jump->to = to;
     return inst;
+}
+
+FeInst* fe_inst_phi(FeFunction* f, FeTy ty, u16 num_srcs) {
+    FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstPhi));
+    inst->kind = FE_PHI;
+    inst->ty = ty;
+    FeInstPhi* phi = fe_extra(inst);
+    phi->len = num_srcs;
+    phi->cap = num_srcs;
+    phi->srcs = fe_malloc(sizeof(phi->srcs[0]) * num_srcs);
+    return inst;
+}
+
+FePhiSrc fe_phi_get_src(FeInst* inst, u16 index) {
+    FeInstPhi* phi = fe_extra(inst);
+    if (index >= phi->len) {
+        fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
+    }
+    return phi->srcs[index];
+}
+
+void fe_phi_set_src(FeInst* inst, u16 index, FeInst* val, FeBlock* block) {
+    FeInstPhi* phi = fe_extra(inst);
+    if (index >= phi->len) {
+        fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
+    }
+    phi->srcs[index].val = val;
+    phi->srcs[index].block = block;
+}
+
+void fe_phi_append_src(FeInst* inst, FeInst* val, FeBlock* block) {
+    FeInstPhi* phi = fe_extra(inst);
+    if (phi->len == phi->cap) {
+        phi->cap += phi->cap >> 1;
+        phi->srcs = fe_realloc(phi->srcs, sizeof(phi->srcs[0]) * phi->cap);
+    }
+    phi->srcs[phi->len].val = val;
+    phi->srcs[phi->len].block = block;
+    phi->len += 1;
+}
+
+void fe_phi_remove_src_unordered(FeInst* inst, u16 index) {
+    FeInstPhi* phi = fe_extra(inst);
+    if (index >= phi->len) {
+        fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
+    }
+    phi->srcs[index] = phi->srcs[phi->len--];
 }
 
 FeInst* fe_inst_call_direct(FeFunction* f, FeFunction* to_call) {
