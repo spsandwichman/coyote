@@ -132,6 +132,10 @@ enum {
     TOK_LSHIFT,     // <<
     TOK_RSHIFT,     // >>
 
+    // unary minus. only emitted by the parser
+    TOK__NEG,       // -
+    TOK__ADDR,      // &
+ 
     TOK_EQ_EQ,      // ==
     TOK_NOT_EQ,     // !=
     TOK_LESS_EQ,    // <=
@@ -147,21 +151,26 @@ enum {
 
     // only for internal lexer use
     // doesn't appear in final token stream
-    TOK_NEWLINE, 
     TOK_HASH,
 
     _TOK_KEYWORDS_BEGIN,
 
-    #define T(ident) TOK_KEYWORD_##ident,
+    #define T(ident) TOK_KW_##ident,
         _LEX_KEYWORDS_
     #undef T
 
     _TOK_KEYWORDS_END,
 
+    // these get preserved and passed onto the parser
+    TOK_PREPROC_SECTION,
+    TOK_PREPROC_ENTERSECTION,
+    TOK_PREPROC_LEAVESECTION,
+    TOK_PREPROC_ASM,
+
     // for tracking preprocessor replacements
     // so error messages can trace it, and the parser
     // can correctly scope things later
-    _TOK_PREPROC_BEGIN,
+    _TOK_LEX_IGNORE,
 
         TOK_PREPROC_MACRO_PASTE, // before a macro is invoked in source code
         TOK_PREPROC_MACRO_ARG_PASTE, // before an argument to a macro gets replaced in the macro's body
@@ -169,23 +178,27 @@ enum {
         TOK_PREPROC_INCLUDE_PASTE, // before a file is included
         TOK_PREPROC_PASTE_END, // marks the end of a paste action
 
-        // these get preserved and passed onto the parser
-        TOK_PREPROC_SECTION,
-        TOK_PREPROC_ENTERSECTION,
-        TOK_PREPROC_LEAVESECTION,
-        TOK_PREPROC_ASM,
+        TOK_NEWLINE, 
 
-    _TOK_PREPROC_END,
-    
+    _TOK_PREPROC_TRANSPARENT_END,
+
     _TOK_COUNT
 };
 static_assert(_TOK_COUNT < (1 << 7));
 
 extern const char* token_kind[_TOK_COUNT];
 
+VecPtr_typedef(SrcFile);
+typedef struct {
+    Token* tokens;
+    u32 tokens_len;
+
+    VecPtr(SrcFile) sources;
+} Context;
+
 Vec_typedef(Token);
 
-Vec(Token) lex_entrypoint(SrcFile* f);
+Context lex_entrypoint(SrcFile* f);
 string tok_span(Token t);
 
 #define MAX_MACRO_ARGS 255
@@ -239,5 +252,23 @@ typedef struct PreprocScope {
     StrMap map;
     struct PreprocScope* parent;
 } PreprocScope;
+
+
+
+typedef enum : u8 {
+    REPORT_ERROR,
+    REPORT_WARNING,
+    REPORT_NOTE,
+} ReportKind;
+
+typedef struct {
+    ReportKind kind;
+    string src; 
+    string path; 
+    string snippet; 
+    string msg;
+} ReportLine;
+
+void report_line(ReportLine* line);
 
 #endif // LEX_H

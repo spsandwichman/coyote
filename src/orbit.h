@@ -14,7 +14,6 @@
 #include <limits.h>
 #include <float.h>
 #include <stdalign.h>
-#include <stdnoreturn.h>
 #include <time.h>
 
 #include "common/type.h"

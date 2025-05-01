@@ -17,10 +17,9 @@
 //     EXPR_STRING
 // ]
 
-
 // KeAssert(1 + 2)
 
-FN add(IN a: UQUAD, IN b: UQUAD, OUT mul: UQUAD): UQUAD
-    mul = a * b
-    RETURN a + b
-END
+
+#MACRO foo (n) [ n + 100 ]
+
+foo(aaaaaaaaaa) = 2

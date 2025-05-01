@@ -1,4 +1,5 @@
 #include "lex.h"
+#include "common/vec.h"
 
 const char* token_kind[_TOK_COUNT] = {
 
@@ -58,7 +59,7 @@ const char* token_kind[_TOK_COUNT] = {
     [TOK_STRING] = "string",
     [TOK_INTEGER] = "integer",
 
-    #define T(kw) [TOK_KEYWORD_##kw] = #kw,
+    #define T(kw) [TOK_KW_##kw] = #kw,
         _LEX_KEYWORDS_
     #undef T
 
@@ -171,7 +172,8 @@ static bool is_numeric(char c) {
 }
 static bool is_whitespace(char c) {
     switch (c) {
-    case '\0': case '\n': case ' ': case '\t': case '\r': case '\v':
+    // case '\n':
+    case '\0': case ' ': case '\t': case '\r': case '\v':
         return true;
     default:
         return false;
@@ -201,7 +203,7 @@ static Token lex_next_raw(Lexer* l) {
     if (l->eof) return eof_token(l);
     switch (l->current) {
         case '#':  return construct_and_advance(l, TOK_HASH, 1);
-        // case '\n': return construct_and_advance(l, TOK_NEWLINE, 1);
+        case '\n': return construct_and_advance(l, TOK_NEWLINE, 1);
 
         case '(': return construct_and_advance(l, TOK_OPEN_PAREN, 1);
         case ')': return construct_and_advance(l, TOK_CLOSE_PAREN, 1);
@@ -462,6 +464,7 @@ static CompactString string_value(CompactString s) {
     // if the string contains no escape sequences,
     // we can return a slice of the input without 
     // the initial and final quotes
+    return s;
 }
 
 static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
@@ -527,7 +530,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
                 TODO("error: invalid operator");
             }
         } else if ((TOK_PLUS <= op.kind && op.kind <= TOK_GREATER) 
-            || op.kind == TOK_KEYWORD_AND || op.kind == TOK_KEYWORD_OR) 
+            || op.kind == TOK_KW_AND || op.kind == TOK_KW_OR) 
         {
             PreprocVal lhs = preproc_collect_value(l, scope);
             PreprocVal rhs = preproc_collect_value(l, scope);
@@ -552,8 +555,8 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
             case TOK_GREATER_EQ: v.integer = lhs.integer >= rhs.integer; break;
             case TOK_LESS:       v.integer = lhs.integer < rhs.integer; break;
             case TOK_GREATER:    v.integer = lhs.integer > rhs.integer; break;
-            case TOK_KEYWORD_AND: v.integer = lhs.integer && rhs.integer; break;
-            case TOK_KEYWORD_OR:  v.integer = lhs.integer || rhs.integer; break;
+            case TOK_KW_AND: v.integer = lhs.integer && rhs.integer; break;
+            case TOK_KW_OR:  v.integer = lhs.integer || rhs.integer; break;
             default:
                 UNREACHABLE;
             }
@@ -564,7 +567,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
             }
             v.kind = PPVAL_INTEGER;
             v.integer = ~inner.integer;
-        } else if (op.kind == TOK_KEYWORD_NOT) {
+        } else if (op.kind == TOK_KW_NOT) {
             PreprocVal inner = preproc_collect_value(l, scope);
             if (inner.kind != PPVAL_INTEGER) {
                 TODO("error: expected integer");
@@ -686,10 +689,10 @@ static u8 preproc_dispatch(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
 
     Token t = lex_next_raw(l);
     switch (t.kind) {
-    case TOK_KEYWORD_IF:
-    case TOK_KEYWORD_ELSE:
-    case TOK_KEYWORD_ELSEIF:
-    case TOK_KEYWORD_END:
+    case TOK_KW_IF:
+    case TOK_KW_ELSE:
+    case TOK_KW_ELSEIF:
+    case TOK_KW_END:
         // the host lexer needs to take care of this,
         // pass it back.
         return t.kind;
@@ -820,7 +823,7 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
         };
 
         if (arg_len >= macro.macro.params_len) {
-            TODO("error: too many parameters, expected %zu", macro.macro.params_len);
+            TODO("error: too many parameters, expected %u", macro.macro.params_len);
         }
         string param_name = tok_span(macro_arg_pool.at[macro.macro.params_index + arg_len]);
         put_replacement_value(param_name, local_scope, arg);
@@ -883,15 +886,15 @@ static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) 
                 UNREACHABLE;
             }
             continue;
-        case TOK_NEWLINE: // discard newlines for now
-            continue;
+        // case TOK_NEWLINE: // discard newlines for now
+            // continue;
         }
 
         vec_append(tokens, t);
     }
 }
 
-Vec(Token) lex_entrypoint(SrcFile* f) {
+Context lex_entrypoint(SrcFile* f) {
     // init keyword perfect hash table
     for (usize i = _TOK_KEYWORDS_BEGIN + 1; i < _TOK_KEYWORDS_END; ++i) {
         const char* keyword = token_kind[i];
@@ -908,7 +911,7 @@ Vec(Token) lex_entrypoint(SrcFile* f) {
     macro_arg_pool = vec_new(Token, 128);
     preproc_val_pool = vec_new(PreprocVal, 128);
     
-    Vec(Token) tokens = vec_new(Token, 64);
+    Vec(Token) tokens = vec_new(Token, 512);
     Lexer l = lexer_from_string(f->src);
     strmap_init(&global_scope.map, 64);
 
@@ -918,7 +921,14 @@ Vec(Token) lex_entrypoint(SrcFile* f) {
     vec_destroy(&preproc_val_pool);
     vec_destroy(&macro_arg_pool);
 
-    vec_shrink(&macro_arg_pool);
+    vec_shrink(&tokens);
 
-    return tokens;
+    Context ctx = {
+        .tokens = tokens.at,
+        .tokens_len = tokens.len,
+        .sources = vecptr_new(SrcFile, 16),
+    };
+    vec_append(&ctx.sources, f);
+
+    return ctx;
 }

@@ -17,9 +17,14 @@ file = {decl};
 
 storageclass = PUBLIC | PRIVATE | EXPORT;
 
+compound = 
+    | "{" list<item> "}"
+    | "{" list<expr> "}"
+    ;
+
 decl =
-    | [storageclass] ident ":" type ["=" expr]
-    | [storageclass] ident ":" "=" expr
+    | [storageclass] ident ":" type ["=" (expr | compound)]
+    | [storageclass] ident ":" "=" (expr | compound)
     | [storageclass] fndecl
     | EXTERN ident ":" type     (* EXTERN parses differently so it cant go in storageclass *)
     | EXTERN FN fnproto 
@@ -91,9 +96,7 @@ unary =
 atomic = 
     | ident | literal | TRUE | FALSE | NULLPTR
     | "(" expr ")"
-    | "{" list<item> "}"
-    | "{" list<expr> "}"
-    | OFFSETOF type "." ident
+    | OFFSETOF ident "." ident {"." ident}
     | SIZEOF type
     | atomic "[" expr "]"
     | atomic "^"

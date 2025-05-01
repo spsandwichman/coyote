@@ -19,7 +19,7 @@ LD = gcc
 
 INCLUDEPATHS = -Isrc/
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
-CFLAGS = -std=gnu2x -g -Wall -Wimplicit-fallthrough -fwrapv -MD -Wno-enum-compare -Wno-format -Wno-enum-conversion -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
+CFLAGS = -std=gnu2x -g -Wall -Wimplicit-fallthrough -fwrapv -MD -Wno-enum-compare -Wno-unused -Wno-format -Wno-enum-conversion -Wincompatible-pointer-types -Wno-discarded-qualifiers -lm -Wno-deprecated-declarations
 OPT = -O0
 
 ifeq ($(OS),Windows_NT)

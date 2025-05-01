@@ -3,67 +3,92 @@
 
 #include "lex.h"
 
+#include "iron/iron.h"
+
 // ----------------- TYPES AND SHIT ----------------- 
 
-enum TypeKind {
-    TYPE_VOID,
+typedef enum : u8 {
+    TY__INVALID,
 
-    TYPE_BYTE,
-    TYPE_UBYTE,
-    TYPE_INT,
-    TYPE_UINT,
-    TYPE_LONG,
-    TYPE_ULONG,
-    TYPE_QUAD,
-    TYPE_UQUAD,
+    TY_VOID,
 
-    TYPE_PTR,
-    TYPE_STRUCT,
-    TYPE_STRUCT_PACKED,
-    TYPE_UNION,
-    TYPE_ENUM,
-    TYPE_FNPTR,
-    TYPE_FN,
-};
+    TY_BYTE,    // i8
+    TY_UBYTE,   // u8
+    TY_INT,     // i16
+    TY_UINT,    // u16
+    TY_LONG,    // i32
+    TY_ULONG,   // u32
+    TY_QUAD,    // i64
+    TY_UQUAD,   // u64
 
-typedef u16 TypeIndex;
-typedef struct {u32 _;} TypeBufSlot;
+    TY_PTR,
+    TY_STRUCT,
+    TY_STRUCT_PACKED,
+    TY_UNION,
+    TY_ENUM,
+    TY_FNPTR,
+    TY_FN,
+} TyKind;
+
+typedef u16 TyIndex;
+typedef struct {u32 _;} TyBufSlot;
+
+typedef struct {
+    TyKind kind;
+} TyBase;
 
 typedef struct {
     u8 kind;
-} TypeBase;
+    TyIndex to;
+} TyPtr;
 
 typedef struct {
-    u8 kind;
-    TypeIndex to;
-} TypePtr;
-static_assert(sizeof(TypePtr) == sizeof(TypeBufSlot));
-// important for ptr cache trick
+    TyIndex type;
+    u16 offset;
+    CompactString name;
+} TyRecordField;
 
-typedef struct {
-    TypeIndex type;
-    CompactString field;
-} TypeRecordField;
-
+#define RECORD_MAX_FIELDS UINT8_MAX
 typedef struct {
     u8 kind;
     u8 len; // should never be a limitation O.O
-    TypeIndex fields[];
+    u16 size;
+    u8 align;
+    TyRecordField fields[];
 } TypeRecord;
-
-// pointers to records are always preallocated
-// before the record's slot, for fast access 
-// (and so only one pointer type is ever needed)
-#define record_ptr_cache(typeindex) (typeindex - 1)
 
 // ------------------- PARSE/SEMA ------------------- 
 
 typedef struct {
-    TypeIndex type; // expression type
+    TyIndex ty; // expression type
+    FeTy fe_ty; // iron type
+    FeInst* fe_value;
 } Expr;
 
 typedef struct {
-    
+    struct {
+        FeModule* m; // module/compilation unit
+        FeFunction* f; // current function
+        FeBlock* b; // current block
+    } fe;
+
+    Token current;
+    Token* tokens;
+    u32 tokens_len;
+    u32 cursor;
+} Parser;
+
+typedef enum : u8 {
+    GEN_VAL, // generate ir for the value of this expression
+    GEN_PTR, // generate ir for the address of this expression.
+    GEN_NONE,// dont generate ir for this expression, just analyze it.
+} GenMode;
+
+typedef struct {
 } Entity;
+
+Expr parse_expr(Parser* p, GenMode mode);
+
+void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg);
 
 #endif // PARSE_H

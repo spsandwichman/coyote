@@ -1,0 +1,25 @@
+
+decl = ":" "=" ident expr ;
+assign = "=" expr expr ;
+
+binop =
+    | "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "|" | "&" | "$"
+    | "!=" | "==" | "<" | ">" | "<=" | ">=" | "AND" | "OR"
+    ;
+
+unop = _UNARY_AND | _UNARY_MINUS | "~" | NOT | SIZEOFVALUE;
+
+expr =
+    | expr expr binop
+    | expr unop
+    | CONTAINEROF expr TO ident "." ident {"." ident}
+    | CAST expr TO type
+    | ident | literal | TRUE | FALSE | NULLPTR
+    | SIZEOF type
+
+type = 
+    | QUAD | UQUAD | LONG | ULONG | INT | UINT | BYTE | UBYTE | VOID
+    | ident
+    | type "^"
+    | type "[" expr "]"
+    ;
