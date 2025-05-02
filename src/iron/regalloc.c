@@ -118,6 +118,10 @@ bool is_live(LiveSet* lvset, u8 regclass, u16 reg) {
     return lvset->reg_live[regclass][reg];
 }
 
+bool should_kill_def(FeVirtualReg* out, FeInst* inst) {
+    return (inst->kind == FE_UPSILON || out->def == inst) && out->real != FE_VREG_REAL_UNASSIGNED;
+}
+
 void fe_regalloc_linear_scan(FeFunction* f) {
     FeVRegBuffer* vbuf = f->vregs;
     const FeTarget* target = f->mod->target;
@@ -157,9 +161,10 @@ void fe_regalloc_linear_scan(FeFunction* f) {
                 // this instruction defines a virtual register
                 FeVirtualReg* inst_out = fe_vreg(vbuf, inst->vr_out);
                 
-                // if this instruction is the "canonical" definition
-                // of the virtual register, KILL IT TO DEATH
-                if (inst_out->def == inst && inst_out->real != FE_VREG_REAL_UNASSIGNED) {
+                // if this instruction is the "canonical" definition of the 
+                // virtual register, or the instruction is an upsilon inst,
+                // KILL IT TO DEATH
+                if (should_kill_def(inst_out, inst)) {
                     liveset_remove(lvset, inst_out->class, inst_out->real);
                 }
             }

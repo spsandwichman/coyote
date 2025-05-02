@@ -180,6 +180,9 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
         } else {
             return ret->multi;
         }
+    case FE_PHI:
+        *len_out = fe_extra_T(inst, FeInstPhi)->len;
+        return fe_extra_T(inst, FeInstPhi)->vals;
     case FE_MACH_STACK_SPILL:
         *len_out = 1;
         return &fe_extra_T(inst, FeMachStackSpill)->val;
@@ -413,16 +416,25 @@ FeInst* fe_inst_phi(FeFunction* f, FeTy ty, u16 num_srcs) {
     FeInstPhi* phi = fe_extra(inst);
     phi->len = num_srcs;
     phi->cap = num_srcs;
-    phi->srcs = fe_malloc(sizeof(phi->srcs[0]) * num_srcs);
+    phi->vals = fe_malloc(sizeof(phi->vals[0]) * num_srcs);
+    phi->blocks = fe_malloc(sizeof(phi->blocks[0]) * num_srcs);
     return inst;
 }
 
-FePhiSrc fe_phi_get_src(FeInst* inst, u16 index) {
+FeInst* fe_phi_get_src_val(FeInst* inst, u16 index) {
     FeInstPhi* phi = fe_extra(inst);
     if (index >= phi->len) {
         fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
     }
-    return phi->srcs[index];
+    return phi->vals[index];
+}
+
+FeBlock* fe_phi_get_src_block(FeInst* inst, u16 index) {
+    FeInstPhi* phi = fe_extra(inst);
+    if (index >= phi->len) {
+        fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
+    }
+    return phi->blocks[index];
 }
 
 void fe_phi_set_src(FeInst* inst, u16 index, FeInst* val, FeBlock* block) {
@@ -430,18 +442,19 @@ void fe_phi_set_src(FeInst* inst, u16 index, FeInst* val, FeBlock* block) {
     if (index >= phi->len) {
         fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
     }
-    phi->srcs[index].val = val;
-    phi->srcs[index].block = block;
+    phi->vals[index] = val;
+    phi->blocks[index] = block;
 }
 
 void fe_phi_append_src(FeInst* inst, FeInst* val, FeBlock* block) {
     FeInstPhi* phi = fe_extra(inst);
     if (phi->len == phi->cap) {
         phi->cap += phi->cap >> 1;
-        phi->srcs = fe_realloc(phi->srcs, sizeof(phi->srcs[0]) * phi->cap);
+        phi->vals = fe_realloc(phi->vals, sizeof(phi->vals[0]) * phi->cap);
+        phi->blocks = fe_realloc(phi->blocks, sizeof(phi->blocks[0]) * phi->cap);
     }
-    phi->srcs[phi->len].val = val;
-    phi->srcs[phi->len].block = block;
+    phi->vals[phi->len] = val;
+    phi->blocks[phi->len] = block;
     phi->len += 1;
 }
 
@@ -450,7 +463,11 @@ void fe_phi_remove_src_unordered(FeInst* inst, u16 index) {
     if (index >= phi->len) {
         fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
     }
-    phi->srcs[index] = phi->srcs[phi->len--];
+    if (index != phi->len - 1) {
+        phi->vals[index] = phi->vals[phi->len];
+        phi->blocks[index] = phi->blocks[phi->len];
+    }
+    phi->len -= 1;
 }
 
 FeInst* fe_inst_call_direct(FeFunction* f, FeFunction* to_call) {

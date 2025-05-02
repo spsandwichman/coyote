@@ -104,6 +104,8 @@ static const char* inst_name[_FE_BASE_INST_END] = {
     [FE_JUMP] = "jump",
     [FE_RETURN] = "return",
 
+    [FE_PHI] = "phi",
+
     [FE_CALL_DIRECT] = "call_direct",
     [FE_CALL_INDIRECT] = "call_indirect",
 };
@@ -205,6 +207,25 @@ static void print_inst(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
         fe__print_block(f, db, branch->if_true);
         fe_db_writecstr(db, ", ");
         fe__print_block(f, db, branch->if_false);
+        break;
+    case FE_JUMP:
+        ;
+        FeInstJump* jump = fe_extra(inst);
+        fe__print_block(f, db, jump->to);
+        break;
+    case FE_PHI:
+        ;
+        FeInstPhi* phi = fe_extra(inst);
+        for_n(i, 0, phi->len) {
+            if (i != 0) {
+                fe_db_writecstr(db, ", ");
+            }
+            FeBlock* src_block = phi->blocks[i];
+            FeInst* src = phi->vals[i];
+            fe__print_block(f, db, src_block);
+            fe_db_writecstr(db, " ");
+            fe__print_ref(f, db, src);
+        }
         break;
     case FE_CONST:
         switch (inst->ty) {

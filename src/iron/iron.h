@@ -281,6 +281,8 @@ typedef enum: FeInstKind {
     // Unop
     FE_MOV,
     FE_MACH_MOV, // mostly for hardcoding register clobbers
+    FE_UPSILON,
+    
     FE_NOT,
     FE_NEG,
     FE_TRUNC, // integer downcast
@@ -399,14 +401,10 @@ typedef struct {
 } FeInstJump;
 
 typedef struct {
-    FeInst* val;
-    FeBlock* block;
-} FePhiSrc;
-
-typedef struct {
     u16 len;
     u16 cap;
-    FePhiSrc* srcs;
+    FeInst** vals;
+    FeBlock** blocks;
 } FeInstPhi;
 
 typedef struct {
@@ -562,7 +560,8 @@ FeInst* fe_inst_branch(FeFunction* f, FeInst* cond, FeBlock* if_true, FeBlock* i
 FeInst* fe_inst_jump(FeFunction* f, FeBlock* to);
 
 FeInst* fe_inst_phi(FeFunction* f, FeTy ty, u16 num_srcs);
-FePhiSrc fe_phi_get_src(FeInst* inst, u16 index);
+FeInst* fe_phi_get_src_val(FeInst* inst, u16 index);
+FeBlock* fe_phi_get_src_block(FeInst* inst, u16 index);
 void fe_phi_set_src(FeInst* inst, u16 index, FeInst* val, FeBlock* block);
 void fe_phi_append_src(FeInst* inst, FeInst* val, FeBlock* block);
 void fe_phi_remove_src_unordered(FeInst* inst, u16 index);
