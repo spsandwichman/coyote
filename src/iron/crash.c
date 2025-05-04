@@ -23,7 +23,7 @@
     va_end(args);
     printf("\n");
 
-#ifndef __WIN32__
+#ifndef _WIN32
     void* array[256]; // hold 256 stack traces
     char** strings;
     int size;
@@ -54,7 +54,7 @@
     exit(-1);
 }
 
-#ifdef __WIN32__
+#ifdef _WIN32
 static void signal_handler(int sig) {
     switch (sig) {
     case SIGSEGV:
