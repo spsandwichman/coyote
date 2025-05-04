@@ -114,7 +114,7 @@ void fe_codegen(FeFunction* f) {
     for_blocks(block, f) {
         for_inst(inst, block) {
             if (inst->kind == FE_UPSILON) continue;
-            if ((inst->ty != FE_TY_VOID || inst->ty != FE_TY_TUPLE) && inst->vr_out == FE_VREG_NONE) {
+            if ((inst->ty != FE_TY_VOID && inst->ty != FE_TY_TUPLE) && inst->vr_out == FE_VREG_NONE) {
                 // TODO choose register class based on architecture and type
                 inst->vr_out = fe_vreg_new(f->vregs, inst, block, target->choose_regclass(inst->kind, inst->ty));
             }
