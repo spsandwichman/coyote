@@ -676,9 +676,8 @@ typedef enum : u8 {
     FE_REG_UNUSABLE,
 } FeRegStatus;
 
-typedef enum : u8 {
-    FE_REGCLASS_NONE,
-} FeRegclass;
+typedef u8 FeRegclass;
+#define FE_REGCLASS_NONE 0
 
 typedef struct FeTarget {
     FeArch arch;
