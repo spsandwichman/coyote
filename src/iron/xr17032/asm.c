@@ -68,31 +68,10 @@ static void emit_branch(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* ins
     // figure out if there's a block next.
     XrRegBranch* br = fe_extra(inst);
 
-    // if the _else block is right after the jump,
-    // elide the uncondiitonal jump.
-    // if (br->_else->flags == b->flags + 1) {
-    //     emit_inst_name(db, inst->kind);
-    //     fe_db_writecstr(db, reg(f, br->reg));
-    //     fe_db_writecstr(db, ", ");
-    //     emit_block_name(db, br->dest);
-    // } else if (br->dest->flags == b->flags + 1) {
-    //     // if the dest block is right after the jump,
-    //     // flip the condition of the branch.
-    //     emit_inst_name(db, inst->kind + 1); // lmao hacky
-    //     fe_db_writecstr(db, reg(f, br->reg));
-    //     fe_db_writecstr(db, ", ");
-    //     emit_block_name(db, br->_else);
-    // } else {
-        // emit both.
-        emit_inst_name(db, inst->kind);
-        fe_db_writecstr(db, reg(f, br->reg));
-        fe_db_writecstr(db, ", ");
-        emit_block_name(db, br->dest);
-        fe_db_writecstr(db, "\n");
-
-        fe_db_writecstr(db, "    j ");
-        emit_block_name(db, br->_else);
-    // }
+    emit_inst_name(db, inst->kind);
+    fe_db_writecstr(db, reg(f, br->reg));
+    fe_db_writecstr(db, ", ");
+    emit_block_name(db, br->dest);
 }
 
 static char* mem_operand_size(FeInstKind kind) {

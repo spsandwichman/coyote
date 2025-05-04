@@ -11,6 +11,9 @@ SRCPATHS = \
 SRC = $(wildcard $(SRCPATHS))
 OBJECTS = $(SRC:src/%.c=build/%.o)
 
+IRON_SRC = $(wildcard $(IRON_SRC_PATHS))
+IRON_OBJECTS = $(IRON_SRC:src/%.c=build/%.o)
+
 EXECUTABLE_NAME = coyote
 ECHO = echo
 
@@ -37,8 +40,16 @@ build/%.o: src/%.c
 	
 	@$(CC) -c -o $@ $< $(INCLUDEPATHS) $(CFLAGS) $(OPT)
 
-build: $(OBJECTS)
+coyote: $(OBJECTS)
 	@$(LD) $(OBJECTS) -o $(EXECUTABLE_NAME) $(CFLAGS)
+
+	
+libiron.o: $(IRON_OBJECTS)
+	@$(LD) $(IRON_OBJECTS) -r -o libiron.o $(CFLAGS)
+
+libiron.a: libiron.o
+	@ar rcs libiron.a libiron.o
+
 
 clean:
 	@rm -rf build/

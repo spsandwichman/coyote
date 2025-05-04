@@ -300,6 +300,19 @@ static u16 reg_num(FeFunction* f, FeInst* inst) {
     return vr->real;
 }
 
+static u16 branch_inv_kind(u16 kind) {
+    switch (kind) {
+    case XR_BEQ: return XR_BNE;
+    case XR_BNE: return XR_BEQ;
+    case XR_BLT: return XR_BGE;
+    case XR_BGE: return XR_BLT;
+    case XR_BGT: return XR_BLE;
+    case XR_BLE: return XR_BGT;
+    default:
+        return 0;
+    }
+}
+
 // final, post-regalloc touchups begin.
 // after this, the function is not necessarily valid SSA
 // nor valid IR at all.
@@ -362,12 +375,10 @@ void xr_final_touchups(FeFunction* f) {
         }
     }
 
-    // time to normalize.
+    // normalize plenty of different instructions
     for_blocks(block, f) {
         for_inst(inst, block) {
             FeInstUnop* unop = fe_extra(inst);
-
-            retry:
 
             switch (inst->kind) {
             case FE_UPSILON:
@@ -410,6 +421,40 @@ void xr_final_touchups(FeFunction* f) {
             default: 
                 continue;
             }
+        }
+    }
+
+    // number blocks rq
+    u32 block_counter = 0;
+    for_blocks(block, f) {
+        block->flags = block_counter++;
+        // for_inst(inst, block) {
+        //     inst->flags = 0;
+        // }
+    }
+
+    // optimize/remove branches
+    for_blocks(block, f) {
+        FeInst* inst = block->bookend->prev;
+        
+        // if its a jump to the very next block, remove it
+        if (inst->kind == XR_J && fe_extra_T(inst, XrJump)->dest->flags == block->flags + 1) {
+            fe_inst_remove(inst);
+            continue;
+        }
+
+        if (branch_inv_kind(inst->kind) == 0)
+            continue;
+        
+        XrRegBranch* br = fe_extra(inst);
+        
+        // if the dest block is right after a conditional jump
+        // reverse its condition and its destination
+        if (br->dest->flags == block->flags + 1) {
+            inst->kind = branch_inv_kind(inst->kind);
+            FeBlock* _else = br->_else;
+            br->_else = br->dest;
+            br->dest = _else;
         }
     }
 }
