@@ -7,6 +7,8 @@
 #include "parse.h"
 #include "iron/iron.h"
 
+
+
 static void quick_print(FeFunction* f) {
     FeDataBuffer db;
     fe_db_init(&db, 512);
@@ -15,6 +17,7 @@ static void quick_print(FeFunction* f) {
 }
 
 FeFunction* make_phi_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs);
+FeFunction* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs);
 
 int main(int argc, char** argv) {
     if (argc == 1) {
@@ -56,8 +59,8 @@ int main(int argc, char** argv) {
 
     FeModule* mod = fe_new_module(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunction* func = make_phi_test(mod, &ipool, &vregs);
-    
+    FeFunction* func = make_regalloc_test(mod, &ipool, &vregs);
+
     quick_print(func);
     fe_codegen(func);
     quick_print(func);
@@ -203,36 +206,36 @@ FeFunction* make_phi_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs)
 //     return f;
 // }
 
-// FeFunction* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
+FeFunction* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
-//     // set up function to call
-//     FeFuncSignature* f_sig = fe_new_funcsig(FE_CCONV_JACKAL, 4, 4);
-//     fe_funcsig_param(f_sig, 0)->ty = FE_TY_I32;
-//     fe_funcsig_param(f_sig, 1)->ty = FE_TY_I32;
-//     fe_funcsig_param(f_sig, 2)->ty = FE_TY_I32;
-//     fe_funcsig_param(f_sig, 3)->ty = FE_TY_I32;
-//     fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
-//     fe_funcsig_return(f_sig, 1)->ty = FE_TY_I32;
-//     fe_funcsig_return(f_sig, 2)->ty = FE_TY_I32;
-//     fe_funcsig_return(f_sig, 3)->ty = FE_TY_I32;
+    // set up function to call
+    FeFuncSignature* f_sig = fe_new_funcsig(FE_CCONV_JACKAL, 1, 1);
+    fe_funcsig_param(f_sig, 0)->ty = FE_TY_I32;
+    // fe_funcsig_param(f_sig, 1)->ty = FE_TY_I32;
+    // fe_funcsig_param(f_sig, 2)->ty = FE_TY_I32;
+    // fe_funcsig_param(f_sig, 3)->ty = FE_TY_I32;
+    fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
+    // fe_funcsig_return(f_sig, 1)->ty = FE_TY_I32;
+    // fe_funcsig_return(f_sig, 2)->ty = FE_TY_I32;
+    // fe_funcsig_return(f_sig, 3)->ty = FE_TY_I32;
 
-//     // make the function and its symbol
-//     FeSymbol* f_sym = fe_new_symbol(mod, "regalloc_test", 0, FE_BIND_GLOBAL);
-//     FeFunction* f = fe_new_function(mod, f_sym, f_sig, ipool, vregs);
+    // make the function and its symbol
+    FeSymbol* f_sym = fe_new_symbol(mod, "id", 0, FE_BIND_GLOBAL);
+    FeFunction* f = fe_new_function(mod, f_sym, f_sig, ipool, vregs);
 
-//     // construct the function's body
-//     FeBlock* entry = f->entry_block;
-//     FeInst* param0 = fe_func_param(f, 0);
-//     FeInst* param1 = fe_func_param(f, 1);
-//     FeInst* param2 = fe_func_param(f, 2);
-//     FeInst* param3 = fe_func_param(f, 3);
+    // construct the function's body
+    FeBlock* entry = f->entry_block;
+    FeInst* param0 = f->params[0];
+    // FeInst* param1 = fe_func_param(f, 1);
+    // FeInst* param2 = fe_func_param(f, 2);
+    // FeInst* param3 = fe_func_param(f, 3);
 
-//     { // entry block
-//         FeInst* ret = fe_append_end(entry, fe_inst_return(f));
-//         fe_set_return_arg(ret, 0, param0);
-//         fe_set_return_arg(ret, 1, param1);
-//         fe_set_return_arg(ret, 2, param2);
-//         fe_set_return_arg(ret, 3, param3);
-//     }
-//     return f;
-// }
+    { // entry block
+        FeInst* ret = fe_append_end(entry, fe_inst_return(f));
+        fe_set_return_arg(ret, 0, param0);
+        // fe_set_return_arg(ret, 1, param1);
+        // fe_set_return_arg(ret, 2, param2);
+        // fe_set_return_arg(ret, 3, param3);
+    }
+    return f;
+}
