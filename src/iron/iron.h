@@ -658,7 +658,7 @@ typedef struct FeBlockLiveness {
 typedef struct FeVirtualReg {
     u8 class;
     u16 real;
-    
+    bool is_phi_out;
     FeVReg hint;
 
     FeInst* def;

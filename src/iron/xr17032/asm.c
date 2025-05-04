@@ -8,7 +8,7 @@
 //     return vr->real;
 // }
 
-static char* reg(FeFunction* f, FeInst* inst) {
+static const char* reg(FeFunction* f, FeInst* inst) {
     if (inst->vr_out == FE_VREG_NONE) {
         return "FE_VREG_NONE";
     }
@@ -24,7 +24,7 @@ static void emit_block_name(FeDataBuffer* db, FeBlock* b) {
 }
 
 static void emit_inst_name(FeDataBuffer* db, u16 kind) {
-    char* name = xr_inst_name(kind, false);
+    const char* name = xr_inst_name(kind, false);
     usize len = strlen(name);
 
     fe_db_writecstr(db, "    ");
@@ -70,29 +70,29 @@ static void emit_branch(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* ins
 
     // if the _else block is right after the jump,
     // elide the uncondiitonal jump.
-    if (br->_else->flags == b->flags + 1) {
-        emit_inst_name(db, inst->kind);
-        fe_db_writecstr(db, reg(f, br->reg));
-        fe_db_writecstr(db, ", ");
-        emit_block_name(db, br->dest);
-    } else if (br->dest->flags == b->flags + 1) {
-        // if the dest block is right after the jump,
-        // flip the condition of the branch.
-        emit_inst_name(db, inst->kind + 1); // lmao hacky
-        fe_db_writecstr(db, reg(f, br->reg));
-        fe_db_writecstr(db, ", ");
-        emit_block_name(db, br->_else);
-    } else {
+    // if (br->_else->flags == b->flags + 1) {
+    //     emit_inst_name(db, inst->kind);
+    //     fe_db_writecstr(db, reg(f, br->reg));
+    //     fe_db_writecstr(db, ", ");
+    //     emit_block_name(db, br->dest);
+    // } else if (br->dest->flags == b->flags + 1) {
+    //     // if the dest block is right after the jump,
+    //     // flip the condition of the branch.
+    //     emit_inst_name(db, inst->kind + 1); // lmao hacky
+    //     fe_db_writecstr(db, reg(f, br->reg));
+    //     fe_db_writecstr(db, ", ");
+    //     emit_block_name(db, br->_else);
+    // } else {
         // emit both.
-        emit_inst_name(db, inst->kind + 1);
+        emit_inst_name(db, inst->kind);
         fe_db_writecstr(db, reg(f, br->reg));
         fe_db_writecstr(db, ", ");
         emit_block_name(db, br->dest);
         fe_db_writecstr(db, "\n");
 
-        fe_db_writecstr(db, "j ");
+        fe_db_writecstr(db, "    j ");
         emit_block_name(db, br->_else);
-    }
+    // }
 }
 
 static char* mem_operand_size(FeInstKind kind) {
@@ -210,6 +210,11 @@ static void emit_inst(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst)
         break;
     case XR_BEQ ... XR_BGE:
         emit_branch(f, b, db, inst);
+        break;
+    case XR_J:
+        emit_inst_name(db, inst->kind);
+        // fe_db_writecstr(db, " ");
+        emit_block_name(db, fe_extra_T(inst, XrJump)->dest);
         break;
     case XR_RET:
         emit_inst_name(db, inst->kind);

@@ -19,6 +19,7 @@ FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class)
     buf->at[vr].def_block = def_block;
     buf->at[vr].real = FE_VREG_REAL_UNASSIGNED;
     buf->at[vr].hint = FE_VREG_NONE;
+    buf->at[vr].is_phi_out = def->kind == FE_PHI;
     def->vr_out = vr;
     return vr;
 }
@@ -28,12 +29,34 @@ FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr) {
     return &buf->at[vr];
 }
 
+static void insert_upsilon(FeFunction* f) {
+    for_blocks(block, f) {
+        for_inst(inst, block) {
+            if (inst->kind != FE_PHI) continue;
+
+            usize len = fe_extra_T(inst, FeInstPhi)->len;
+            FeInst** srcs = fe_extra_T(inst, FeInstPhi)->vals;
+            FeBlock** blocks = fe_extra_T(inst, FeInstPhi)->blocks;
+
+            // add upsilon nodes
+            for_n(i, 0, len) {
+                FeInst* upsilon = fe_inst_unop(f, inst->ty, FE_UPSILON, srcs[i]);
+                fe_insert_before(blocks[i]->bookend->prev, upsilon);
+                srcs[i] = upsilon;
+            }
+        }
+    }
+}
+
 typedef struct {
     FeInstChain to;
     FeInst* from;
 } InstPair;
 
 void fe_codegen(FeFunction* f) {
+
+    insert_upsilon(f);
+
     const FeTarget* target = f->mod->target;
 
     fe_inst_update_uses(f);
@@ -90,9 +113,24 @@ void fe_codegen(FeFunction* f) {
     // create virtual registers for instructions that dont have them yet
     for_blocks(block, f) {
         for_inst(inst, block) {
+            if (inst->kind == FE_UPSILON) continue;
             if ((inst->ty != FE_TY_VOID || inst->ty != FE_TY_TUPLE) && inst->vr_out == FE_VREG_NONE) {
                 // TODO choose register class based on architecture and type
                 inst->vr_out = fe_vreg_new(f->vregs, inst, block, target->choose_regclass(inst->kind, inst->ty));
+            }
+        }
+    }
+    for_blocks(block, f) {
+        for_inst(inst, block) {
+            if (inst->kind != FE_PHI) continue;
+
+            usize len = fe_extra_T(inst, FeInstPhi)->len;
+            FeInst** srcs = fe_extra_T(inst, FeInstPhi)->vals;
+
+            // add upsilon nodes
+            for_n(i, 0, len) {
+                FeInst* upsilon = srcs[i];
+                upsilon->vr_out = inst->vr_out;
             }
         }
     }

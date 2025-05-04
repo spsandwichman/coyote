@@ -1,5 +1,7 @@
 #include "iron/iron.h"
 #include "xr.h"
+#include <stdatomic.h>
+#include <string.h>
 
 static bool is_const_zero(FeInst* inst) {
     return inst->kind == FE_CONST && fe_extra_T(inst, FeInstConst)->val == 0;
@@ -207,8 +209,12 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         return chain;
     }
     case FE_BRANCH: {
-        if (fe_extra_T(inst, FeInstBranch)->cond->kind == FE_EQ) {
-            FeInstBinop* cmp_eq = fe_extra(fe_extra_T(inst, FeInstBranch)->cond);
+        FeInst* condition = fe_extra_T(inst, FeInstBranch)->cond;
+        FeBlock* if_true = fe_extra_T(inst, FeInstBranch)->if_true;
+        FeBlock* if_false = fe_extra_T(inst, FeInstBranch)->if_false;
+        ;
+        if (condition->kind == FE_EQ) {
+            FeInstBinop* cmp_eq = fe_extra(condition);
 
             FeInst* beq = create_mach(f, XR_BEQ, FE_TY_VOID, sizeof(XrRegBranch));
             FeInstChain chain = fe_new_chain(beq);
@@ -236,12 +242,24 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             }
 
             fe_extra_T(beq, XrRegBranch)->reg = result;
-            fe_extra_T(beq, XrRegBranch)->dest = fe_extra_T(inst, FeInstBranch)->if_true;
-            fe_extra_T(beq, XrRegBranch)->_else = fe_extra_T(inst, FeInstBranch)->if_false;
+            fe_extra_T(beq, XrRegBranch)->dest = if_true;
+            fe_extra_T(beq, XrRegBranch)->_else = if_false;
 
             return chain;
+        } else {
+            // just branch-not-equal (not-zero)
+            FeInst* bne = create_mach(f, XR_BNE, FE_TY_VOID, sizeof(XrRegBranch));
+            fe_extra_T(bne, XrRegBranch)->reg = condition;
+            fe_extra_T(bne, XrRegBranch)->dest = if_true;
+            fe_extra_T(bne, XrRegBranch)->_else = if_false;
+            return fe_new_chain(bne);
         }
-        return fe_new_chain(inst);
+        // return fe_new_chain(inst);
+    }
+    case FE_JUMP: {
+        FeInst* j = create_mach(f, XR_J, FE_TY_VOID, sizeof(XrJump));
+        fe_extra_T(j, XrJump)->dest = fe_extra_T(inst, FeInstJump)->to;
+        return fe_new_chain(j);
     }
     case FE_RETURN: {
         FeInstReturn* inst_ret = extra;
@@ -269,6 +287,8 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         return chain;
     }
     case FE_MACH_MOV:
+    case FE_PHI:
+    case FE_UPSILON:
         return fe_new_chain(inst);
     }
     fe_runtime_crash("xr_isel: unable to select inst kind %u", inst->kind);
@@ -347,7 +367,12 @@ void xr_final_touchups(FeFunction* f) {
         for_inst(inst, block) {
             FeInstUnop* unop = fe_extra(inst);
 
+            retry:
+
             switch (inst->kind) {
+            case FE_UPSILON:
+                inst->kind = FE_MACH_MOV;
+                [[fallthrough]];
             case FE_MACH_MOV:
                 if (reg_num(f, inst) == reg_num(f, unop->un)) {
                     fe_inst_remove(inst);
@@ -360,6 +385,7 @@ void xr_final_touchups(FeFunction* f) {
                 }
                 break;
             case FE_MACH_REG:
+            case FE_PHI:
                 fe_inst_remove(inst);
                 break;
             case FE_MACH_STACK_SPILL:

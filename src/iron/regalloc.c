@@ -1,6 +1,10 @@
 #include "iron.h"
 #include "iron/iron.h"
 
+bool is_canon_def(FeVirtualReg* inst_out, FeInst* inst) {
+    return (inst->kind == FE_UPSILON || inst_out->def == inst);
+}
+
 static bool add_live_in(FeBlockLiveness* lv, FeVReg vr) {
     // check to see if its already in the live-in_set.
     for_n(i, 0, lv->in_len) {
@@ -62,7 +66,8 @@ static void calculate_liveness(FeFunction* f) {
             FeInst** inputs = fe_inst_list_inputs(t, inst, &inputs_len);
             for_n(i, 0, inputs_len) {
                 FeInst* input = inputs[i];
-                if (fe_vreg(f->vregs, input->vr_out)->def_block != block) {
+                FeVirtualReg* vr = fe_vreg(f->vregs, input->vr_out);
+                if (input->kind == FE_UPSILON || vr->def_block != block) {
                     add_live_in(block->live, input->vr_out);
                 }
             }
@@ -82,7 +87,8 @@ static void calculate_liveness(FeFunction* f) {
                     // add it to block.out
                     changed |= add_live_out(block->live, succ_live_in);
                     // if not defined in this block, add it block.in
-                    if (fe_vreg(f->vregs, succ_live_in)->def_block != block) {
+                    FeVirtualReg* succ_live_in_vr = fe_vreg(f->vregs, succ_live_in);
+                    if (!succ_live_in_vr->is_phi_out && succ_live_in_vr->def_block != block) {
                         changed |= add_live_in(block->live, succ_live_in);
                     }
                 }
@@ -118,14 +124,11 @@ bool is_live(LiveSet* lvset, u8 regclass, u16 reg) {
     return lvset->reg_live[regclass][reg];
 }
 
-bool should_kill_def(FeVirtualReg* out, FeInst* inst) {
-    return (inst->kind == FE_UPSILON || out->def == inst) && out->real != FE_VREG_REAL_UNASSIGNED;
-}
-
 void fe_regalloc_linear_scan(FeFunction* f) {
     FeVRegBuffer* vbuf = f->vregs;
     const FeTarget* target = f->mod->target;
     calculate_liveness(f);
+
 
     // hints!
     for_blocks(block, f) {
@@ -157,14 +160,14 @@ void fe_regalloc_linear_scan(FeFunction* f) {
         }
 
         for_inst_reverse(inst, block) {
-            if (inst->vr_out != FE_VREG_NONE) {
+            if (inst->kind == FE_PHI || inst->vr_out != FE_VREG_NONE) {
                 // this instruction defines a virtual register
                 FeVirtualReg* inst_out = fe_vreg(vbuf, inst->vr_out);
                 
                 // if this instruction is the "canonical" definition of the 
                 // virtual register, or the instruction is an upsilon inst,
                 // KILL IT TO DEATH
-                if (should_kill_def(inst_out, inst)) {
+                if (is_canon_def(inst_out, inst) && inst_out->real != FE_VREG_REAL_UNASSIGNED) {
                     liveset_remove(lvset, inst_out->class, inst_out->real);
                 }
             }

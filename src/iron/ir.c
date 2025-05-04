@@ -612,8 +612,9 @@ static FeTrait inst_traits[_FE_INST_END] = {
     [FE_FDIV] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
     [FE_FREM] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
 
-    [FE_MOV]          = SAME_IN_OUT,
+    [FE_MOV]      = SAME_IN_OUT,
     [FE_MACH_MOV] = VOL | SAME_IN_OUT | MOV_HINT,
+    [FE_UPSILON]  = VOL | SAME_IN_OUT | MOV_HINT,
     [FE_NOT]   = INT_IN | SAME_IN_OUT,
     [FE_NEG]   = INT_IN | SAME_IN_OUT,
     [FE_TRUNC] = INT_IN,

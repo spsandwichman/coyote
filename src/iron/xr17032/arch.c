@@ -12,6 +12,7 @@
         R(XR_SHIFT, XR_LOAD32_REG) = sizeof(XrRegReg),
         R(XR_STORE8_REG, XR_STORE32_REG) = sizeof(XrRegRegReg),
         R(XR_BEQ, XR_BGE) = sizeof(XrRegBranch),
+        I(XR_J)     = sizeof(XrJump),
         I(XR_RET)   = 0,
     };
     FeTrait xr_trait_table[_FE_XR_INST_END - _FE_XR_INST_BEGIN] = {
@@ -26,6 +27,7 @@
         R(XR_STORE8_REG, XR_STORE32_REG) = VOL,
 
         R(XR_BEQ, XR_BGE) = TERM,
+        I(XR_J)           = TERM,
         I(XR_RET)         = TERM,
     };
 #undef I
@@ -87,6 +89,8 @@ const char* xr_inst_name(FeInstKind kind, bool ir) {
     case XR_BGT: return ir ? "xr.bgt" : "bgt";
     case XR_BLE: return ir ? "xr.ble" : "ble";
     case XR_BGE: return ir ? "xr.bge" : "bge";
+
+    case XR_J: return ir ? "xr.j" : "j";
 
     case XR_RET: return ir ? "xr.ret" : "ret";
     default:
@@ -260,6 +264,7 @@ FeInst** xr_list_inputs(FeInst* inst, usize* len_out) {
         *len_out = 1;
         return &fe_extra_T(inst, XrRegBranch)->reg;
     case XR_RET:
+    case XR_J:
         *len_out = 0;
         return nullptr;
     default:
@@ -270,6 +275,9 @@ FeInst** xr_list_inputs(FeInst* inst, usize* len_out) {
 
 FeBlock** xr_term_list_targets(FeInst* term, usize* len_out) {
     switch (term->kind) {
+    case XR_J:
+        *len_out = 1;
+        return &fe_extra_T(term, XrJump)->dest;
     case XR_BEQ:
     case XR_BNE:
     case XR_BLT:

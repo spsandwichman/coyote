@@ -80,6 +80,7 @@ static const char* inst_name[_FE_BASE_INST_END] = {
 
     [FE_MOV] = "mov",
     [FE_MACH_MOV] = "mach_mov",
+    [FE_UPSILON] = "upsilon",
     [FE_NOT] = "not",
     [FE_NEG] = "neg",
     [FE_TRUNC] = "trunc",

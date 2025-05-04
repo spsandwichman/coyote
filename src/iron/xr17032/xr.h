@@ -61,6 +61,9 @@ typedef enum: FeInstKind {
     XR_BLE,
     XR_BGE,
 
+    // XrJump
+    XR_J,
+
     // void
     XR_RET,
 } XrInstKind;
@@ -113,6 +116,10 @@ typedef struct {
     FeBlock* dest;
     FeBlock* _else; // gets emitted as a secondary jump IF NECESSARY
 } XrRegBranch;
+
+typedef struct {
+    FeBlock* dest;
+} XrJump;
 
 enum {
     XR_REGCLASS_REG = 1,
