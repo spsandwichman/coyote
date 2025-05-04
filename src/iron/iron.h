@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <stdalign.h>
 
 #if __STDC_VERSION__ <= 201710L 
     #error "Iron is a C23 library!"
