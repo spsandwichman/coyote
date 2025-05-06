@@ -166,7 +166,7 @@ void fe_ipool_destroy(FeInstPool* pool) {
     while (top != nullptr) {
         FeInstPoolChunk* this = top;
         top = top->next;
-        free(this);
+        fe_free(this);
     } 
     *pool = (FeInstPool){0};
 }
