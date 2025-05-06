@@ -3,12 +3,12 @@
 
 #define DONT_EMIT 1
 
-// static u16 reg_num(FeFunction* f, FeInst* inst) {
+// static u16 reg_num(FeFunc* f, FeInst* inst) {
 //     FeVirtualReg* vr = fe_vreg(f->vregs, inst->vr_out);
 //     return vr->real;
 // }
 
-static const char* reg(FeFunction* f, FeInst* inst) {
+static const char* reg(FeFunc* f, FeInst* inst) {
     if (inst->vr_out == FE_VREG_NONE) {
         return "FE_VREG_NONE";
     }
@@ -35,7 +35,7 @@ static void emit_inst_name(FeDataBuffer* db, u16 kind) {
     fe_db_write8(db, ' ');
 }
 
-static void emit_reg_imm16(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
+static void emit_reg_imm16(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
     emit_inst_name(db, inst->kind);
     fe_db_writecstr(db, reg(f, inst));
     fe_db_writecstr(db, ", ");
@@ -44,7 +44,7 @@ static void emit_reg_imm16(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
     fe_db_writef(db, ", %u", ri->imm16);
 }
 
-static void emit_reg_reg(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
+static void emit_reg_reg(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
     emit_inst_name(db, inst->kind);
     fe_db_writecstr(db, reg(f, inst));
     fe_db_writecstr(db, ", ");
@@ -64,7 +64,7 @@ static void emit_shift_group(FeDataBuffer* db, XrShiftKind shift_kind, u8 imm5) 
     }
 }
 
-static void emit_branch(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
+static void emit_branch(FeFunc* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
     // figure out if there's a block next.
     XrRegBranch* br = fe_extra(inst);
 
@@ -100,7 +100,7 @@ static char* mem_operand_size(FeInstKind kind) {
     }
 }
 
-static void emit_mem_operand(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
+static void emit_mem_operand(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
     FeInst* base;
     FeInst* shifted;
     XrShiftKind shift;
@@ -141,7 +141,7 @@ static void emit_mem_operand(FeFunction* f, FeDataBuffer* db, FeInst* inst) {
     fe_db_writecstr(db, "]");
 }
 
-static void emit_inst(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
+static void emit_inst(FeFunc* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
     switch ((XrInstKind)inst->kind) {
     case XR_MOV: {
         emit_inst_name(db, inst->kind);
@@ -205,7 +205,7 @@ static void emit_inst(FeFunction* f, FeBlock* b, FeDataBuffer* db, FeInst* inst)
     fe_db_writecstr(db, "\n");
 }
 
-void xr_emit_assembly(FeFunction* f, FeDataBuffer* db) {
+void xr_emit_assembly(FeDataBuffer* db, FeFunc* f) {
     // number all instructions and blocks
     u32 block_counter = 0;
     for_blocks(block, f) {

@@ -36,7 +36,7 @@ static u16 as_hi_u16(FeInst* inst) {
     return (u16)(fe_extra_T(inst, FeInstConst)->val >> 16);
 }
 
-static FeInst* mach_reg(FeFunction* f, FeBlock* block, u16 real_reg) {
+static FeInst* mach_reg(FeFunc* f, FeBlock* block, u16 real_reg) {
     FeInst* zero = fe_ipool_alloc(f->ipool, 0);
     zero->kind = FE_MACH_REG;
     zero->ty = FE_TY_I32;
@@ -45,7 +45,7 @@ static FeInst* mach_reg(FeFunction* f, FeBlock* block, u16 real_reg) {
     return zero;
 }
 
-static FeInst* create_mach(FeFunction* f, FeInstKind kind, FeTy ty, usize size) {
+static FeInst* create_mach(FeFunc* f, FeInstKind kind, FeTy ty, usize size) {
     FeInst* i = fe_ipool_alloc(f->ipool, size);
     memset(fe_extra(i), 0, size);
     i->kind = kind; 
@@ -56,7 +56,7 @@ static FeInst* create_mach(FeFunction* f, FeInstKind kind, FeTy ty, usize size) 
     return i;
 }
 
-static FeInst* mach_mov(FeFunction* f, FeInst* source) {
+static FeInst* mach_mov(FeFunc* f, FeInst* source) {
     FeInst* i = fe_inst_unop(f, FE_TY_I32, FE_MACH_MOV, source);
     i->flags = FE_ISEL_GENERATED;
     // i->vr_out = fe_vreg_new(f->vregs, i, XR_REGCLASS_REG);
@@ -64,21 +64,21 @@ static FeInst* mach_mov(FeFunction* f, FeInst* source) {
     return i;
 }
 
-static void preassign(FeFunction* f, FeInst* inst, FeBlock* block, u16 real_reg) {
+static void preassign(FeFunc* f, FeInst* inst, FeBlock* block, u16 real_reg) {
     if (inst->vr_out == FE_VREG_NONE) {
         inst->vr_out = fe_vreg_new(f->vregs, inst, block, XR_REGCLASS_REG);
     }
     fe_vreg(f->vregs, inst->vr_out)->real = real_reg;
 }
 
-// static void set_hint(FeFunction* f, FeInst* inst, FeBlock* block, u16 real_reg) {
+// static void set_hint(FeFunc* f, FeInst* inst, FeBlock* block, u16 real_reg) {
 //     if (inst->vr_out == FE_VREG_NONE) {
 //         inst->vr_out = fe_vreg_new(f->vregs, inst, block, XR_REGCLASS_REG);
 //     }
 //     fe_vreg(f->vregs, inst->vr_out)->hint = real_reg;
 // }
 
-FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
+FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
     void* extra = fe_extra(inst);
     FeInstBinop* binop = extra;
 
@@ -99,7 +99,7 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         FeInst* param_reg = mach_reg(f, block, real_param_reg);
         FeInst* mov = mach_mov(f, param_reg);
         // set_hint(f, mov, block, real_param_reg);
-        FeInstChain chain = fe_new_chain(param_reg);
+        FeInstChain chain = fe_chain_new(param_reg);
         chain = fe_chain_append_end(chain, mov);
         return chain;
     }
@@ -110,7 +110,7 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             FeInst* addi = create_mach(f, XR_ADDI, FE_TY_I32, sizeof(XrRegImm16));
             fe_extra_T(addi, XrRegImm16)->reg = zero;
             fe_extra_T(addi, XrRegImm16)->imm16 = as_u16(inst);
-            FeInstChain chain = fe_new_chain(addi);
+            FeInstChain chain = fe_chain_new(addi);
             chain = fe_chain_append_begin(chain, zero);
             return chain;
         } if (can_subi_const_u16(inst)) {
@@ -119,7 +119,7 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             FeInst* zero = mach_reg(f, block, XR_REG_ZERO);
             fe_extra_T(subi, XrRegImm16)->reg = zero;
             fe_extra_T(subi, XrRegImm16)->imm16 = as_subi_const_u16(inst);
-            FeInstChain chain = fe_new_chain(subi);
+            FeInstChain chain = fe_chain_new(subi);
             chain = fe_chain_append_begin(chain, zero);
             return chain;
         } else {
@@ -135,23 +135,23 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             fe_extra_T(addi, XrRegImm16)->reg = lui;
             fe_extra_T(addi, XrRegImm16)->imm16 = as_u16(inst);
 
-            FeInstChain chain = fe_new_chain(zero);
+            FeInstChain chain = fe_chain_new(zero);
             chain = fe_chain_append_end(chain, lui);
             chain = fe_chain_append_end(chain, addi);
             return chain;
         }
-        return fe_new_chain(inst);
+        return fe_chain_new(inst);
     case FE_IADD:
         if (can_const_u16(binop->rhs)) {
             FeInst* addi = create_mach(f, XR_ADDI, FE_TY_I32, sizeof(XrRegImm16));
             fe_extra_T(addi, XrRegImm16)->reg = binop->lhs;
             fe_extra_T(addi, XrRegImm16)->imm16 = as_u16(binop->rhs);
-            return fe_new_chain(addi);
+            return fe_chain_new(addi);
         } else {
             FeInst* add = create_mach(f, XR_ADD, FE_TY_I32, sizeof(XrRegReg));
             fe_extra_T(add, XrRegReg)->r1 = binop->lhs;
             fe_extra_T(add, XrRegReg)->r2 = binop->rhs;
-            return fe_new_chain(add);
+            return fe_chain_new(add);
         }
         break;
     case FE_ISUB:
@@ -159,18 +159,18 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             FeInst* sub = create_mach(f, XR_SUBI, FE_TY_I32, sizeof(XrRegImm16));
             fe_extra_T(sub, XrRegImm16)->reg = binop->lhs;
             fe_extra_T(sub, XrRegImm16)->imm16 = as_u16(binop->rhs);
-            return fe_new_chain(sub);
+            return fe_chain_new(sub);
         } else {
             FeInst* sub = create_mach(f, XR_SUB, FE_TY_I32, sizeof(XrRegReg));
             fe_extra_T(sub, XrRegReg)->r1 = binop->lhs;
             fe_extra_T(sub, XrRegReg)->r2 = binop->rhs;
-            return fe_new_chain(sub);
+            return fe_chain_new(sub);
         }
     case FE_IMUL: {
         FeInst* mul = create_mach(f, XR_MUL, FE_TY_I32, sizeof(XrRegReg));
         fe_extra_T(mul, XrRegReg)->r1 = binop->lhs;
         fe_extra_T(mul, XrRegReg)->r2 = binop->rhs;
-        return fe_new_chain(mul);
+        return fe_chain_new(mul);
     }
     case FE_SHL:
         if (can_const_u5(binop->rhs)) {
@@ -182,7 +182,7 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             fe_extra_T(add, XrRegReg)->shift_kind = XR_SHIFT_LSH;
             fe_extra_T(add, XrRegReg)->imm5 = as_const_u5(binop->rhs);
 
-            FeInstChain chain = fe_new_chain(zero);
+            FeInstChain chain = fe_chain_new(zero);
             chain = fe_chain_append_end(chain, add);
             return chain;
         } else {
@@ -190,7 +190,7 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             fe_extra_T(shift, XrRegReg)->r1 = binop->lhs;
             fe_extra_T(shift, XrRegReg)->r2 = binop->rhs;
             fe_extra_T(shift, XrRegReg)->shift_kind = XR_SHIFT_LSH;
-            return fe_new_chain(shift);
+            return fe_chain_new(shift);
         }
     case FE_EQ: {
         //  %2 = eq %0, %1
@@ -204,7 +204,7 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
         fe_extra_T(slti, XrRegImm16)->reg = sub;
         fe_extra_T(slti, XrRegImm16)->imm16 = 1;
 
-        FeInstChain chain = fe_new_chain(sub);
+        FeInstChain chain = fe_chain_new(sub);
         chain = fe_chain_append_end(chain, slti);
         return chain;
     }
@@ -217,7 +217,7 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             FeInstBinop* cmp_eq = fe_extra(condition);
 
             FeInst* beq = create_mach(f, XR_BEQ, FE_TY_VOID, sizeof(XrRegBranch));
-            FeInstChain chain = fe_new_chain(beq);
+            FeInstChain chain = fe_chain_new(beq);
 
             FeInst* result;
             if (is_const_zero(cmp_eq->rhs)) {
@@ -252,21 +252,21 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
             fe_extra_T(bne, XrRegBranch)->reg = condition;
             fe_extra_T(bne, XrRegBranch)->dest = if_true;
             fe_extra_T(bne, XrRegBranch)->_else = if_false;
-            return fe_new_chain(bne);
+            return fe_chain_new(bne);
         }
-        // return fe_new_chain(inst);
+        // return fe_chain_new(inst);
     }
     case FE_JUMP: {
         FeInst* j = create_mach(f, XR_J, FE_TY_VOID, sizeof(XrJump));
         fe_extra_T(j, XrJump)->dest = fe_extra_T(inst, FeInstJump)->to;
-        return fe_new_chain(j);
+        return fe_chain_new(j);
     }
     case FE_RETURN: {
         FeInstReturn* inst_ret = extra;
         FeInst* ret = fe_ipool_alloc(f->ipool, 0);
         ret->kind = XR_RET;
         ret->ty = FE_TY_VOID;
-        FeInstChain chain = fe_new_chain(ret);
+        FeInstChain chain = fe_chain_new(ret);
         for_n(i, 0, inst_ret->len) {
             FeInst* arg = fe_return_arg(inst, i);
             FeInst* mov = mach_mov(f, arg);
@@ -289,13 +289,13 @@ FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst) {
     case FE_MACH_MOV:
     case FE_PHI:
     case FE_UPSILON:
-        return fe_new_chain(inst);
+        return fe_chain_new(inst);
     }
     fe_runtime_crash("xr_isel: unable to select inst kind %u", inst->kind);
-    return fe_new_chain(inst);
+    return fe_chain_new(inst);
 }
 
-static u16 reg_num(FeFunction* f, FeInst* inst) {
+static u16 reg_num(FeFunc* f, FeInst* inst) {
     FeVirtualReg* vr = fe_vreg(f->vregs, inst->vr_out);
     return vr->real;
 }
@@ -317,18 +317,18 @@ static u16 branch_inv_kind(u16 kind) {
 // after this, the function is not necessarily valid SSA
 // nor valid IR at all.
 // here be dragons!!!!!
-void xr_final_touchups(FeFunction* f) {
+void xr_final_touchups(FeFunc* f) {
 
     bool should_push_lr = false;
 
     // if this function contains a call, push the link register to the top of the stack frame.
     FeStackItem* lr_slot = nullptr;
     if (should_push_lr) {
-        lr_slot = fe_new_stack_item(4, 4);
+        lr_slot = fe_stack_item_new(4, 4);
         fe_stack_append_top(f, lr_slot);
     }
 
-    u32 stack_size = fe_calculate_stack_size(f);
+    u32 stack_size = fe_stack_calculate_size(f);
 
     // add stack spill at the beginning
     FeInst* lr = mach_reg(f, f->entry_block, XR_REG_LR);
@@ -386,7 +386,7 @@ void xr_final_touchups(FeFunction* f) {
                 [[fallthrough]];
             case FE_MACH_MOV:
                 if (reg_num(f, inst) == reg_num(f, unop->un)) {
-                    fe_inst_remove(inst);
+                    fe_inst_remove_pos(inst);
                 } else {
                     // turn it into a regular XR mov
                     FeInst* addi = create_mach(f, XR_MOV, FE_TY_I32, sizeof(XrRegImm16));
@@ -397,7 +397,7 @@ void xr_final_touchups(FeFunction* f) {
                 break;
             case FE_MACH_REG:
             case FE_PHI:
-                fe_inst_remove(inst);
+                fe_inst_remove_pos(inst);
                 break;
             case FE_MACH_STACK_SPILL:
                 // turn it into a store to sp
@@ -439,7 +439,7 @@ void xr_final_touchups(FeFunction* f) {
         
         // if its a jump to the very next block, remove it
         if (inst->kind == XR_J && fe_extra_T(inst, XrJump)->dest->flags == block->flags + 1) {
-            fe_inst_remove(inst);
+            fe_inst_remove_pos(inst);
             continue;
         }
 

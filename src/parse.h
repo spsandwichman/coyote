@@ -68,7 +68,7 @@ typedef struct {
 typedef struct {
     struct {
         FeModule* m; // module/compilation unit
-        FeFunction* f; // current function
+        FeFunc* f; // current function
         FeBlock* b; // current block
     } fe;
 

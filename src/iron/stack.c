@@ -8,7 +8,7 @@ static usize align_forward_p2(usize value, usize align) {
     return (value + (align - 1)) & ~(align - 1);
 }
 
-FeStackItem* fe_new_stack_item(u16 size, u16 align) {
+FeStackItem* fe_stack_item_new(u16 size, u16 align) {
     if (!is_pow2(align)) {
         fe_runtime_crash("stack item alignment must be power of two");
     }
@@ -21,7 +21,7 @@ FeStackItem* fe_new_stack_item(u16 size, u16 align) {
     return item;
 }
 
-FeStackItem* fe_stack_append_bottom(FeFunction* f, FeStackItem* item) {
+FeStackItem* fe_stack_append_bottom(FeFunc* f, FeStackItem* item) {
     if (f->stack_bottom == nullptr) {
         f->stack_bottom = item;
         f->stack_top = item;
@@ -34,7 +34,7 @@ FeStackItem* fe_stack_append_bottom(FeFunction* f, FeStackItem* item) {
     return item;
 }
 
-FeStackItem* fe_stack_append_top(FeFunction* f, FeStackItem* item) {
+FeStackItem* fe_stack_append_top(FeFunc* f, FeStackItem* item) {
     if (f->stack_top == nullptr) {
         f->stack_bottom = item;
         f->stack_top = item;
@@ -47,7 +47,7 @@ FeStackItem* fe_stack_append_top(FeFunction* f, FeStackItem* item) {
     return item;
 }
 
-u32 fe_calculate_stack_size(FeFunction* f) {
+u32 fe_stack_calculate_size(FeFunc* f) {
     u32 stack_size = 0;
 
     FeStackItem* item = f->stack_bottom;

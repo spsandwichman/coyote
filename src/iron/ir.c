@@ -1,15 +1,21 @@
 #include "iron.h"
 #include "iron/iron.h"
+#include <string.h>
 
-FeModule* fe_new_module(FeArch arch, FeSystem system) {
+FeModule* fe_module_new(FeArch arch, FeSystem system) {
     FeModule* mod = fe_malloc(sizeof(FeModule));
     memset(mod, 0, sizeof(FeModule));
     mod->target = fe_make_target(arch, system);
     return mod;
 }
 
+void fe_module_destroy(FeModule* mod) {
+    fe_free(mod->target);
+    fe_free(mod);
+}
+
 // if len == 0, calculate with strlen
-FeSymbol* fe_new_symbol(FeModule* m, const char* name, u16 len, FeSymbolBinding bind) {
+FeSymbol* fe_symbol_new(FeModule* m, const char* name, u16 len, FeSymbolBinding bind) {
     if (len == 0) {
         len = strlen(name);
     }
@@ -23,9 +29,14 @@ FeSymbol* fe_new_symbol(FeModule* m, const char* name, u16 len, FeSymbolBinding 
     return sym;
 }
 
-FeFuncSignature* fe_new_funcsig(FeCallConv cconv, u16 param_len, u16 return_len) {
-    FeFuncSignature* sig = fe_malloc(
-        sizeof(FeFuncSignature) + (param_len + return_len) * sizeof(sig->params[0])
+void fe_symbol_destroy(FeSymbol* sym) {
+    memset(sym, 0, sizeof(*sym));
+    fe_free(sym);
+}
+
+FeFuncSig* fe_funcsig_new(FeCallConv cconv, u16 param_len, u16 return_len) {
+    FeFuncSig* sig = fe_malloc(
+        sizeof(FeFuncSig) + (param_len + return_len) * sizeof(sig->params[0])
     );
     sig->cconv = cconv,
     sig->param_len = param_len;
@@ -33,25 +44,27 @@ FeFuncSignature* fe_new_funcsig(FeCallConv cconv, u16 param_len, u16 return_len)
     return sig;
 };
 
-FeFuncParam* fe_funcsig_param(FeFuncSignature* sig, usize index) {
+FeFuncParam* fe_funcsig_param(FeFuncSig* sig, u16 index) {
     if (index >= sig->param_len) {
         fe_runtime_crash("index > param_len");
     }
     return &sig->params[index];
 }
 
-FeFuncParam* fe_funcsig_return(FeFuncSignature* sig, usize index) {
-    if (index >= sig->param_len) {
-        fe_runtime_crash("index > param_len");
+FeFuncParam* fe_funcsig_return(FeFuncSig* sig, u16 index) {
+    if (index >= sig->return_len) {
+        fe_runtime_crash("index > return_len");
     }
     return &sig->params[sig->param_len + index];
 }
 
-FeBlock* fe_new_block(FeFunction* f) {
+void fe_funcsig_destroy(FeFuncSig* sig) {
+    fe_free(sig);
+}
+
+FeBlock* fe_block_new(FeFunc* f) {
     FeBlock* block = fe_malloc(sizeof(FeBlock));
     memset(block, 0, sizeof(*block));
-    block->list_next = nullptr;
-    block->list_prev = nullptr;
     
     // adds initial bookend instruction to block
     FeInst* bookend = fe_ipool_alloc(f->ipool, sizeof(FeInstBookend));
@@ -72,8 +85,32 @@ FeBlock* fe_new_block(FeFunction* f) {
     return block;
 }
 
-FeFunction* fe_new_function(FeModule* mod, FeSymbol* sym, FeFuncSignature* sig, FeInstPool* ipool, FeVRegBuffer* vregs) {
-    FeFunction* f = fe_malloc(sizeof(FeFunction));
+void fe_block_destroy(FeBlock *block) {
+    FeFunc* f = block->func;
+    for_inst(inst, block) {
+        fe_inst_free(f, inst);
+    };
+    fe_inst_free(f, block->bookend);
+    fe_free(block);
+}
+
+FeInstChain fe_chain_from_block(FeBlock* block) {
+    FeInstChain chain;
+    
+    // extract it from the block's inst list
+    chain.begin = block->bookend->next;
+    chain.end = block->bookend->prev;
+    chain.begin->prev = nullptr;
+    chain.end->next = nullptr;
+    
+    // remove it from the block
+    block->bookend->next = block->bookend;
+    block->bookend->prev = block->bookend;
+    return chain;
+}
+
+FeFunc* fe_func_new(FeModule* mod, FeSymbol* sym, FeFuncSig* sig, FeInstPool* ipool, FeVRegBuffer* vregs) {
+    FeFunc* f = fe_malloc(sizeof(FeFunc));
     memset(f, 0, sizeof(*f));
     f->sig = sig;
     f->mod = mod;
@@ -90,7 +127,7 @@ FeFunction* fe_new_function(FeModule* mod, FeSymbol* sym, FeFuncSignature* sig, 
     mod->funcs.first = f;
 
     // add initial basic block
-    f->entry_block = f->last_block = fe_new_block(f);
+    f->entry_block = f->last_block = fe_block_new(f);
 
     f->params = fe_malloc(sizeof(f->params[0]) * sig->param_len);
 
@@ -113,10 +150,24 @@ FeFunction* fe_new_function(FeModule* mod, FeSymbol* sym, FeFuncSignature* sig, 
     return f;
 }
 
-FeInst* fe_func_param(FeFunction* f, usize index) {
+void fe_func_destroy(FeFunc *f) {
+    fe_free(f->params);
+
+    // free the block list
+    for (FeBlock* block = f->entry_block, *next = block->list_next; block != nullptr; block = next, next = next->list_next) {
+        fe_block_destroy(block);
+    }
+
+    // free the block list
+    for (FeStackItem* item = f->stack_top, *next = item->next; item != nullptr; item = next, next = next->next) {
+        fe_free(item);
+    }
+}
+
+FeInst* fe_func_param(FeFunc* f, u16 index) {
     return f->params[index];
 }
-void fe_inst_update_uses(FeFunction* f) {
+void fe_inst_update_uses(FeFunc* f) {
     const FeTarget* t = f->mod->target;
 
     for_blocks(block, f) {
@@ -224,11 +275,11 @@ FeBlock** fe_inst_term_list_targets(const FeTarget* t, FeInst* term, usize* len_
     }
 }
 
-void fe_inst_free(FeFunction* f, FeInst* inst) {
+void fe_inst_free(FeFunc* f, FeInst* inst) {
     fe_ipool_free(f->ipool, inst);
 }
 
-FeInst* fe_inst_remove(FeInst* inst) {
+FeInst* fe_inst_remove_pos(FeInst* inst) {
     inst->next->prev = inst->prev;
     inst->prev->next = inst->next;
     inst->next = nullptr;
@@ -261,7 +312,7 @@ void fe_inst_replace_pos(FeInst* from, FeInst* to) {
     to->prev = from->prev;
 }
 
-FeInstChain fe_new_chain(FeInst* initial) {
+FeInstChain fe_chain_new(FeInst* initial) {
     FeInstChain chain = {0};
     chain.begin = initial;
     chain.end = initial;
@@ -305,7 +356,13 @@ void fe_chain_replace_pos(FeInst* from, FeInstChain to) {
     to.begin->prev = from->prev;
 }
 
-FeInst* fe_inst_const(FeFunction* f, FeTy ty, u64 val) {
+void fe_chain_destroy(FeFunc* f, FeInstChain chain) {
+    for (FeInst* inst = chain.begin, *next = inst->next; inst == nullptr; inst = next, next = next->next) {
+        fe_inst_free(f, inst);
+    }
+}
+
+FeInst* fe_inst_const(FeFunc* f, FeTy ty, u64 val) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstConst));
     inst->kind = FE_CONST;
     inst->ty = ty;
@@ -313,7 +370,7 @@ FeInst* fe_inst_const(FeFunction* f, FeTy ty, u64 val) {
     return inst;
 }
 
-FeInst* fe_inst_unop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* val) {
+FeInst* fe_inst_unop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* val) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstUnop));
     inst->kind = kind;
     inst->ty = ty;
@@ -321,7 +378,7 @@ FeInst* fe_inst_unop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* val) {
     return inst;
 }
 
-FeInst* fe_inst_binop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs) {
+FeInst* fe_inst_binop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstBinop));
     inst->kind = kind;
     inst->ty = ty;
@@ -340,14 +397,14 @@ FeInst* fe_inst_binop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeIn
     return inst;
 }
 
-FeInst* fe_inst_bare(FeFunction* f, FeTy ty, FeInstKind kind) {
+FeInst* fe_inst_bare(FeFunc* f, FeTy ty, FeInstKind kind) {
     FeInst* inst = fe_ipool_alloc(f->ipool, 0);
     inst->kind = kind;
     inst->ty = ty;
     return inst;
 }
 
-FeInst* fe_inst_return(FeFunction* f) {
+FeInst* fe_inst_return(FeFunc* f) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstReturn));
     inst->kind = FE_RETURN;
     FeInstReturn* ret = fe_extra_T(inst, FeInstReturn);
@@ -376,7 +433,7 @@ FeInst* fe_return_arg(FeInst* ret, usize index) {
     }
 }
 
-void fe_set_return_arg(FeInst* ret, usize index, FeInst* arg) {
+void fe_return_set_arg(FeInst* ret, usize index, FeInst* arg) {
     FeInstReturn* r = fe_extra_T(ret, FeInstReturn);
     if (index >= r->len) {
         fe_runtime_crash("index >= ret->len");
@@ -391,7 +448,7 @@ void fe_set_return_arg(FeInst* ret, usize index, FeInst* arg) {
     }
 }
 
-FeInst* fe_inst_branch(FeFunction* f, FeInst* cond, FeBlock* if_true, FeBlock* if_false) {
+FeInst* fe_inst_branch(FeFunc* f, FeInst* cond, FeBlock* if_true, FeBlock* if_false) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstBranch));
     inst->kind = FE_BRANCH;
     FeInstBranch* branch = fe_extra(inst);
@@ -401,7 +458,7 @@ FeInst* fe_inst_branch(FeFunction* f, FeInst* cond, FeBlock* if_true, FeBlock* i
     return inst;
 }
 
-FeInst* fe_inst_jump(FeFunction* f, FeBlock* to) {
+FeInst* fe_inst_jump(FeFunc* f, FeBlock* to) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstJump));
     inst->kind = FE_JUMP;
     FeInstJump* jump = fe_extra(inst);
@@ -409,7 +466,7 @@ FeInst* fe_inst_jump(FeFunction* f, FeBlock* to) {
     return inst;
 }
 
-FeInst* fe_inst_phi(FeFunction* f, FeTy ty, u16 num_srcs) {
+FeInst* fe_inst_phi(FeFunc* f, FeTy ty, u16 num_srcs) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstPhi));
     inst->kind = FE_PHI;
     inst->ty = ty;
@@ -470,7 +527,7 @@ void fe_phi_remove_src_unordered(FeInst* inst, u16 index) {
     phi->len -= 1;
 }
 
-FeInst* fe_inst_call_direct(FeFunction* f, FeFunction* to_call) {
+FeInst* fe_inst_call_direct(FeFunc* f, FeFunc* to_call) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstCallDirect));
     inst->kind = FE_CALL_DIRECT;
     FeInstCallDirect* call = fe_extra(inst);
@@ -497,7 +554,7 @@ FeInst* fe_inst_call_direct(FeFunction* f, FeFunction* to_call) {
     return inst;
 }
 
-FeInst* fe_inst_call_indirect(FeFunction* f, FeInst* to_call, FeFuncSignature* sig) {
+FeInst* fe_inst_call_indirect(FeFunc* f, FeInst* to_call, FeFuncSig* sig) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstCallIndirect));
     inst->kind = FE_CALL_INDIRECT;
     FeInstCallIndirect* call = fe_extra(inst);
@@ -538,7 +595,7 @@ FeInst* fe_call_arg(FeInst* call, usize index) {
     }
 }
 
-void fe_set_call_arg(FeInst* call, usize index, FeInst* arg) {
+void fe_call_set_arg(FeInst* call, usize index, FeInst* arg) {
     // direct/indirect calls have the same param list layout, so its fine
     FeInstCallDirect* c = fe_extra(call);
     if (index >= c->len) {

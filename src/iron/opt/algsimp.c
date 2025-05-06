@@ -68,7 +68,7 @@ static FeInst* identity(FeInst* inst) {
     return inst;
 }
 
-void fe_opt_algsimp(FeFunction* f) {
+void fe_opt_algsimp(FeFunc* f) {
     const FeTarget* t = f->mod->target;
 
     for_blocks(b, f) {

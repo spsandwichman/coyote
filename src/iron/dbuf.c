@@ -5,9 +5,10 @@
 
 // data buffer functions
 
-void fe_db_init(FeDataBuffer* buf, usize initial_capacity) {
-    buf->at = fe_malloc(initial_capacity);
-    buf->cap = initial_capacity;
+void fe_db_init(FeDataBuffer* buf, usize cap) {
+    if (cap < 2) cap = 2;
+    buf->at = fe_malloc(cap);
+    buf->cap = cap;
     buf->len = 0;
 }
 
@@ -28,8 +29,7 @@ void fe_db_reserve(FeDataBuffer* buf, usize more) {
     if (buf->cap >= buf->len + more) return;
 
     while (buf->cap < buf->len + more) {
-        buf->cap *= 3;
-        buf->cap /= 2;
+        buf->cap += buf->cap >> 1;
     }
 
     buf->at = fe_realloc(buf->at, buf->cap);
@@ -94,4 +94,9 @@ usize fe_db_writef(FeDataBuffer* buf, const char* fmt, ...) {
     usize len = vsprintf(chars, fmt, varargs);
     fe_db_writecstr(buf, chars);
     return len;
+}
+
+void fe_db_destroy(FeDataBuffer* buf) {
+    fe_free(buf->at);
+    *buf = (FeDataBuffer){};
 }

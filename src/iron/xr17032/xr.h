@@ -157,15 +157,15 @@ const char* xr_inst_name(FeInstKind kind, bool ir);
 const char* xr_reg_name(u8 regclass, u16 real);
 FeRegStatus xr_reg_status(u8 cconv, u8 regclass, u16 real);
 
-void xr_print_args(FeFunction* f, FeDataBuffer* db, FeInst* inst);
+void xr_print_args(FeDataBuffer* db, FeFunc* f, FeInst* inst);
 FeInst** xr_list_inputs(FeInst* inst, usize* len_out);
 FeBlock** xr_term_list_targets(FeInst* term, usize* len_out);
 
-FeInstChain xr_isel(FeFunction* f, FeBlock* block, FeInst* inst);
-void xr_pre_regalloc_opt(FeFunction* f);
-void xr_final_touchups(FeFunction* f);
+FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst);
+void xr_pre_regalloc_opt(FeFunc* f);
+void xr_final_touchups(FeFunc* f);
 
-void xr_emit_assembly(FeFunction* f, FeDataBuffer* db);
+void xr_emit_assembly(FeDataBuffer* db, FeFunc* f);
 
 FeRegclass xr_choose_regclass(FeInstKind kind, FeTy ty);
 

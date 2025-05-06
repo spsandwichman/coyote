@@ -8,12 +8,26 @@ static void number(FeCFGNode* n, usize* rev_post) {
     n->rev_post = ++*rev_post;
 }
 
-void fe_calculate_cfg(FeFunction* f) {
+void fe_cfg_destroy(FeFunc* f) {
+    for (FeBlock* b = f->entry_block; b != nullptr; b = b->list_next) {
+        if (b->cfg_node) {
+            fe_free(b->cfg_node->ins);
+            fe_free(b->cfg_node);
+        }
+        b->cfg_node = nullptr;
+    }
+}
+
+void fe_cfg_calculate(FeFunc* f) {
     const FeTarget* target = f->mod->target;
     {
         usize i = 0;
         for (FeBlock* b = f->entry_block; b != nullptr; b = b->list_next) {
             b->flags = i++;
+            if (b->cfg_node) {
+                fe_free(b->cfg_node->ins);
+                fe_free(b->cfg_node);
+            }
             FeCFGNode* cfgn = fe_malloc(sizeof(FeCFGNode));
             b->cfg_node = cfgn;
             cfgn->block = b;
@@ -46,7 +60,7 @@ void fe_calculate_cfg(FeFunction* f) {
         FeBlock** outs = fe_inst_term_list_targets(target, term, &outs_len);
 
         usize size = sizeof(b->cfg_node->ins[0]) * (b->cfg_node->in_len + outs_len);
-        b->cfg_node->ins = malloc(size);
+        b->cfg_node->ins = fe_malloc(size);
         memset(b->cfg_node->ins, 0, size);
         for_n(i, 0, outs_len) {
             fe_cfgn_out(b->cfg_node, i) = outs[i]->cfg_node;

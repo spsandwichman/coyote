@@ -3,9 +3,20 @@
 #include "iron.h"
 
 void fe_vrbuf_init(FeVRegBuffer* buf, usize cap) {
+    if (cap < 2) cap = 2;
     buf->len = 0;
     buf->cap = cap;
     buf->at = fe_malloc(cap * sizeof(buf->at[0]));
+}
+
+void fe_vrbuf_clear(FeVRegBuffer* buf) {
+    // memset(buf->at, 0, buf->len * sizeof(buf->at[0]));
+    buf->len = 0;
+}
+
+void fe_vrbuf_destroy(FeVRegBuffer* buf) {
+    fe_free(buf->at);
+    *buf = (FeVRegBuffer){};
 }
 
 FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class) {
@@ -29,7 +40,7 @@ FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr) {
     return &buf->at[vr];
 }
 
-static void insert_upsilon(FeFunction* f) {
+static void insert_upsilon(FeFunc* f) {
     for_blocks(block, f) {
         for_inst(inst, block) {
             if (inst->kind != FE_PHI) continue;
@@ -53,7 +64,7 @@ typedef struct {
     FeInst* from;
 } InstPair;
 
-void fe_codegen(FeFunction* f) {
+void fe_codegen(FeFunc* f) {
 
     insert_upsilon(f);
 
@@ -146,6 +157,6 @@ void fe_codegen(FeFunction* f) {
     printf("codegen complete\n");
 }
 
-void fe_emit_asm(FeFunction* f, FeDataBuffer* db) {
-    f->mod->target->emit_asm(f, db);
+void fe_emit_asm(FeDataBuffer* db, FeFunc* f) {
+    f->mod->target->emit_asm(db, f);
 }

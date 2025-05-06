@@ -37,11 +37,11 @@ static bool add_live_out(FeBlockLiveness* lv, FeVReg vr) {
     return true;
 }
 
-static void calculate_liveness(FeFunction* f) {
+static void calculate_liveness(FeFunc* f) {
     const FeTarget* t = f->mod->target;
 
     // make sure cfg is updated.
-    fe_calculate_cfg(f);
+    fe_cfg_calculate(f);
 
     // give every basic block a liveness chunk.
     for_blocks(block, f) {
@@ -124,7 +124,7 @@ bool is_live(LiveSet* lvset, u8 regclass, u16 reg) {
     return lvset->reg_live[regclass][reg];
 }
 
-void fe_regalloc_linear_scan(FeFunction* f) {
+void fe_regalloc_linear_scan(FeFunc* f) {
     FeVRegBuffer* vbuf = f->vregs;
     const FeTarget* target = f->mod->target;
     calculate_liveness(f);

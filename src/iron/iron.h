@@ -65,7 +65,7 @@ typedef enum: u8 {
     // member types dependent on source inst
     FE_TY_TUPLE,
 
-    FE_TY_V128 = 0b010000,
+    FE_TY_V128 = 0b010000, // elem type fits in lower 4 bits
     FE_TY_V256 = 0b100000,
     FE_TY_V512 = 0b110000,
 
@@ -124,8 +124,8 @@ typedef enum: u8 {
 typedef struct FeInst FeInst;
 typedef struct FeBlock FeBlock;
 typedef struct FeSymbol FeSymbol;
-typedef struct FeFunction FeFunction;
-typedef struct FeFuncSignature FeFuncSignature;
+typedef struct FeFunc FeFunc;
+typedef struct FeFuncSig FeFuncSig;
 typedef struct FeModule FeModule;
 typedef struct FeTarget FeTarget;
 typedef struct FeStackItem FeStackItem;
@@ -157,7 +157,7 @@ typedef struct FeSymbol {
     FeSymbolBinding bind; // where is this symbol visible?
 
     union {
-        FeFunction* func;
+        FeFunc* func;
     };
 } FeSymbol;
 
@@ -166,38 +166,38 @@ typedef struct FeFuncParam {
 } FeFuncParam;
 
 // holds type/interface information about a function.
-typedef struct FeFuncSignature {
+typedef struct FeFuncSig {
     FeCallConv cconv;
     u16 param_len;
     u16 return_len;
     FeFuncParam params[];
-} FeFuncSignature;
+} FeFuncSig;
 
-typedef struct FeFunction {
-    FeFuncSignature* sig;
+typedef struct FeFunc {
+    FeFuncSig* sig;
     FeSymbol* sym;
     FeModule* mod;
 
     FeInstPool* ipool;
     FeVRegBuffer* vregs;
 
-    FeInst** params;
+    FeInst** params; // gets length of params from signature
 
     FeBlock* entry_block;
     FeBlock* last_block;
     
-    FeFunction* list_next;
-    FeFunction* list_prev;
+    FeFunc* list_next;
+    FeFunc* list_prev;
 
     FeStackItem* stack_top; // most-positive offset from stack pointer
     FeStackItem* stack_bottom;
-} FeFunction;
+} FeFunc;
 
 typedef struct FeModule {
     const FeTarget* target;
     struct {
-        FeFunction* first;
-        FeFunction* last;
+        FeFunc* first;
+        FeFunc* last;
     } funcs;
 } FeModule;
 
@@ -215,7 +215,7 @@ typedef struct FeCFGNode {
 #define fe_cfgn_out(cfgn, i) ((cfgn)->ins[i + (cfgn)->in_len])
 
 typedef struct FeBlock {
-    FeFunction* func;
+    FeFunc* func;
     u32 flags;
     FeInst* bookend;
 
@@ -229,16 +229,16 @@ typedef struct FeBlock {
 } FeBlock;
 
 #define for_funcs(f, modptr) \
-    for (FeFunction* f = (modptr)->funcs.first; f != nullptr; f = f->list_next)
+    for (FeFunc* f = (modptr)->funcs.first; f != nullptr; f = f->list_next)
 
 #define for_blocks(block, funcptr) \
     for (FeBlock* block = (funcptr)->entry_block; block != nullptr; block = block->list_next)
 
 #define for_inst(inst, blockptr) \
-    for (FeInst* inst = (blockptr)->bookend->next, *_prev_ = inst->next; inst->kind != FE_BOOKEND; inst = _prev_, _prev_ = _prev_->next)
+    for (FeInst* inst = (blockptr)->bookend->next, *_next_ = inst->next; inst->kind != FE_BOOKEND; inst = _next_, _next_ = _next_->next)
 
 #define for_inst_reverse(inst, blockptr) \
-    for (FeInst* inst = (blockptr)->bookend->prev, *_next_ = inst->prev; inst->kind != FE_BOOKEND; inst = _next_, _next_ = _next_->prev)
+    for (FeInst* inst = (blockptr)->bookend->prev, *_prev_ = inst->prev; inst->kind != FE_BOOKEND; inst = _prev_, _prev_ = _prev_->prev)
 
 typedef u16 FeInstKind;
 typedef enum: FeInstKind {
@@ -423,7 +423,7 @@ typedef struct {
         FeInst** multi_arg;
     };
 
-    FeFunction* to_call;
+    FeFunc* to_call;
 } FeInstCallDirect;
 
 typedef struct {
@@ -435,7 +435,7 @@ typedef struct {
     };
 
     FeInst* to_call;
-    FeFuncSignature* sig;
+    FeFuncSig* sig;
 } FeInstCallIndirect;
 
 typedef struct {
@@ -459,10 +459,10 @@ typedef struct FeStackItem {
     u32 _offset;
 } FeStackItem;
 
-FeStackItem* fe_new_stack_item(u16 size, u16 align);
-FeStackItem* fe_stack_append_bottom(FeFunction* f, FeStackItem* item);
-FeStackItem* fe_stack_append_top(FeFunction* f, FeStackItem* item);
-u32 fe_calculate_stack_size(FeFunction* f);
+FeStackItem* fe_stack_item_new(u16 size, u16 align);
+FeStackItem* fe_stack_append_bottom(FeFunc* f, FeStackItem* item);
+FeStackItem* fe_stack_append_top(FeFunc* f, FeStackItem* item);
+u32 fe_stack_calculate_size(FeFunc* f);
 
 typedef enum : u16 {
     // x op y == y op x
@@ -499,27 +499,34 @@ usize fe_inst_extra_size(FeInstKind kind);
 usize fe_inst_extra_size_unsafe(FeInstKind kind);
 void fe__load_extra_size_table(usize start_index, u8* table, usize len);
 
-FeModule* fe_new_module(FeArch arch, FeSystem system);
-FeSymbol* fe_new_symbol(FeModule* m, const char* name, u16 len, FeSymbolBinding bind);
+FeModule* fe_module_new(FeArch arch, FeSystem system);
+void fe_module_destroy(FeModule* mod);
 
-FeFuncSignature* fe_new_funcsig(FeCallConv cconv, u16 param_len, u16 return_len);
-FeFuncParam* fe_funcsig_param(FeFuncSignature* sig, usize index);
-FeFuncParam* fe_funcsig_return(FeFuncSignature* sig, usize index);
+FeSymbol* fe_symbol_new(FeModule* mod, const char* name, u16 len, FeSymbolBinding bind);
+void fe_symbol_destroy(FeSymbol* sym);
 
-FeBlock* fe_new_block(FeFunction* f);
-FeFunction* fe_new_function(
-    FeModule* mod, 
-    FeSymbol* sym, 
-    FeFuncSignature* sig, 
-    FeInstPool* ipool, 
+FeFuncSig* fe_funcsig_new(FeCallConv cconv, u16 param_len, u16 return_len);
+FeFuncParam* fe_funcsig_param(FeFuncSig* sig, u16 index);
+FeFuncParam* fe_funcsig_return(FeFuncSig* sig, u16 index);
+void fe_funcsig_destroy(FeFuncSig* sig);
+
+FeBlock* fe_block_new(FeFunc* f);
+void fe_block_destroy(FeBlock* block);
+
+FeFunc* fe_func_new(
+    FeModule* mod,
+    FeSymbol* sym,
+    FeFuncSig* sig,
+    FeInstPool* ipool,
     FeVRegBuffer* vregs);
-FeInst* fe_func_param(FeFunction* f, usize index);
+void fe_func_destroy(FeFunc* f);
+FeInst* fe_func_param(FeFunc* f, u16 index);
 
 FeInst* fe_insert_before(FeInst* point, FeInst* i);
 FeInst* fe_insert_after(FeInst* point, FeInst* i);
 #define fe_append_begin(block, inst) fe_insert_after((block)->bookend, inst)
 #define fe_append_end(block, inst) fe_insert_before((block)->bookend, inst)
-FeInst* fe_inst_remove(FeInst* inst);
+FeInst* fe_inst_remove_pos(FeInst* inst);
 void fe_inst_replace_pos(FeInst* from, FeInst* to);
 
 // a "chain" is a free-floating (not attached to a block)
@@ -529,36 +536,37 @@ typedef struct FeInstChain {
     FeInst* end;
 } FeInstChain;
 
-FeInstChain fe_new_chain(FeInst* initial);
+FeInstChain fe_chain_new(FeInst* initial);
 FeInstChain fe_chain_append_end(FeInstChain chain, FeInst* i);
 FeInstChain fe_chain_append_begin(FeInstChain chain, FeInst* i);
 void fe_insert_chain_before(FeInst* point, FeInstChain chain);
 void fe_insert_chain_after(FeInst* point, FeInstChain chain);
 void fe_chain_replace_pos(FeInst* from, FeInstChain to);
+void fe_chain_destroy(FeFunc* f, FeInstChain chain);
 
-void fe_inst_free(FeFunction* f, FeInst* inst);
-void fe_inst_update_uses(FeFunction* f);
+void fe_inst_free(FeFunc* f, FeInst* inst);
+void fe_inst_update_uses(FeFunc* f);
 FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out);
 FeBlock** fe_inst_term_list_targets(const FeTarget* t, FeInst* term, usize* len_out);
 
 FeTy fe_proj_ty(FeInst* tuple, usize index);
 
-FeInst* fe_inst_const(FeFunction* f, FeTy ty, u64 val);
-FeInst* fe_inst_unop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* val);
-FeInst* fe_inst_binop(FeFunction* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs);
-FeInst* fe_inst_bare(FeFunction* f, FeTy ty, FeInstKind kind);
-FeInst* fe_inst_call_direct(FeFunction* f, FeFunction* to_call);
-FeInst* fe_inst_call_indirect(FeFunction* f, FeInst* to_call, FeFuncSignature* sig);
+FeInst* fe_inst_const(FeFunc* f, FeTy ty, u64 val);
+FeInst* fe_inst_unop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* val);
+FeInst* fe_inst_binop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs);
+FeInst* fe_inst_bare(FeFunc* f, FeTy ty, FeInstKind kind);
+FeInst* fe_inst_call_direct(FeFunc* f, FeFunc* to_call);
+FeInst* fe_inst_call_indirect(FeFunc* f, FeInst* to_call, FeFuncSig* sig);
 FeInst* fe_call_arg(FeInst* call, usize index);
-void fe_set_call_arg(FeInst* call, usize index, FeInst* arg);
-FeInst* fe_inst_return(FeFunction* f);
+void fe_call_set_arg(FeInst* call, usize index, FeInst* arg);
+FeInst* fe_inst_return(FeFunc* f);
 FeInst* fe_return_arg(FeInst* ret, usize index);
-void fe_set_return_arg(FeInst* ret, usize index, FeInst* arg);
+void fe_return_set_arg(FeInst* ret, usize index, FeInst* arg);
 
-FeInst* fe_inst_branch(FeFunction* f, FeInst* cond, FeBlock* if_true, FeBlock* if_false);
-FeInst* fe_inst_jump(FeFunction* f, FeBlock* to);
+FeInst* fe_inst_branch(FeFunc* f, FeInst* cond, FeBlock* if_true, FeBlock* if_false);
+FeInst* fe_inst_jump(FeFunc* f, FeBlock* to);
 
-FeInst* fe_inst_phi(FeFunction* f, FeTy ty, u16 num_srcs);
+FeInst* fe_inst_phi(FeFunc* f, FeTy ty, u16 num_srcs);
 FeInst* fe_phi_get_src_val(FeInst* inst, u16 index);
 FeBlock* fe_phi_get_src_block(FeInst* inst, u16 index);
 void fe_phi_set_src(FeInst* inst, u16 index, FeInst* val, FeBlock* block);
@@ -587,12 +595,13 @@ void fe_ipool_free(FeInstPool* pool, FeInst* inst);
 usize fe_ipool_free_manual(FeInstPool* pool, FeInst* inst);
 void fe_ipool_destroy(FeInstPool* pool);
 
-// ------------------------------- opt -------------------------------
+// ----------------------------- passes ------------------------------
 
-void fe_calculate_cfg(FeFunction* f);
+void fe_cfg_calculate(FeFunc* f);
+void fe_cfg_destroy(FeFunc* f);
 
-void fe_opt_tdce(FeFunction* f);
-void fe_opt_algsimp(FeFunction* f);
+void fe_opt_tdce(FeFunc* f);
+void fe_opt_algsimp(FeFunc* f);
 
 // ------------------------------ utils ------------------------------
 
@@ -603,8 +612,9 @@ typedef struct FeDataBuffer {
     usize cap;
 } FeDataBuffer;
 
-void fe_db_init(FeDataBuffer* buf, usize initial_capacity);
+void fe_db_init(FeDataBuffer* buf, usize cap);
 void fe_db_clone(FeDataBuffer* dst, FeDataBuffer* src);
+void fe_db_destroy(FeDataBuffer* buf) ;
 
 char* fe_db_clone_to_cstring(FeDataBuffer* buf);
 
@@ -624,9 +634,9 @@ usize fe_db_write32(FeDataBuffer* buf, u32 data);
 usize fe_db_write64(FeDataBuffer* buf, u64 data);
 usize fe_db_writef(FeDataBuffer* buf, const char* fmt, ...);
 
-void fe_print_func(FeDataBuffer* db, FeFunction* f);
-void fe__print_block(FeFunction* f, FeDataBuffer* db, FeBlock* ref);
-void fe__print_ref(FeFunction* f, FeDataBuffer* db, FeInst* ref);
+void fe_print_func(FeDataBuffer* db, FeFunc* f);
+void fe__print_block(FeDataBuffer* db, FeFunc* f, FeBlock* ref);
+void fe__print_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref);
 
 // crash at runtime with a stack trace (if available)
 [[noreturn]] void fe_runtime_crash(const char* error, ...);
@@ -683,15 +693,13 @@ typedef struct FeTarget {
     FeArch arch;
     FeSystem system;
 
-    void (*ir_print_args)(FeFunction* f, FeDataBuffer* db, FeInst* inst);
-
     const char* (*inst_name)(FeInstKind kind, bool ir);
     FeInst** (*list_inputs)(FeInst* inst, usize* len_out);
     FeBlock** (*list_targets)(FeInst* term, usize* len_out);
 
-    FeInstChain (*isel)(FeFunction* f, FeBlock* block, FeInst* inst);
-    void (*pre_regalloc_opt)(FeFunction* f);
-    void (*final_touchups)(FeFunction* f);
+    FeInstChain (*isel)(FeFunc* f, FeBlock* block, FeInst* inst);
+    void (*pre_regalloc_opt)(FeFunc* f);
+    void (*final_touchups)(FeFunc* f);
 
     FeRegclass (*choose_regclass)(FeInstKind kind, FeTy ty);
     const char* (*reg_name)(u8 regclass, u16 real);
@@ -702,18 +710,22 @@ typedef struct FeTarget {
 
     u64 stack_pointer_align;
 
-    void (*emit_asm)(FeFunction* f, FeDataBuffer* db);
+    void (*ir_print_args)(FeDataBuffer* db, FeFunc* f, FeInst* inst);
+    void (*emit_asm)(FeDataBuffer* db, FeFunc* f);
 } FeTarget;
 
 const FeTarget* fe_make_target(FeArch arch, FeSystem system);
 
-void fe_regalloc_linear_scan(FeFunction* f);
+void fe_regalloc_linear_scan(FeFunc* f);
 
 void fe_vrbuf_init(FeVRegBuffer* buf, usize cap);
+void fe_vrbuf_clear(FeVRegBuffer* buf);
+void fe_vrbuf_destroy(FeVRegBuffer* buf);
+
 FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class);
 FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr);
 
-void fe_codegen(FeFunction* f);
-void fe_emit_asm(FeFunction* f, FeDataBuffer* db);
+void fe_codegen(FeFunc* f);
+void fe_emit_asm(FeDataBuffer* db, FeFunc* f);
 
 #endif

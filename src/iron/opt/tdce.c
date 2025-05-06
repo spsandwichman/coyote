@@ -33,7 +33,7 @@ static void worklist_destroy(Worklist* wl) {
 
 #define TDCE_DEAD_LMAO 0xDEADDEAD
 
-void fe_opt_tdce(FeFunction* f) {
+void fe_opt_tdce(FeFunc* f) {
     const FeTarget* t = f->mod->target;
 
     // TODO fuck all these worklists into OUTERED SPACE
@@ -84,7 +84,7 @@ void fe_opt_tdce(FeFunction* f) {
         if (dead.at[i]->flags == 0) {
             continue;
         }
-        fe_inst_remove(dead.at[i]); // remove from block
+        fe_inst_remove_pos(dead.at[i]); // remove from block
         worklist_push(&to_free, dead.at[i]);
         dead.at[i]->flags = 0;
     }
