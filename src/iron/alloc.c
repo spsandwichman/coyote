@@ -64,6 +64,8 @@ struct Fe__InstPoolFreeSpace {
 
 static Fe__InstPoolChunk* ipool_new_chunk() {
     Fe__InstPoolChunk* chunk = fe_malloc(sizeof(Fe__InstPoolChunk));
+    chunk->next = nullptr;
+    chunk->used = 0;
     chunk->backstop = 0xFF;
     return chunk;
 }

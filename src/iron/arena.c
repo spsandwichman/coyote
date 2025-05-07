@@ -51,7 +51,7 @@ void* fe_arena_alloc(FeArena* arena, usize size, usize align) {
 
     Fe__ArenaChunk* new_chunk = arena->top->next;
     if (new_chunk == NULL) {
-        fe_malloc(sizeof(*new_chunk));
+        new_chunk = fe_malloc(sizeof(*new_chunk));
         new_chunk->prev = arena->top;
         new_chunk->next = nullptr;
         arena->top->next = new_chunk;
