@@ -21,21 +21,21 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // SrcFile f = {
-    //     .src = fs_read_entire(file),
-    //     .path = fs_from_path(&file->path),
-    // };
+    SrcFile f = {
+        .src = fs_read_entire(file),
+        .path = fs_from_path(&file->path),
+    };
 
-    // Context ctx = lex_entrypoint(&f);
-    // for_n(i, 0, ctx.tokens_len) {
-    //     Token* t = &ctx.tokens[i];
-    //     if (_TOK_LEX_IGNORE < t->kind && t->kind < _TOK_PREPROC_TRANSPARENT_END) {
-    //         // printf("%s ", token_kind[t->kind]);
-    //         continue;
-    //     }
-    //     // printf(str_fmt, str_arg(tok_span(*t)));
-    //     token_error(&ctx, i, i + 3, "error on 'x'");
-    //     break;
-    //     // printf(" ");
-    // }
+    Context ctx = lex_entrypoint(&f);
+    for_n(i, 0, ctx.tokens_len) {
+        Token* t = &ctx.tokens[i];
+        if (_TOK_LEX_IGNORE < t->kind && t->kind < _TOK_PREPROC_TRANSPARENT_END) {
+            // printf("%s ", token_kind[t->kind]);
+            continue;
+        }
+        printf(str_fmt, str_arg(tok_span(*t)));
+        // token_error(&ctx, i, i + 3, "error on 'x'");
+        // break;
+        printf(" ");
+    }
 }

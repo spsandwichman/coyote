@@ -3,6 +3,7 @@
 *.d
 *.exe
 coyote
+./iron
 .vscode
 gmon.out
 .clangd

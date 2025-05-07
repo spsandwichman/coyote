@@ -6,7 +6,6 @@
 #include "lex.h"
 #include <stdint.h>
 #include <string.h>
-#include <winnt.h>
 
 static struct {
     TyBufSlot* at;

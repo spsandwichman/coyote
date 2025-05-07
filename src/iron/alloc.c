@@ -120,7 +120,7 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
     FeInstPoolChunk* new_chunk = ipool_new_chunk();
     new_chunk->next = pool->top;
     pool->top = new_chunk;
-    new_chunk->used += node_slots;
+    new_chunk->used = node_slots;
     FeInst* inst = (FeInst*) &new_chunk->data;
     return init_inst(inst);
 }
