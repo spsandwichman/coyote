@@ -121,7 +121,7 @@ static int ansi(usize x) {
     }
 }
 
-_Thread_local static bool should_ansi = true;
+thread_local static bool should_ansi = true;
 
 static void print_inst_ty(FeDataBuffer* db, FeInst* inst) {
     if (inst->ty == FE_TY_TUPLE) {
