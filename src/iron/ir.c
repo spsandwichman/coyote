@@ -81,12 +81,27 @@ FeBlock* fe_block_new(FeFunc* f) {
         block->list_prev = last;
         last->list_next = block;
         f->last_block = block;
+    } else {
+        f->last_block = f->entry_block = block;
     }
     return block;
 }
 
 void fe_block_destroy(FeBlock *block) {
     FeFunc* f = block->func;
+
+    // remove from linked list
+    if (block->list_next) {
+        block->list_next->list_prev = block->list_prev;
+    } else {
+        f->last_block = block->list_prev;
+    }
+    if (block->list_prev) {
+        block->list_prev->list_next = block->list_next;
+    } else {
+        f->entry_block = block->list_next;
+    }
+
     for_inst(inst, block) {
         fe_inst_free(f, inst);
     };
@@ -157,11 +172,24 @@ void fe_func_destroy(FeFunc *f) {
     for (FeBlock* block = f->entry_block, *next = block->list_next; block != nullptr; block = next, next = next->list_next) {
         fe_block_destroy(block);
     }
-
-    // free the block list
+    
+    // free the stack
     for (FeStackItem* item = f->stack_top, *next = item->next; item != nullptr; item = next, next = next->next) {
         fe_free(item);
     }
+
+    // remove from linked list
+    if (f->list_next) {
+        f->list_next->list_prev = f->list_prev;
+    } else {
+        f->mod->funcs.last = f->list_prev;
+    }
+    if (f->list_prev) {
+        f->list_prev->list_next = f->list_next;
+    } else {
+        f->mod->funcs.first = f->list_next;
+    }
+
 }
 
 FeInst* fe_func_param(FeFunc* f, u16 index) {
