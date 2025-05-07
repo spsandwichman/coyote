@@ -50,28 +50,27 @@ usize fe_inst_extra_size(FeInstKind kind) {
 }
 
 #define IPOOL_CHUNK_DATA_SIZE 4096
-struct FeInstPoolChunk {
-    FeInstPoolChunk* next;
+struct Fe__InstPoolChunk {
+    Fe__InstPoolChunk* next;
     usize used;
     usize data[IPOOL_CHUNK_DATA_SIZE];
     // set to non-zero so slot reclaimer doesn't
     // walk off the end of the chunk data on accident
     usize backstop;
 };
-
-struct FeInstPoolFreeSpace {
-    FeInstPoolFreeSpace* next;
+struct Fe__InstPoolFreeSpace {
+    Fe__InstPoolFreeSpace* next;
 };
 
-static FeInstPoolChunk* ipool_new_chunk() {
-    FeInstPoolChunk* chunk = fe_malloc(sizeof(FeInstPoolChunk));
+static Fe__InstPoolChunk* ipool_new_chunk() {
+    Fe__InstPoolChunk* chunk = fe_malloc(sizeof(Fe__InstPoolChunk));
     chunk->backstop = 0xFF;
     return chunk;
 }
 
 void fe_ipool_init(FeInstPool* pool) {
     pool->top = ipool_new_chunk();
-    for_n(i, 0, FE_IPOOL_FREE_SPACES_LEN) {
+    for_n(i, 0, FE__IPOOL_FREE_SPACES_LEN) {
         pool->free_spaces[i] = nullptr;
     }
 }
@@ -117,7 +116,7 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
     // converted into a free space. not a huge concern but just a small thing
 
     // we need to make a new block and allocate on this.
-    FeInstPoolChunk* new_chunk = ipool_new_chunk();
+    Fe__InstPoolChunk* new_chunk = ipool_new_chunk();
     new_chunk->next = pool->top;
     pool->top = new_chunk;
     new_chunk->used = node_slots;
@@ -133,12 +132,12 @@ void fe_ipool_free(FeInstPool* pool, FeInst* inst) {
 
     // reclaim slots
     usize size_class = extra_size / sizeof(pool->top->data[0]);
-    while (size_class < FE_IPOOL_FREE_SPACES_LEN - 1 && extra[size_class] == 0) {
+    while (size_class < FE__IPOOL_FREE_SPACES_LEN - 1 && extra[size_class] == 0) {
         size_class += 1;
     }
 
     // add to free list
-    FeInstPoolFreeSpace* free_space = (FeInstPoolFreeSpace*)inst;
+    Fe__InstPoolFreeSpace* free_space = (Fe__InstPoolFreeSpace*)inst;
     free_space->next = pool->free_spaces[size_class];
     pool->free_spaces[size_class] = free_space;
 }
@@ -153,7 +152,7 @@ usize fe_ipool_free_manual(FeInstPool* pool, FeInst* inst) {
 
     // reclaim slots
     usize size_class = extra_size / sizeof(pool->top->data[0]);
-    while (size_class < FE_IPOOL_FREE_SPACES_LEN - 1 && extra[size_class] == 0) {
+    while (size_class < FE__IPOOL_FREE_SPACES_LEN - 1 && extra[size_class] == 0) {
         size_class += 1;
     }
 
@@ -161,9 +160,9 @@ usize fe_ipool_free_manual(FeInstPool* pool, FeInst* inst) {
 }
 
 void fe_ipool_destroy(FeInstPool* pool) {
-    FeInstPoolChunk* top = pool->top;
+    Fe__InstPoolChunk* top = pool->top;
     while (top != nullptr) {
-        FeInstPoolChunk* this = top;
+        Fe__InstPoolChunk* this = top;
         top = top->next;
         fe_free(this);
     } 

@@ -581,12 +581,12 @@ void fe_phi_remove_src_unordered(FeInst* inst, u16 index);
 // with a runtime init function
 #define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstCallIndirect)
 
-#define FE_IPOOL_FREE_SPACES_LEN (FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1)
-typedef struct FeInstPoolChunk FeInstPoolChunk;
-typedef struct FeInstPoolFreeSpace FeInstPoolFreeSpace;
+#define FE__IPOOL_FREE_SPACES_LEN (FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1)
+typedef struct Fe__InstPoolChunk Fe__InstPoolChunk;
+typedef struct Fe__InstPoolFreeSpace Fe__InstPoolFreeSpace;
 typedef struct FeInstPool {
-    FeInstPoolChunk* top;
-    FeInstPoolFreeSpace* free_spaces[FE_IPOOL_FREE_SPACES_LEN];
+    Fe__InstPoolChunk* top;
+    Fe__InstPoolFreeSpace* free_spaces[FE__IPOOL_FREE_SPACES_LEN];
 } FeInstPool;
 
 void fe_ipool_init(FeInstPool* pool);

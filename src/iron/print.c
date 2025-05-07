@@ -272,6 +272,7 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
 }
 
 void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
+    should_ansi = fancy;
     // number all instructions and blocks
     u32 inst_counter = 1;
     u32 block_counter = 1;

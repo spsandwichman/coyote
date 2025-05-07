@@ -21,7 +21,7 @@ void fe_module_destroy(FeModule* mod) {
 
 // if len == 0, calculate with strlen
 FeSymbol* fe_symbol_new(FeModule* m, const char* name, u16 len, FeSymbolBinding bind) {
-    if (len == 0) {
+    if (len == 0 && name != nullptr) {
         len = strlen(name);
     }
     // put this in an arena of some sort later
