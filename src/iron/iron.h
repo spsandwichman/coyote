@@ -634,9 +634,9 @@ usize fe_db_write32(FeDataBuffer* buf, u32 data);
 usize fe_db_write64(FeDataBuffer* buf, u64 data);
 usize fe_db_writef(FeDataBuffer* buf, const char* fmt, ...);
 
-void fe_print_func(FeDataBuffer* db, FeFunc* f);
-void fe__print_block(FeDataBuffer* db, FeFunc* f, FeBlock* ref);
-void fe__print_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref);
+void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy);
+void fe__emit_ir_block_label(FeDataBuffer* db, FeFunc* f, FeBlock* ref);
+void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref);
 
 // crash at runtime with a stack trace (if available)
 [[noreturn]] void fe_runtime_crash(const char* error, ...);

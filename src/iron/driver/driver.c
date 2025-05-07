@@ -5,7 +5,7 @@
 static void quick_print(FeFunc* f) {
     FeDataBuffer db;
     fe_db_init(&db, 512);
-    fe_print_func(&db, f);
+    fe_emit_ir_func(&db, f, true);
     printf("%.*s", (int)db.len, db.at);
 }
 

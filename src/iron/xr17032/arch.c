@@ -196,14 +196,14 @@ FeRegStatus xr_reg_status(u8 cconv, u8 regclass, u16 real) {
 void xr_print_args(FeDataBuffer* db, FeFunc* f, FeInst* inst) {
     switch ((XrInstKind)inst->kind) {  
     case XR_ADDI ... XR_LOAD32_IMM:
-        fe__print_ref(db, f, fe_extra_T(inst, XrRegImm16)->reg);
+        fe__emit_ir_ref(db, f, fe_extra_T(inst, XrRegImm16)->reg);
         if (inst->kind != XR_MOV) 
             fe_db_writef(db, ", 0x%x", (u16)fe_extra_T(inst, XrRegImm16)->imm16);
         break;    
     case XR_SHIFT ... XR_LOAD32_REG:
-        fe__print_ref(db, f, fe_extra_T(inst, XrRegReg)->r1);
+        fe__emit_ir_ref(db, f, fe_extra_T(inst, XrRegReg)->r1);
         fe_db_writecstr(db, ", ");
-        fe__print_ref(db, f, fe_extra_T(inst, XrRegReg)->r2);
+        fe__emit_ir_ref(db, f, fe_extra_T(inst, XrRegReg)->r2);
         if (fe_extra_T(inst, XrRegReg)->imm5 != 0) {
             switch (fe_extra_T(inst, XrRegReg)->shift_kind) {
             case XR_SHIFT_LSH: fe_db_writef(db, " lsh %u", fe_extra_T(inst, XrRegReg)->imm5); break;
@@ -214,23 +214,23 @@ void xr_print_args(FeDataBuffer* db, FeFunc* f, FeInst* inst) {
         }
         break;
     case XR_BEQ ... XR_BGE:
-        fe__print_ref(db, f, fe_extra_T(inst, XrRegBranch)->reg);
+        fe__emit_ir_ref(db, f, fe_extra_T(inst, XrRegBranch)->reg);
         fe_db_writecstr(db, ", ");
-        fe__print_block(db, f, fe_extra_T(inst, XrRegBranch)->dest);
+        fe__emit_ir_block_label(db, f, fe_extra_T(inst, XrRegBranch)->dest);
         fe_db_writecstr(db, " (else ");
-        fe__print_block(db, f, fe_extra_T(inst, XrRegBranch)->_else);
+        fe__emit_ir_block_label(db, f, fe_extra_T(inst, XrRegBranch)->_else);
         fe_db_writecstr(db, ")");
         break;
     case XR_STORE8_IMM ... XR_STORE32_IMM:
-        fe__print_ref(db, f, fe_extra_T(inst, XrRegRegImm16)->r1);
+        fe__emit_ir_ref(db, f, fe_extra_T(inst, XrRegRegImm16)->r1);
         fe_db_writecstr(db, ", ");
-        fe__print_ref(db, f, fe_extra_T(inst, XrRegRegImm16)->r2);
+        fe__emit_ir_ref(db, f, fe_extra_T(inst, XrRegRegImm16)->r2);
         fe_db_writef(db, ", 0x%x", (u16)fe_extra_T(inst, XrRegRegImm16)->imm16);
         break;
     case XR_STORE8_REG ... XR_STORE32_REG:
-        fe__print_ref(db, f, fe_extra_T(inst, XrRegRegReg)->r1);
+        fe__emit_ir_ref(db, f, fe_extra_T(inst, XrRegRegReg)->r1);
         fe_db_writecstr(db, ", ");
-        fe__print_ref(db, f, fe_extra_T(inst, XrRegRegReg)->r2);
+        fe__emit_ir_ref(db, f, fe_extra_T(inst, XrRegRegReg)->r2);
         if (fe_extra_T(inst, XrRegRegReg)->imm5 != 0) {
             switch (fe_extra_T(inst, XrRegRegReg)->shift_kind) {
             case XR_SHIFT_LSH: fe_db_writef(db, " lsh %u", fe_extra_T(inst, XrRegRegReg)->imm5); break;
@@ -240,7 +240,7 @@ void xr_print_args(FeDataBuffer* db, FeFunc* f, FeInst* inst) {
             }
         }
         fe_db_writecstr(db, ", ");
-        fe__print_ref(db, f, fe_extra_T(inst, XrRegRegReg)->r3);
+        fe__emit_ir_ref(db, f, fe_extra_T(inst, XrRegRegReg)->r3);
         break;
     case XR_RET:
         break;
