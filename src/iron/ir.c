@@ -10,7 +10,12 @@ FeModule* fe_module_new(FeArch arch, FeSystem system) {
 }
 
 void fe_module_destroy(FeModule* mod) {
-    fe_free(mod->target);
+    // destroy the functions
+    for (FeFunc* f = mod->funcs.first, *next = f->list_next; f != nullptr; f = next, next = next->list_next) {
+        fe_func_destroy(f);
+    }
+
+    fe_free((void*)mod->target);
     fe_free(mod);
 }
 

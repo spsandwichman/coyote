@@ -186,7 +186,7 @@ int main() {
 
     FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunc* func = make_regalloc_test(mod, &ipool, &vregs);
+    FeFunc* func = make_phi_test(mod, &ipool, &vregs);
 
     quick_print(func);
     fe_codegen(func);
@@ -198,4 +198,6 @@ int main() {
     fe_db_init(&db, 2048);
     fe_emit_asm(&db, func);
     printf("%.*s", (int)db.len, db.at);
+
+    fe_module_destroy(mod);
 }
