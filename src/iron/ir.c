@@ -72,6 +72,7 @@ void fe_funcsig_destroy(FeFuncSig* sig) {
 FeBlock* fe_block_new(FeFunc* f) {
     FeBlock* block = fe_malloc(sizeof(FeBlock));
     memset(block, 0, sizeof(*block));
+    block->func = f;
     
     // adds initial bookend instruction to block
     FeInst* bookend = fe_ipool_alloc(f->ipool, sizeof(FeInstBookend));

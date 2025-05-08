@@ -170,3 +170,82 @@ void fe_ipool_destroy(FeInstPool* pool) {
     } 
     *pool = (FeInstPool){0};
 }
+
+#define ARENA_CHUNK_DATA_SIZE 32768
+typedef struct Fe__ArenaChunk {
+    Fe__ArenaChunk* prev;
+    Fe__ArenaChunk* next;
+    usize used;
+    u8 data[ARENA_CHUNK_DATA_SIZE];
+} Fe__ArenaChunk;
+
+// assume align is a power of two
+static inline uintptr_t align_forward(uintptr_t ptr, uintptr_t align) {
+    return (ptr + align - 1) & ~(align - 1);
+}
+
+// return nullptr if cannot allocate
+static void* chunk_alloc(Fe__ArenaChunk* ch, usize size, usize align) {
+    usize new_used = align_forward(ch->used, align);
+    if (new_used + size > ARENA_CHUNK_DATA_SIZE) {
+        return nullptr;
+    }
+    ch->used = new_used;
+    void* mem = &ch->data[ch->used];
+    ch->used += size;
+    return mem;
+}
+
+void fe_arena_init(FeArena* arena) {
+    arena->top = fe_malloc(sizeof(*arena->top));
+    arena->top->next = nullptr;
+    arena->top->prev = nullptr;
+    arena->top->used = 0;
+}
+
+void fe_arena_destroy(FeArena* arena) {
+    Fe__ArenaChunk* top = arena->top;
+    // traverse up to top of the list
+    while (top->next) {
+        top = top->next;
+    }
+    // destroy any saved blocks below
+    for (Fe__ArenaChunk* ch = top, *prev = ch->prev; ch != nullptr; ch = prev, prev = prev->prev) {
+        fe_free(ch);
+    }
+    arena->top = nullptr;
+}
+
+void* fe_arena_alloc(FeArena* arena, usize size, usize align) {
+    void* mem = chunk_alloc(arena->top, size, align);
+    if (mem) {
+        return mem;
+    }
+
+    Fe__ArenaChunk* new_chunk = arena->top->next;
+    if (new_chunk == NULL) {
+        new_chunk = fe_malloc(sizeof(*new_chunk));
+        new_chunk->prev = arena->top;
+        new_chunk->next = nullptr;
+        arena->top->next = new_chunk;
+    }
+    new_chunk->used = 0;
+    arena->top = new_chunk;
+    mem = chunk_alloc(new_chunk, size, align);
+    if (mem) {
+        return mem;
+    }
+    fe_runtime_crash("unable to arena-alloc size %zu align %zu", size, align);
+}
+
+FeArenaSavepoint fe_arena_save(FeArena* arena) {
+    return (FeArenaSavepoint){
+        .top = arena->top,
+        .used = arena->top->used,
+    };
+}
+
+void fe_arena_restore(FeArena* arena, FeArenaSavepoint save) {
+    arena->top = save.top;
+    arena->top->used = save.used;
+}

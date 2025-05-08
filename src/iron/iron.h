@@ -130,6 +130,7 @@ typedef struct FeModule FeModule;
 typedef struct FeTarget FeTarget;
 typedef struct FeStackItem FeStackItem;
 typedef struct FeInstPool FeInstPool;
+typedef struct FeArena FeArena;
 
 typedef u32 FeVReg; // vreg index.
 typedef struct FeVRegBuffer FeVRegBuffer;
@@ -581,6 +582,8 @@ void fe_phi_remove_src_unordered(FeInst* inst, u16 index);
 // with a runtime init function
 #define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstCallIndirect)
 
+// ----------------------------- passes ------------------------------
+
 #define FE__IPOOL_FREE_SPACES_LEN (FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1)
 typedef struct Fe__InstPoolChunk Fe__InstPoolChunk;
 typedef struct Fe__InstPoolFreeSpace Fe__InstPoolFreeSpace;
@@ -594,6 +597,23 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size);
 void fe_ipool_free(FeInstPool* pool, FeInst* inst);
 usize fe_ipool_free_manual(FeInstPool* pool, FeInst* inst);
 void fe_ipool_destroy(FeInstPool* pool);
+
+typedef struct Fe__ArenaChunk Fe__ArenaChunk;
+typedef struct FeArena {
+    Fe__ArenaChunk* top;
+} FeArena;
+
+typedef struct FeArenaSavepoint {
+    Fe__ArenaChunk* top;
+    usize used;
+} FeArenaSavepoint;
+
+void fe_arena_init(FeArena* arena);
+void fe_arena_destroy(FeArena* arena);
+void* fe_arena_alloc(FeArena* arena, usize size, usize align);
+
+FeArenaSavepoint fe_arena_save(FeArena* arena);
+void fe_arena_restore(FeArena* arena, FeArenaSavepoint save);
 
 // ----------------------------- passes ------------------------------
 
