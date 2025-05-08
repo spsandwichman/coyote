@@ -456,7 +456,7 @@ FeInst* fe_inst_return(FeFunc* f) {
     return inst;
 }
 
-FeInst* fe_return_arg(FeInst* ret, usize index) {
+FeInst* fe_return_arg(FeInst* ret, u16 index) {
     FeInstReturn* r = fe_extra_T(ret, FeInstReturn);
     if (index >= r->len) {
         fe_runtime_crash("index >= ret->len");
@@ -468,7 +468,7 @@ FeInst* fe_return_arg(FeInst* ret, usize index) {
     }
 }
 
-void fe_return_set_arg(FeInst* ret, usize index, FeInst* arg) {
+void fe_return_set_arg(FeInst* ret, u16 index, FeInst* arg) {
     FeInstReturn* r = fe_extra_T(ret, FeInstReturn);
     if (index >= r->len) {
         fe_runtime_crash("index >= ret->len");
@@ -617,7 +617,7 @@ FeInst* fe_inst_call_indirect(FeFunc* f, FeInst* to_call, FeFuncSig* sig) {
     return inst;
 }
 
-FeInst* fe_call_arg(FeInst* call, usize index) {
+FeInst* fe_call_arg(FeInst* call, u16 index) {
     // direct/indirect calls have the same param list layout
     FeInstCallDirect* c = fe_extra(call);
     if (index >= c->len) {
@@ -630,7 +630,7 @@ FeInst* fe_call_arg(FeInst* call, usize index) {
     }
 }
 
-void fe_call_set_arg(FeInst* call, usize index, FeInst* arg) {
+void fe_call_set_arg(FeInst* call, u16 index, FeInst* arg) {
     // direct/indirect calls have the same param list layout, so its fine
     FeInstCallDirect* c = fe_extra(call);
     if (index >= c->len) {

@@ -559,11 +559,11 @@ FeInst* fe_inst_binop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* 
 FeInst* fe_inst_bare(FeFunc* f, FeTy ty, FeInstKind kind);
 FeInst* fe_inst_call_direct(FeFunc* f, FeFunc* to_call);
 FeInst* fe_inst_call_indirect(FeFunc* f, FeInst* to_call, FeFuncSig* sig);
-FeInst* fe_call_arg(FeInst* call, usize index);
-void fe_call_set_arg(FeInst* call, usize index, FeInst* arg);
+FeInst* fe_call_arg(FeInst* call, u16 index);
+void fe_call_set_arg(FeInst* call, u16 index, FeInst* arg);
 FeInst* fe_inst_return(FeFunc* f);
-FeInst* fe_return_arg(FeInst* ret, usize index);
-void fe_return_set_arg(FeInst* ret, usize index, FeInst* arg);
+FeInst* fe_return_arg(FeInst* ret, u16 index);
+void fe_return_set_arg(FeInst* ret, u16 index, FeInst* arg);
 
 FeInst* fe_inst_branch(FeFunc* f, FeInst* cond, FeBlock* if_true, FeBlock* if_false);
 FeInst* fe_inst_jump(FeFunc* f, FeBlock* to);
