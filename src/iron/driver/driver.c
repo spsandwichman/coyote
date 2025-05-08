@@ -133,7 +133,7 @@ FeFunc* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) 
     }
     { // if_false block
         FeInst* add = fe_append_end(if_false, fe_inst_binop(f, 
-            FE_TY_I32, FE_ISUB, 
+            FE_TY_I32, FE_IADD, 
             param,
             fe_append_end(if_false, fe_inst_const(f, FE_TY_I32, 10))
         ));
@@ -186,7 +186,7 @@ int main() {
 
     FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunc* func = make_phi_test(mod, &ipool, &vregs);
+    FeFunc* func = make_branch_test(mod, &ipool, &vregs);
 
     quick_print(func);
     fe_codegen(func);

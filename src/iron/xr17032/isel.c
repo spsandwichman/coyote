@@ -172,6 +172,18 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
         fe_extra_T(mul, XrRegReg)->r2 = binop->rhs;
         return fe_chain_new(mul);
     }
+    case FE_IDIV: {
+        FeInst* div = create_mach(f, XR_DIV_SIGNED, FE_TY_I32, sizeof(XrRegReg));
+        fe_extra_T(div, XrRegReg)->r1 = binop->lhs;
+        fe_extra_T(div, XrRegReg)->r2 = binop->rhs;
+        return fe_chain_new(div);
+    }
+    case FE_UDIV: {
+        FeInst* div = create_mach(f, XR_DIV, FE_TY_I32, sizeof(XrRegReg));
+        fe_extra_T(div, XrRegReg)->r1 = binop->lhs;
+        fe_extra_T(div, XrRegReg)->r2 = binop->rhs;
+        return fe_chain_new(div);
+    }
     case FE_SHL:
         if (can_const_u5(binop->rhs)) {
             // xr.add zero, %1 lsh <const>

@@ -583,7 +583,8 @@ void fe_phi_remove_src_unordered(FeInst* inst, u16 index);
 // with a runtime init function
 #define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstCallIndirect)
 
-// ----------------------------- passes ------------------------------
+// --------------------------- allocation ----------------------------
+// TODO merge FeInstPool and FeArena into the same thing lol
 
 #define FE__IPOOL_FREE_SPACES_LEN (FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1)
 typedef struct Fe__InstPoolChunk Fe__InstPoolChunk;
