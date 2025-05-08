@@ -98,16 +98,16 @@ static void calculate_liveness(FeFunc* f) {
 }
 
 typedef struct {
-    bool shutthefuckupclang;
-    bool* reg_live[];
+    bool** reg_live;
 } LiveSet;
 
-LiveSet* liveset_new(const FeTarget* target) {
-    LiveSet* lvset = fe_malloc(sizeof(lvset->reg_live[0]) * target->max_regclass);
+LiveSet liveset_new(const FeTarget* target) {
+    LiveSet lvset;
+    lvset.reg_live = fe_malloc(sizeof(lvset.reg_live[0]) * (target->max_regclass + 1));
     for_n(i, 0, target->max_regclass + 1) {
-        usize regclass_size = sizeof(lvset->reg_live[0][0]) * target->regclass_lens[i];
-        lvset->reg_live[i] = fe_malloc(regclass_size);
-        memset(lvset->reg_live[i], 0, regclass_size);
+        usize regclass_size = sizeof(lvset.reg_live[0][0]) * target->regclass_lens[i];
+        lvset.reg_live[i] = fe_malloc(regclass_size);
+        memset(lvset.reg_live[i], 0, regclass_size);
     }
     return lvset;
 }
@@ -148,14 +148,14 @@ void fe_regalloc_linear_scan(FeFunc* f) {
         }
     }
 
-    LiveSet* lvset = liveset_new(target);
+    LiveSet lvset = liveset_new(target);
 
     for_blocks(block, f) {
         // make everything in live_out live now
         for_n(i, 0, block->live->out_len) {
             FeVirtualReg* vr = fe_vreg(vbuf, block->live->out[i]);
             if (vr->real != FE_VREG_REAL_UNASSIGNED) {
-                liveset_add(lvset, vr->class, vr->real);
+                liveset_add(&lvset, vr->class, vr->real);
             }
         }
 
@@ -168,7 +168,7 @@ void fe_regalloc_linear_scan(FeFunc* f) {
                 // virtual register, or the instruction is an upsilon inst,
                 // KILL IT TO DEATH
                 if (is_canon_def(inst_out, inst) && inst_out->real != FE_VREG_REAL_UNASSIGNED) {
-                    liveset_remove(lvset, inst_out->class, inst_out->real);
+                    liveset_remove(&lvset, inst_out->class, inst_out->real);
                 }
             }
 
@@ -204,7 +204,7 @@ void fe_regalloc_linear_scan(FeFunc* f) {
                         continue;
                     }
                     // if this real register is already used, skip past it.
-                    if (is_live(lvset, input_vr->class, real)) {
+                    if (is_live(&lvset, input_vr->class, real)) {
                         continue;
                     }
 
@@ -217,14 +217,14 @@ void fe_regalloc_linear_scan(FeFunc* f) {
 
                 // assign real register to virtual register
                 input_vr->real = real;
-                liveset_add(lvset, input_vr->class, input_vr->real);
+                liveset_add(&lvset, input_vr->class, input_vr->real);
             }
         }
 
         // unlive everything that is live_in
         for_n(i, 0, block->live->in_len) {
             FeVirtualReg* vr = fe_vreg(vbuf, block->live->in[i]);
-            liveset_remove(lvset, vr->class, vr->real);
+            liveset_remove(&lvset, vr->class, vr->real);
         }
     }
 }

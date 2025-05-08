@@ -146,15 +146,15 @@ FeFunc* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) 
 FeFunc* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
     // set up function to call
-    FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 1, 1);
+    FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 4, 4);
     fe_funcsig_param(f_sig, 0)->ty = FE_TY_I32;
-    // fe_funcsig_param(f_sig, 1)->ty = FE_TY_I32;
-    // fe_funcsig_param(f_sig, 2)->ty = FE_TY_I32;
-    // fe_funcsig_param(f_sig, 3)->ty = FE_TY_I32;
+    fe_funcsig_param(f_sig, 1)->ty = FE_TY_I32;
+    fe_funcsig_param(f_sig, 2)->ty = FE_TY_I32;
+    fe_funcsig_param(f_sig, 3)->ty = FE_TY_I32;
     fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
-    // fe_funcsig_return(f_sig, 1)->ty = FE_TY_I32;
-    // fe_funcsig_return(f_sig, 2)->ty = FE_TY_I32;
-    // fe_funcsig_return(f_sig, 3)->ty = FE_TY_I32;
+    fe_funcsig_return(f_sig, 1)->ty = FE_TY_I32;
+    fe_funcsig_return(f_sig, 2)->ty = FE_TY_I32;
+    fe_funcsig_return(f_sig, 3)->ty = FE_TY_I32;
 
     // make the function and its symbol
     FeSymbol* f_sym = fe_symbol_new(mod, "id", 0, FE_BIND_GLOBAL);
@@ -163,16 +163,16 @@ FeFunc* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs
     // construct the function's body
     FeBlock* entry = f->entry_block;
     FeInst* param0 = f->params[0];
-    // FeInst* param1 = fe_func_param(f, 1);
-    // FeInst* param2 = fe_func_param(f, 2);
-    // FeInst* param3 = fe_func_param(f, 3);
+    FeInst* param1 = fe_func_param(f, 1);
+    FeInst* param2 = fe_func_param(f, 2);
+    FeInst* param3 = fe_func_param(f, 3);
 
     { // entry block
         FeInst* ret = fe_append_end(entry, fe_inst_return(f));
         fe_return_set_arg(ret, 0, param0);
-        // fe_return_set_arg(ret, 1, param1);
-        // fe_return_set_arg(ret, 2, param2);
-        // fe_return_set_arg(ret, 3, param3);
+        fe_return_set_arg(ret, 1, param1);
+        fe_return_set_arg(ret, 2, param2);
+        fe_return_set_arg(ret, 3, param3);
     }
     return f;
 }
@@ -186,7 +186,7 @@ int main() {
 
     FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunc* func = make_branch_test(mod, &ipool, &vregs);
+    FeFunc* func = make_regalloc_test(mod, &ipool, &vregs);
 
     quick_print(func);
     fe_codegen(func);
