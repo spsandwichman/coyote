@@ -463,6 +463,7 @@ typedef struct FeStackItem {
 FeStackItem* fe_stack_item_new(u16 size, u16 align);
 FeStackItem* fe_stack_append_bottom(FeFunc* f, FeStackItem* item);
 FeStackItem* fe_stack_append_top(FeFunc* f, FeStackItem* item);
+FeStackItem* fe_stack_remove(FeFunc* f, FeStackItem* item);
 u32 fe_stack_calculate_size(FeFunc* f);
 
 typedef enum : u16 {

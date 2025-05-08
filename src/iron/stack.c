@@ -21,6 +21,25 @@ FeStackItem* fe_stack_item_new(u16 size, u16 align) {
     return item;
 }
 
+FeStackItem* fe_stack_remove(FeFunc* f, FeStackItem* item) {
+    if (item->next) {
+        item->prev->next = item->next;
+    } else {
+        f->stack_top = item->prev;
+    }
+
+    if (item->prev) {
+        item->next->prev = item->prev;
+    } else {
+        f->stack_bottom = item->next;
+    }
+
+    item->next = nullptr;
+    item->prev = nullptr;
+
+    return item;
+}
+
 FeStackItem* fe_stack_append_bottom(FeFunc* f, FeStackItem* item) {
     if (f->stack_bottom == nullptr) {
         f->stack_bottom = item;

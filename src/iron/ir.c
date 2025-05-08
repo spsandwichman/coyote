@@ -11,10 +11,8 @@ FeModule* fe_module_new(FeArch arch, FeSystem system) {
 
 void fe_module_destroy(FeModule* mod) {
     // destroy the functions
-    if (mod->funcs.first) {
-        for (FeFunc* f = mod->funcs.first, *next = f->list_next; f != nullptr; f = next, next = next->list_next) {
-            fe_func_destroy(f);
-        }
+    while (mod->funcs.first) {
+        fe_func_destroy(mod->funcs.first);  
     }
 
     fe_free((void*)mod->target);
@@ -111,8 +109,8 @@ void fe_block_destroy(FeBlock *block) {
     }
 
     for_inst(inst, block) {
-        fe_inst_free(f, inst);
-    };
+        fe_inst_free(f, fe_inst_remove_pos(inst));
+    }
     fe_inst_free(f, block->bookend);
     fe_free(block);
 }
@@ -177,14 +175,15 @@ void fe_func_destroy(FeFunc *f) {
     fe_free(f->params);
 
     // free the block list
-    for (FeBlock* block = f->entry_block, *next = block->list_next; block != nullptr; block = next, next = next->list_next) {
-        fe_block_destroy(block);
+    while (f->entry_block) {
+        fe_block_destroy(f->entry_block);
     }
     
     // free the stack
-    for (FeStackItem* item = f->stack_top, *next = item->next; item != nullptr; item = next, next = next->next) {
-        fe_free(item);
+    while (f->stack_top) {
+        fe_free(fe_stack_remove(f, f->stack_top));
     }
+
 
     // remove from linked list
     if (f->list_next) {
