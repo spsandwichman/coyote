@@ -92,6 +92,8 @@ typedef enum: u8 {
     FE_TY_F16x32 = FE_TY_VEC(FE_TY_V512, FE_TY_F16),
     FE_TY_F32x16 = FE_TY_VEC(FE_TY_V512, FE_TY_F32),
     FE_TY_F64x8  = FE_TY_VEC(FE_TY_V512, FE_TY_F64),
+
+    FE__TY_END,
 } FeTy;
 
 typedef enum: u8 {
@@ -329,12 +331,12 @@ typedef enum: FeInstKind {
     // CallIndirect
     FE_CALL_INDIRECT,
 
-    _FE_BASE_INST_END,
+    FE__BASE_INST_END,
 
-    _FE_XR_INST_BEGIN = FE_ARCH_XR17032 * 256,
-    _FE_XR_INST_END = _FE_XR_INST_BEGIN + 256,
+    FE__XR_INST_BEGIN = FE_ARCH_XR17032 * 256,
+    FE__XR_INST_END = FE__XR_INST_BEGIN + 256,
 
-    _FE_INST_END,
+    FE__INST_END,
 } FeInstKindGeneric;
 
 typedef struct FeInst {
@@ -574,6 +576,9 @@ FeBlock* fe_phi_get_src_block(FeInst* inst, u16 index);
 void fe_phi_set_src(FeInst* inst, u16 index, FeInst* val, FeBlock* block);
 void fe_phi_append_src(FeInst* inst, FeInst* val, FeBlock* block);
 void fe_phi_remove_src_unordered(FeInst* inst, u16 index);
+
+const char* fe_inst_name(const FeTarget* target, FeInst* inst);
+const char* fe_ty_name(FeTy ty);
 
 #define fe_extra(instptr) ((void*)&(instptr)->extra[0])
 #define fe_extra_T(instptr, T) ((T*)&(instptr)->extra[0])

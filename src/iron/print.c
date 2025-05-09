@@ -1,4 +1,5 @@
 #include "iron/iron.h"
+#include <string.h>
 
 static const char* ty_name[] = {
     [FE_TY_VOID] = "void",
@@ -41,7 +42,7 @@ static const char* ty_name[] = {
     [FE_TY_F64x8]  = "f64x8",
 };
 
-static const char* inst_name[_FE_BASE_INST_END] = {
+static const char* inst_name[FE__BASE_INST_END] = {
     [FE_BOOKEND] = "<bookend>",
 
     [FE_CONST] = "const",
@@ -158,6 +159,22 @@ void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref) {
     if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
 }
 
+const char* fe_inst_name(const FeTarget* target, FeInst* inst) {
+    if (inst->kind < FE__BASE_INST_END) {
+        return inst_name[inst->kind];
+    } else {
+        return target->inst_name(inst->kind, true);
+    }
+}
+
+const char* fe_ty_name(FeTy ty) {
+    if (ty < FE__TY_END) {
+        return ty_name[ty];
+    }
+    return nullptr;
+}
+
+
 static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
     const FeTarget* target = f->mod->target;
 
@@ -168,7 +185,7 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         fe_db_writecstr(db, " = ");
     }
 
-    if (inst->kind < _FE_BASE_INST_END) {
+    if (inst->kind < FE__BASE_INST_END) {
         const char* name = inst_name[inst->kind];
         
         if (name) fe_db_writecstr(db, name);
@@ -262,7 +279,7 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         u16 real = vreg->real;
         fe_db_writecstr(db, f->mod->target->reg_name(class, real));
         break;
-    case _FE_XR_INST_BEGIN ... _FE_XR_INST_END:
+    case FE__XR_INST_BEGIN ... FE__XR_INST_END:
         target->ir_print_args(db, f, inst);
         break;
     default:

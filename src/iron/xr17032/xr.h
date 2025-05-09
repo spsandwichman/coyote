@@ -5,7 +5,7 @@
 
 typedef enum: FeInstKind {
     // XrRegImm16
-    XR_ADDI = _FE_XR_INST_BEGIN, 
+    XR_ADDI = FE__XR_INST_BEGIN, 
                     // out = reg + uimm16
     XR_SUBI,        // out = reg - uimm16
     XR_SLTI,        // out = reg < uimm16
@@ -68,7 +68,7 @@ typedef enum: FeInstKind {
     XR_RET,
 } XrInstKind;
 
-// #define fe_kind_is_xr(kind) (_FE_XR_INST_BEGIN <= (kind) && (kind) <= _FE_XR_INST_END)
+// #define fe_kind_is_xr(kind) (FE__XR_INST_BEGIN <= (kind) && (kind) <= FE__XR_INST_END)
 
 typedef struct {
     FeInst* reg;

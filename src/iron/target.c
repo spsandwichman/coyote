@@ -26,8 +26,8 @@ const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
         t->final_touchups = xr_final_touchups;
         t->stack_pointer_align = 4;
 
-        fe__load_extra_size_table(_FE_XR_INST_BEGIN, xr_size_table, _FE_XR_INST_END - _FE_XR_INST_BEGIN);
-        fe__load_trait_table(_FE_XR_INST_BEGIN, xr_trait_table, _FE_XR_INST_END - _FE_XR_INST_BEGIN);
+        fe__load_extra_size_table(FE__XR_INST_BEGIN, xr_size_table, FE__XR_INST_END - FE__XR_INST_BEGIN);
+        fe__load_trait_table(FE__XR_INST_BEGIN, xr_trait_table, FE__XR_INST_END - FE__XR_INST_BEGIN);
         break;
     default:
         fe_runtime_crash("arch unsupported");

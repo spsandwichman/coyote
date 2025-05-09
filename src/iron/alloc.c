@@ -2,9 +2,9 @@
 
 #include "iron.h"
 
-static u8 extra_size_table[_FE_INST_END] = {
+static u8 extra_size_table[FE__INST_END] = {
     // default error value
-    [0 ... _FE_INST_END - 1] = 255,
+    [0 ... FE__INST_END - 1] = 255,
 
     [FE_BOOKEND] = sizeof(FeInstBookend),
     [FE_PROJ ... FE_MACH_PROJ] = sizeof(FeInstProj),
@@ -34,7 +34,7 @@ void fe__load_extra_size_table(usize start_index, u8* table, usize len) {
 
 usize fe_inst_extra_size_unsafe(FeInstKind kind) {
     u8 size = 255;
-    if (kind < _FE_INST_END) {
+    if (kind < FE__INST_END) {
         size = extra_size_table[kind];
     }
 

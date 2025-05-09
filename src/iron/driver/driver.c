@@ -188,6 +188,11 @@ int main() {
 
     FeFunc* func = make_regalloc_test(mod, &ipool, &vregs);
 
+    FeFunc* func2 = make_regalloc_test(mod, &ipool, &vregs);
+
+    printf("yuh %p\n", func->list_prev);
+    printf("yuh %p\n", func2->list_prev);
+
     quick_print(func);
     fe_codegen(func);
     quick_print(func);

@@ -3,9 +3,9 @@
 
 #include "../short_traits.h"
 
-#define R(a, b) [a - _FE_XR_INST_BEGIN ... b - _FE_XR_INST_BEGIN]
-#define I(a) [a - _FE_XR_INST_BEGIN]
-    u8 xr_size_table[_FE_XR_INST_END - _FE_XR_INST_BEGIN] = {
+#define R(a, b) [a - FE__XR_INST_BEGIN ... b - FE__XR_INST_BEGIN]
+#define I(a) [a - FE__XR_INST_BEGIN]
+    u8 xr_size_table[FE__XR_INST_END - FE__XR_INST_BEGIN] = {
         [0 ... 255] = 255,
         R(XR_ADDI, XR_LOAD32_IMM) = sizeof(XrRegImm16),
         R(XR_STORE8_IMM, XR_STORE32_IMM) = sizeof(XrRegRegImm16),
@@ -15,7 +15,7 @@
         I(XR_J)     = sizeof(XrJump),
         I(XR_RET)   = 0,
     };
-    FeTrait xr_trait_table[_FE_XR_INST_END - _FE_XR_INST_BEGIN] = {
+    FeTrait xr_trait_table[FE__XR_INST_END - FE__XR_INST_BEGIN] = {
         // TODO add more traits here.
         I(XR_ADDI) = INT_IN | SAME_IN_OUT,
         I(XR_SUBI) = INT_IN | SAME_IN_OUT,

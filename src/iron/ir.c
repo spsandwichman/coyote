@@ -2,6 +2,7 @@
 #include "iron/iron.h"
 #include <string.h>
 
+
 FeModule* fe_module_new(FeArch arch, FeSystem system) {
     FeModule* mod = fe_malloc(sizeof(FeModule));
     memset(mod, 0, sizeof(FeModule));
@@ -142,11 +143,15 @@ FeFunc* fe_func_new(FeModule* mod, FeSymbol* sym, FeFuncSig* sig, FeInstPool* ip
     sym->kind = FE_SYMKIND_FUNC;
 
     // append to function list
-    f->list_prev = mod->funcs.first;
-    if (mod->funcs.first) mod->funcs.first->list_next = f;
-    else mod->funcs.last = f;
-    mod->funcs.first = f;
-
+    if (mod->funcs.first == nullptr) {
+        mod->funcs.first = mod->funcs.last = f;
+    } else {
+        f->list_prev = mod->funcs.last;
+        f->list_prev->list_next = f;
+        f->list_next = nullptr;
+        mod->funcs.last = f;
+    }
+    
     // add initial basic block
     f->entry_block = f->last_block = fe_block_new(f);
 
@@ -171,8 +176,11 @@ FeFunc* fe_func_new(FeModule* mod, FeSymbol* sym, FeFuncSig* sig, FeInstPool* ip
     return f;
 }
 
+
 void fe_func_destroy(FeFunc *f) {
-    fe_free(f->params);
+    if (f->params) {
+        fe_free(f->params);    
+    }
 
     // free the block list
     while (f->entry_block) {
@@ -184,19 +192,20 @@ void fe_func_destroy(FeFunc *f) {
         fe_free(fe_stack_remove(f, f->stack_top));
     }
 
-
     // remove from linked list
-    if (f->list_next) {
-        f->list_next->list_prev = f->list_prev;
-    } else {
+    if (f->list_next == nullptr) { // at back of list
         f->mod->funcs.last = f->list_prev;
-    }
-    if (f->list_prev) {
-        f->list_prev->list_next = f->list_next;
     } else {
-        f->mod->funcs.first = f->list_next;
+        f->list_next->list_prev = f->list_prev;
     }
-
+    if (f->list_prev == nullptr) { // at front of list
+        f->mod->funcs.first = f->list_next;
+    } else {
+        f->list_prev->list_next = f->list_next;
+    }
+    f->list_next = NULL;
+    f->list_prev = NULL;
+    fe_free(f);
 }
 
 FeInst* fe_func_param(FeFunc* f, u16 index) {
@@ -223,7 +232,7 @@ void fe_inst_update_uses(FeFunc* f) {
 
 // jank as FUCK and very likely to break; too bad!
 FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
-    if (inst->kind > _FE_BASE_INST_END) {
+    if (inst->kind > FE__BASE_INST_END) {
         return t->list_inputs(inst, len_out);
     }
 
@@ -292,7 +301,7 @@ FeBlock** fe_inst_term_list_targets(const FeTarget* t, FeInst* term, usize* len_
     if (!fe_inst_has_trait(term->kind, FE_TRAIT_TERMINATOR)) {
         fe_runtime_crash("list_targets: inst %d is not a terminator", term->kind);
     }
-    if (term->kind > _FE_BASE_INST_END) {
+    if (term->kind > FE__BASE_INST_END) {
         return t->list_targets(term, len_out);
     }
 
@@ -672,7 +681,7 @@ FeTy fe_proj_ty(FeInst* tuple, usize index) {
 
 #include "short_traits.h"
 
-static FeTrait inst_traits[_FE_INST_END] = {
+static FeTrait inst_traits[FE__INST_END] = {
     [FE_PROJ] = 0,
     [FE_MACH_PROJ] = VOL,
     [FE_PARAM] = VOL,
@@ -731,7 +740,7 @@ static FeTrait inst_traits[_FE_INST_END] = {
 };
 
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait) {
-    if (kind > _FE_INST_END) return false;
+    if (kind > FE__INST_END) return false;
     return (inst_traits[kind] & trait) != 0;
 }
 
