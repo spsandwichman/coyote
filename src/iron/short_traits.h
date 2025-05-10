@@ -6,12 +6,12 @@
 enum {
     COMMU       = FE_TRAIT_COMMUTATIVE,
     // if something is associative, it is also fast-associative.
-    ASSOC       = FE_TRAIT_ASSOCIATIVE | FE_TRAIT_FAST_ASSOCIATIVE,
+    ASSOC       = FE_TRAIT_ASSOCIATIVE,
     FAST_ASSOC  = FE_TRAIT_FAST_ASSOCIATIVE,
 
     VOL         = FE_TRAIT_VOLATILE,
     // term always implies volatile
-    TERM        = FE_TRAIT_TERMINATOR | FE_TRAIT_VOLATILE,
+    TERM        = FE_TRAIT_TERMINATOR,
     SAME_IN_OUT = FE_TRAIT_SAME_IN_OUT_TY,
     SAME_INS    = FE_TRAIT_SAME_INPUT_TYS,
     INT_IN      = FE_TRAIT_INT_INPUT_TYS,

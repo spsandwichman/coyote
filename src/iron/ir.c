@@ -305,7 +305,7 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
     }
 }
 
-FeBlock** fe_inst_term_list_targets(const FeTarget* t, FeInst* term, usize* len_out) {
+FeBlock** fe_inst_list_terminator_successors(const FeTarget* t, FeInst* term, usize* len_out) {
     if (!fe_inst_has_trait(term->kind, FE_TRAIT_TERMINATOR)) {
         fe_runtime_crash("list_targets: inst %d is not a terminator", term->kind);
     }
@@ -742,17 +742,17 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_PARAM] = VOL,
     [FE_CONST] = 0,
 
-    [FE_IADD] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
+    [FE_IADD] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
     [FE_ISUB] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
-    [FE_IMUL] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
-    [FE_UMUL] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
+    [FE_IMUL] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
+    [FE_UMUL] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
     [FE_IDIV] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
     [FE_UDIV] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
     [FE_IREM] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
     [FE_UREM] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
-    [FE_AND]  = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
-    [FE_OR]   = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
-    [FE_XOR]  = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC,
+    [FE_AND]  = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
+    [FE_OR]   = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
+    [FE_XOR]  = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
     [FE_SHL]  = INT_IN | VEC_IN | SAME_IN_OUT,
     [FE_USR]  = INT_IN | VEC_IN | SAME_IN_OUT,
     [FE_ISR]  = INT_IN | VEC_IN | SAME_IN_OUT,
@@ -789,9 +789,9 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_CASCADE_UNIQUE]   = VOL,
     [FE_CASCADE_VOLATILE] = VOL,
 
-    [FE_BRANCH] = TERM,
-    [FE_JUMP]   = TERM,
-    [FE_RETURN] = TERM,
+    [FE_BRANCH] = TERM | VOL,
+    [FE_JUMP]   = TERM | VOL,
+    [FE_RETURN] = TERM | VOL,
 };
 
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait) {

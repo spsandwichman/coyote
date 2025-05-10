@@ -553,7 +553,7 @@ void fe_chain_destroy(FeFunc* f, FeInstChain chain);
 void fe_inst_free(FeFunc* f, FeInst* inst);
 void fe_inst_update_uses(FeFunc* f);
 FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out);
-FeBlock** fe_inst_term_list_targets(const FeTarget* t, FeInst* term, usize* len_out);
+FeBlock** fe_inst_list_terminator_successors(const FeTarget* t, FeInst* term, usize* len_out);
 
 FeTy fe_proj_ty(FeInst* tuple, usize index);
 

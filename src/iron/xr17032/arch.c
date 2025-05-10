@@ -26,9 +26,9 @@
         R(XR_STORE8_IMM, XR_STORE32_IMM) = VOL,
         R(XR_STORE8_REG, XR_STORE32_REG) = VOL,
 
-        R(XR_BEQ, XR_BGE) = TERM,
-        I(XR_J)           = TERM,
-        I(XR_RET)         = TERM,
+        R(XR_BEQ, XR_BGE) = TERM | VOL,
+        I(XR_J)           = TERM | VOL,
+        I(XR_RET)         = TERM | VOL,
     };
 #undef I
 #undef R

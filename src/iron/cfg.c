@@ -43,7 +43,7 @@ void fe_cfg_calculate(FeFunc* f) {
         FeInst* term = b->bookend->prev;
 
         usize outs_len;
-        FeBlock** outs = fe_inst_term_list_targets(target, term, &outs_len);
+        FeBlock** outs = fe_inst_list_terminator_successors(target, term, &outs_len);
         b->cfg_node->out_len = outs_len;
 
         for_n(i, 0, outs_len) {
@@ -57,7 +57,7 @@ void fe_cfg_calculate(FeFunc* f) {
         FeInst* term = b->bookend->prev;
 
         usize outs_len;
-        FeBlock** outs = fe_inst_term_list_targets(target, term, &outs_len);
+        FeBlock** outs = fe_inst_list_terminator_successors(target, term, &outs_len);
 
         usize size = sizeof(b->cfg_node->ins[0]) * (b->cfg_node->in_len + outs_len);
         b->cfg_node->ins = fe_malloc(size);
