@@ -159,11 +159,11 @@ void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref) {
     if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
 }
 
-const char* fe_inst_name(const FeTarget* target, FeInst* inst) {
-    if (inst->kind < FE__BASE_INST_END) {
-        return inst_name[inst->kind];
+const char* fe_inst_name(const FeTarget* target, FeInstKind kind) {
+    if (kind < FE__BASE_INST_END) {
+        return inst_name[kind];
     } else {
-        return target->inst_name(inst->kind, true);
+        return target->inst_name(kind, true);
     }
 }
 

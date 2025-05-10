@@ -9,17 +9,6 @@
     #error "Iron is a C23 library!"
 #endif
 
-// feel free to make iron use your own heap-like allocator.
-#ifndef FE_CUSTOM_ALLOCATOR
-    #define fe_malloc  malloc
-    #define fe_realloc realloc
-    #define fe_free    free
-#else
-    void* fe_malloc(usize size);
-    void* fe_realloc(void* ptr, usize size);
-    void fe_free(void* ptr, usize size);
-#endif
-
 typedef uint64_t u64;
 typedef uint32_t u32;
 typedef uint16_t u16;
@@ -37,6 +26,17 @@ typedef uintptr_t usize;
 typedef double   f64;
 typedef float    f32;
 typedef _Float16 f16;
+
+// feel free to make iron use your own heap-like allocator.
+#ifndef FE_CUSTOM_ALLOCATOR
+    #define fe_malloc  malloc
+    #define fe_realloc realloc
+    #define fe_free    free
+#else
+    void* fe_malloc(usize size);
+    void* fe_realloc(void* ptr, usize size);
+    void fe_free(void* ptr);
+#endif
 
 // simple ++n loop
 #ifndef for_n
@@ -433,11 +433,13 @@ typedef struct {
     u16 len;
     u16 cap; // if cap == 0, use single.
     union {
-        FeInst*  single_arg;
-        FeInst** multi_arg;
+        struct {
+            FeInst* callee;
+            FeInst* arg;
+        } single;
+        FeInst** multi;
     };
 
-    FeInst* to_call;
     FeFuncSig* sig;
 } FeInstCallIndirect;
 
@@ -559,10 +561,14 @@ FeInst* fe_inst_const(FeFunc* f, FeTy ty, u64 val);
 FeInst* fe_inst_unop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* val);
 FeInst* fe_inst_binop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs);
 FeInst* fe_inst_bare(FeFunc* f, FeTy ty, FeInstKind kind);
+
 FeInst* fe_inst_call_direct(FeFunc* f, FeFunc* to_call);
 FeInst* fe_inst_call_indirect(FeFunc* f, FeInst* to_call, FeFuncSig* sig);
 FeInst* fe_call_arg(FeInst* call, u16 index);
 void fe_call_set_arg(FeInst* call, u16 index, FeInst* arg);
+FeInst* fe_call_indirect_callee(FeInst* call);
+void fe_call_indirect_set_callee(FeInst* call, FeInst* callee);
+
 FeInst* fe_inst_return(FeFunc* f);
 FeInst* fe_return_arg(FeInst* ret, u16 index);
 void fe_return_set_arg(FeInst* ret, u16 index, FeInst* arg);
@@ -577,7 +583,7 @@ void fe_phi_set_src(FeInst* inst, u16 index, FeInst* val, FeBlock* block);
 void fe_phi_append_src(FeInst* inst, FeInst* val, FeBlock* block);
 void fe_phi_remove_src_unordered(FeInst* inst, u16 index);
 
-const char* fe_inst_name(const FeTarget* target, FeInst* inst);
+const char* fe_inst_name(const FeTarget* target, FeInstKind kind);
 const char* fe_ty_name(FeTy ty);
 
 #define fe_extra(instptr) ((void*)&(instptr)->extra[0])

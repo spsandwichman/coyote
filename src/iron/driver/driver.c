@@ -186,12 +186,7 @@ int main() {
 
     FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunc* func = make_regalloc_test(mod, &ipool, &vregs);
-
-    FeFunc* func2 = make_regalloc_test(mod, &ipool, &vregs);
-
-    printf("yuh %p\n", func->list_prev);
-    printf("yuh %p\n", func2->list_prev);
+    FeFunc* func = make_branch_test(mod, &ipool, &vregs);
 
     quick_print(func);
     fe_codegen(func);

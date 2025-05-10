@@ -230,7 +230,7 @@ void fe_inst_update_uses(FeFunc* f) {
     }
 }
 
-// jank as FUCK and very likely to break; too bad!
+// likely to break; too bad!
 FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
     if (inst->kind > FE__BASE_INST_END) {
         return t->list_inputs(inst, len_out);
@@ -257,7 +257,6 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
         *len_out = 1;
         return &fe_extra_T(inst, FeInstBranch)->cond;
     case FE_CALL_DIRECT:  
-    case FE_CALL_INDIRECT:
         ;
         FeInstCallDirect* call = fe_extra(inst);
         *len_out = call->len;
@@ -265,6 +264,15 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
             return &call->single_arg;
         } else {
             return call->multi_arg;
+        }
+    case FE_CALL_INDIRECT:
+        ;
+        FeInstCallIndirect* icall = fe_extra(inst);
+        *len_out = icall->len + 1;
+        if (icall->cap == 0) {
+            return &icall->single.callee;
+        } else {
+            return icall->multi;
         }
     case FE_RETURN:
         ;
@@ -320,6 +328,15 @@ FeBlock** fe_inst_term_list_targets(const FeTarget* t, FeInst* term, usize* len_
 }
 
 void fe_inst_free(FeFunc* f, FeInst* inst) {
+    if (inst->kind == FE_CALL_DIRECT && fe_extra_T(inst, FeInstCallDirect)->cap != 0) {
+        fe_free(fe_extra_T(inst, FeInstCallDirect)->multi_arg);
+    }
+    if (inst->kind == FE_CALL_INDIRECT && fe_extra_T(inst, FeInstCallIndirect)->cap != 0) {
+        fe_free(fe_extra_T(inst, FeInstCallIndirect)->multi);
+    }
+    if (inst->kind == FE_RETURN && fe_extra_T(inst, FeInstReturn)->cap != 0) {
+        fe_free(fe_extra_T(inst, FeInstReturn)->multi);
+    }
     fe_ipool_free(f->ipool, inst);
 }
 
@@ -602,7 +619,6 @@ FeInst* fe_inst_call_indirect(FeFunc* f, FeInst* to_call, FeFuncSig* sig) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstCallIndirect));
     inst->kind = FE_CALL_INDIRECT;
     FeInstCallIndirect* call = fe_extra(inst);
-    call->to_call = to_call;
     call->sig = sig;
 
     // set up parameters
@@ -610,10 +626,12 @@ FeInst* fe_inst_call_indirect(FeFunc* f, FeInst* to_call, FeFuncSig* sig) {
     call->len = num_params;
     if (num_params < 2) {
         call->cap = 0;
+        call->single.callee = to_call;
     } else {
         call->cap = num_params;
         // allocate buffer
-        call->multi_arg = fe_malloc(sizeof(FeInst*) * num_params);
+        call->multi = fe_malloc(sizeof(FeInst*) * (num_params + 1));
+        call->multi[0] = to_call;
     }
     // set up return type
     if (sig->return_len == 0) {
@@ -626,32 +644,69 @@ FeInst* fe_inst_call_indirect(FeFunc* f, FeInst* to_call, FeFuncSig* sig) {
     return inst;
 }
 
-FeInst* fe_call_arg(FeInst* call, u16 index) {
-    // direct/indirect calls have the same param list layout
-    FeInstCallDirect* c = fe_extra(call);
-    if (index >= c->len) {
-        fe_runtime_crash("index >= ret->len");
-    }
-    if (c->len <= 1) {
-        return c->single_arg;
+FeInst* fe_call_indirect_callee(FeInst* call) {
+    FeInstCallIndirect* c = fe_extra(call);
+    if (c->cap == 0) {
+        return c->single.callee;
     } else {
-        return c->multi_arg[index];
+        return c->multi[0];
+    }
+}
+
+void fe_call_indirect_set_callee(FeInst* call, FeInst* callee) {
+    FeInstCallIndirect* c = fe_extra(call);
+    if (c->cap == 0) {
+        c->single.callee = callee;
+    } else {
+        c->multi[0] = callee;
+    }
+}
+
+FeInst* fe_call_arg(FeInst* call, u16 index) {
+    if (call->kind == FE_CALL_DIRECT) {
+        FeInstCallDirect* c = fe_extra(call);
+        if (index >= c->len) {
+            fe_runtime_crash("index >= ret->len");
+        }
+        if (c->cap == 0) {
+            return c->single_arg;
+        } else {
+            return c->multi_arg[index];
+        }
+    } else {
+        FeInstCallIndirect* c = fe_extra(call);
+        if (index >= c->len) {
+            fe_runtime_crash("index >= ret->len");
+        }
+        if (c->cap == 0) {
+            return c->single.arg;
+        } else {
+            return c->multi[index + 1]; // offset for callee
+        }
     }
 }
 
 void fe_call_set_arg(FeInst* call, u16 index, FeInst* arg) {
-    // direct/indirect calls have the same param list layout, so its fine
-    FeInstCallDirect* c = fe_extra(call);
-    if (index >= c->len) {
-        fe_runtime_crash("index >= ret->len");
-    }
-    
-    // arg->use_count++; // since we dont do it earlier...
-
-    if (c->len <= 1) {
-        c->single_arg = arg;
+    if (call->kind == FE_CALL_DIRECT) {
+        FeInstCallDirect* c = fe_extra(call);
+        if (index >= c->len) {
+            fe_runtime_crash("index >= call->len");
+        }
+        if (c->cap == 0) {
+            c->single_arg = arg;
+        } else {
+            c->multi_arg[index] = arg;
+        }
     } else {
-        c->multi_arg[index] = arg;
+        FeInstCallIndirect* c = fe_extra(call);
+        if (index >= c->len) {
+            fe_runtime_crash("index >= ret->len");
+        }
+        if (c->cap == 0) {
+            c->single.arg = arg;
+        } else {
+            c->multi[index + 1] = arg; // offset for callee
+        }
     }
 }
 

@@ -47,7 +47,7 @@ bin/coyote: $(OBJECTS)
 .PHONY: iron
 iron: bin/iron
 bin/iron: bin/libiron.a src/iron/driver/driver.c
-	@$(CC) src/iron/driver/driver.c bin/libiron.a -o bin/iron  $(INCLUDEPATHS) $(CFLAGS) $(OPT) -lm
+	@$(CC) src/iron/driver/driver.c -MD bin/libiron.a -o bin/iron $(INCLUDEPATHS) $(CFLAGS) $(OPT) -lm
 
 bin/libiron.o: $(IRON_OBJECTS)
 	@$(LD) $(IRON_OBJECTS) -r -o bin/libiron.o $(CFLAGS) -lm
