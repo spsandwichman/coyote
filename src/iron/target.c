@@ -1,5 +1,4 @@
 #include "iron/iron.h"
-
 #include "iron/xr17032/xr.h"
 
 // target construction.
@@ -18,7 +17,7 @@ const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
         t->isel = xr_isel;
         t->reg_name = xr_reg_name;
         t->reg_status = xr_reg_status;
-        t->max_regclass = XR_REGCLASS_REG;
+        t->num_regclasses = XR_REGCLASS_REG;
         t->regclass_lens = xr_regclass_lens;
         t->emit_asm = xr_emit_assembly;
         t->choose_regclass = xr_choose_regclass;

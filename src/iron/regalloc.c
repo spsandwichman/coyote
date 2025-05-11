@@ -103,8 +103,8 @@ typedef struct {
 
 LiveSet liveset_new(const FeTarget* target) {
     LiveSet lvset;
-    lvset.reg_live = fe_malloc(sizeof(lvset.reg_live[0]) * (target->max_regclass + 1));
-    for_n(i, 0, target->max_regclass + 1) {
+    lvset.reg_live = fe_malloc(sizeof(lvset.reg_live[0]) * target->num_regclasses);
+    for_n(i, 0, target->num_regclasses) {
         usize regclass_size = sizeof(lvset.reg_live[0][0]) * target->regclass_lens[i];
         lvset.reg_live[i] = fe_malloc(regclass_size);
         memset(lvset.reg_live[i], 0, regclass_size);

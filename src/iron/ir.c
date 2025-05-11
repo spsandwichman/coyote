@@ -3,6 +3,15 @@
 #include <string.h>
 
 
+static const char* inst_name(FeInst* inst) {
+    FeInst* bookend = inst;
+    while (bookend->kind != FE_BOOKEND) {
+        bookend = bookend->next;
+    }
+    const FeTarget* t = fe_extra_T(bookend, FeInstBookend)->block->func->mod->target;
+    return fe_inst_name(t, inst->kind);
+}
+
 FeModule* fe_module_new(FeArch arch, FeSystem system) {
     FeModule* mod = fe_malloc(sizeof(FeModule));
     memset(mod, 0, sizeof(FeModule));
@@ -307,7 +316,7 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
 
 FeBlock** fe_inst_list_terminator_successors(const FeTarget* t, FeInst* term, usize* len_out) {
     if (!fe_inst_has_trait(term->kind, FE_TRAIT_TERMINATOR)) {
-        fe_runtime_crash("list_targets: inst %d is not a terminator", term->kind);
+        fe_runtime_crash("list_targets: inst %s is not a terminator", inst_name(term));
     }
     if (term->kind > FE__BASE_INST_END) {
         return t->list_targets(term, len_out);
@@ -336,6 +345,10 @@ void fe_inst_free(FeFunc* f, FeInst* inst) {
     }
     if (inst->kind == FE_RETURN && fe_extra_T(inst, FeInstReturn)->cap != 0) {
         fe_free(fe_extra_T(inst, FeInstReturn)->multi);
+    }
+    if (inst->kind == FE_PHI) {
+        fe_free(fe_extra_T(inst, FeInstPhi)->blocks);
+        fe_free(fe_extra_T(inst, FeInstPhi)->vals);
     }
     fe_ipool_free(f->ipool, inst);
 }
@@ -582,8 +595,8 @@ void fe_phi_remove_src_unordered(FeInst* inst, u16 index) {
         fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
     }
     if (index != phi->len - 1) {
-        phi->vals[index] = phi->vals[phi->len];
-        phi->blocks[index] = phi->blocks[phi->len];
+        phi->vals[index] = phi->vals[phi->len - 1];
+        phi->blocks[index] = phi->blocks[phi->len - 1];
     }
     phi->len -= 1;
 }
@@ -712,7 +725,7 @@ void fe_call_set_arg(FeInst* call, u16 index, FeInst* arg) {
 
 FeTy fe_proj_ty(FeInst* tuple, usize index) {
     if (tuple->ty != FE_TY_TUPLE) {
-        fe_runtime_crash("projection on non-tuple");
+        fe_runtime_crash("projection on non-tuple inst %s", inst_name(tuple));
     }
     switch (tuple->kind) {
     case FE_CALL_DIRECT:
@@ -793,6 +806,11 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_JUMP]   = TERM | VOL,
     [FE_RETURN] = TERM | VOL,
 };
+
+FeTrait fe_inst_traits(FeInstKind kind) {
+    if (kind > FE__INST_END) return 0;
+    return inst_traits[kind];
+}
 
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait) {
     if (kind > FE__INST_END) return false;

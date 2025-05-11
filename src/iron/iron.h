@@ -4,9 +4,26 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
 
 #if __STDC_VERSION__ <= 201710L 
-    #error "Iron is a C23 library!"
+    #error Iron is a C23 library!
+#endif
+
+#if defined(__x86_64__)
+    #define FE_HOST_X86_64
+    #define FE_HOST_BITS 64
+#elif defined (__i386__)
+    #define FE_HOST_X86_32
+    #define FE_HOST_BITS 32
+#elif defined (__aarch64__)
+    #define FE_HOST_ARM64
+    #define FE_HOST_BITS 64
+#elif defined (__arm__)
+    #define FE_HOST_ARM32
+    #define FE_HOST_BITS 32
+#else
+    #error unrecognized host!
 #endif
 
 typedef uint64_t u64;
@@ -26,6 +43,23 @@ typedef uintptr_t usize;
 typedef double   f64;
 typedef float    f32;
 typedef _Float16 f16;
+
+#if FE_HOST_BITS == 32
+    typedef struct FeCompactStr {
+        char* data;
+        u16 len;
+    } FeCompactStr;
+    #define fe_compstr(data_, len_) ((FeCompactStr){.data = (data_), .len = (len_)})
+    #define fe_compstr_data(compstr) ((compstr).data)
+#else
+    typedef struct FeCompactStr {
+        u64 len : 16;
+        i64 data : 48;
+    } FeCompactStr;
+    #define fe_compstr(data_, len_) ((FeCompactStr){.data = (i64)(char*)(data_), .len = (len_)})
+    #define fe_compstr_data(compstr) ((char*)(i64)(compstr).data)
+#endif
+static_assert(sizeof(FeCompactStr) == 8);
 
 // feel free to make iron use your own heap-like allocator.
 #ifndef FE_CUSTOM_ALLOCATOR
@@ -498,6 +532,7 @@ typedef enum : u16 {
     FE_TRAIT_REG_MOV_HINT     = 1u << 11,
 } FeTrait;
 
+FeTrait fe_inst_traits(FeInstKind kind);
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait);
 void fe__load_trait_table(usize start_index, FeTrait* table, usize len);
 
@@ -616,17 +651,17 @@ typedef struct FeArena {
     Fe__ArenaChunk* top;
 } FeArena;
 
-typedef struct FeArenaSavepoint {
+typedef struct FeArenaState {
     Fe__ArenaChunk* top;
     usize used;
-} FeArenaSavepoint;
+} FeArenaState;
 
 void fe_arena_init(FeArena* arena);
 void fe_arena_destroy(FeArena* arena);
 void* fe_arena_alloc(FeArena* arena, usize size, usize align);
 
-FeArenaSavepoint fe_arena_save(FeArena* arena);
-void fe_arena_restore(FeArena* arena, FeArenaSavepoint save);
+FeArenaState fe_arena_save(FeArena* arena);
+void fe_arena_restore(FeArena* arena, FeArenaState save);
 
 // ----------------------------- passes ------------------------------
 
@@ -738,7 +773,7 @@ typedef struct FeTarget {
     const char* (*reg_name)(u8 regclass, u16 real);
     FeRegStatus (*reg_status)(u8 cconv, u8 regclass, u16 real);
     
-    u8 max_regclass;
+    u8 num_regclasses;
     const u16* regclass_lens;
 
     u64 stack_pointer_align;

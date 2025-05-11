@@ -238,14 +238,14 @@ void* fe_arena_alloc(FeArena* arena, usize size, usize align) {
     fe_runtime_crash("unable to arena-alloc size %zu align %zu", size, align);
 }
 
-FeArenaSavepoint fe_arena_save(FeArena* arena) {
-    return (FeArenaSavepoint){
+FeArenaState fe_arena_save(FeArena* arena) {
+    return (FeArenaState){
         .top = arena->top,
         .used = arena->top->used,
     };
 }
 
-void fe_arena_restore(FeArena* arena, FeArenaSavepoint save) {
+void fe_arena_restore(FeArena* arena, FeArenaState save) {
     arena->top = save.top;
     arena->top->used = save.used;
 }
