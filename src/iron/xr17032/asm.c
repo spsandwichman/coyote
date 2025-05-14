@@ -1,7 +1,7 @@
 #include "iron/iron.h"
 #include "xr.h"
 
-#define DONT_EMIT 1
+#include <stdio.h>
 
 // static u16 reg_num(FeFunc* f, FeInst* inst) {
 //     FeVirtualReg* vr = fe_vreg(f->vregs, inst->vr_out);
@@ -10,11 +10,13 @@
 
 static const char* reg(FeFunc* f, FeInst* inst) {
     if (inst->vr_out == FE_VREG_NONE) {
-        return "FE_VREG_NONE";
+        return "<none>";
     }
     FeVirtualReg* vr = fe_vreg(f->vregs, inst->vr_out);
     if (vr->real == FE_VREG_REAL_UNASSIGNED) {
-        return "FE_VREG_REAL_UNASSIGNED";
+        static char buf[10];
+        snprintf(buf, 10, "<%u>", inst->vr_out);
+        return buf;
     }
     return xr_reg_name(vr->class, vr->real);
 }
@@ -205,31 +207,50 @@ static void emit_inst(FeFunc* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
     fe_db_writecstr(db, "\n");
 }
 
-void xr_emit_assembly(FeDataBuffer* db, FeFunc* f) {
-    // number all instructions and blocks
-    u32 block_counter = 0;
-    for_blocks(block, f) {
-        block->flags = block_counter++;
-        for_inst(inst, block) {
-            inst->flags = 0;
-        }
-    }
+void xr_emit_assembly(FeDataBuffer* db, FeModule* m) {
 
-    // function label
-    fe_db_write(db, f->sym->name, f->sym->name_len);
-    fe_db_writecstr(db, ":\n");
-
-    for_blocks(block, f) {
-        if (block->flags != 0) {
-            emit_block_name(db, block);
-            fe_db_writecstr(db, "\n");
-        }
-
-        for_inst(inst, block) {
-            if (inst->flags == DONT_EMIT) {
-                continue;
+    fe_db_writecstr(db, ".section text\n\n");
+    for_funcs(f, m) {
+        // number all instructions and blocks
+        u32 block_counter = 0;
+        for_blocks(block, f) {
+            block->flags = block_counter++;
+            for_inst(inst, block) {
+                inst->flags = 0;
             }
-            emit_inst(f, block, db, inst);
+        }
+
+        // function label
+        fe_db_write(db, fe_compstr_data(f->sym->name), f->sym->name.len);
+        fe_db_writecstr(db, ":\n");
+
+        // visibility 
+        switch (f->sym->bind) {
+        case FE_BIND_EXTERN:
+        case FE_BIND_SHARED_IMPORT:
+        case FE_BIND_LOCAL:
+            break;
+        case FE_BIND_GLOBAL:
+            fe_db_writecstr(db, ".global ");
+            fe_db_write(db, fe_compstr_data(f->sym->name), f->sym->name.len);
+            fe_db_writecstr(db, "\n");
+            break;
+        case FE_BIND_SHARED_EXPORT:
+            fe_db_writecstr(db, ".export ");
+            fe_db_write(db, fe_compstr_data(f->sym->name), f->sym->name.len);
+            fe_db_writecstr(db, "\n");
+            break;
+        }
+
+        for_blocks(block, f) {
+            if (block->flags != 0) {
+                emit_block_name(db, block);
+                fe_db_writecstr(db, ":\n");
+            }
+
+            for_inst(inst, block) {
+                emit_inst(f, block, db, inst);
+            }
         }
     }
 }

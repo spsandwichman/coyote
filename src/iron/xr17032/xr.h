@@ -165,7 +165,7 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst);
 void xr_pre_regalloc_opt(FeFunc* f);
 void xr_final_touchups(FeFunc* f);
 
-void xr_emit_assembly(FeDataBuffer* db, FeFunc* f);
+void xr_emit_assembly(FeDataBuffer* db, FeModule* m);
 
 FeRegclass xr_choose_regclass(FeInstKind kind, FeTy ty);
 

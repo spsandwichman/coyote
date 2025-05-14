@@ -1,6 +1,4 @@
-#include <stdio.h>
-
-#include "iron.h"
+#include "iron/iron.h"
 
 void fe_vrbuf_init(FeVRegBuffer* buf, usize cap) {
     if (cap < 2) cap = 2;
@@ -145,18 +143,12 @@ void fe_codegen(FeFunc* f) {
             }
         }
     }
-
-    printf("isel complete\n");
-
+    
     fe_regalloc_linear_scan(f);
 
-    printf("regalloc complete\n");
-
     f->mod->target->final_touchups(f);
-
-    printf("codegen complete\n");
 }
 
-void fe_emit_asm(FeDataBuffer* db, FeFunc* f) {
-    f->mod->target->emit_asm(db, f);
+void fe_emit_asm(FeDataBuffer* db, FeModule* m) {
+    m->target->emit_asm(db, m);
 }

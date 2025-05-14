@@ -44,22 +44,21 @@ typedef double   f64;
 typedef float    f32;
 typedef _Float16 f16;
 
-#if FE_HOST_BITS == 32
+#ifdef FE_HOST_X86_64
+    typedef struct FeCompactStr {
+        i64 data : 48;
+        u64 len : 16;
+    } FeCompactStr;
+    #define fe_compstr(data_, len_) ((FeCompactStr){.data = (i64)(char*)(data_), .len = (len_)})
+    #define fe_compstr_data(compstr) ((char*)(i64)(compstr).data)
+#else // fallback to regular string
     typedef struct FeCompactStr {
         char* data;
         u16 len;
     } FeCompactStr;
     #define fe_compstr(data_, len_) ((FeCompactStr){.data = (data_), .len = (len_)})
     #define fe_compstr_data(compstr) ((compstr).data)
-#else
-    typedef struct FeCompactStr {
-        u64 len : 16;
-        i64 data : 48;
-    } FeCompactStr;
-    #define fe_compstr(data_, len_) ((FeCompactStr){.data = (i64)(char*)(data_), .len = (len_)})
-    #define fe_compstr_data(compstr) ((char*)(i64)(compstr).data)
 #endif
-static_assert(sizeof(FeCompactStr) == 8);
 
 // feel free to make iron use your own heap-like allocator.
 #ifndef FE_CUSTOM_ALLOCATOR
@@ -179,17 +178,19 @@ typedef enum: u8 {
     // shared libary stuff
     FE_BIND_SHARED_EXPORT,
     FE_BIND_SHARED_IMPORT,
+
+    FE_BIND_EXTERN, 
 } FeSymbolBinding;
 
 typedef enum: u8 {
-    FE_SYMKIND_FUNC = 1,
+    FE_SYMKIND_NONE = 0,
+    FE_SYMKIND_FUNC,
     FE_SYMKIND_DATA,
-    FE_SYMKIND_EXTERN, // not defined in this unit
 } FeSymbolKind;
 
 typedef struct FeSymbol {
-    const char* name;
-    u16 name_len;
+    FeCompactStr name;
+
     FeSymbolKind kind; // what does this symbol refer to?
     FeSymbolBinding bind; // where is this symbol visible?
 
@@ -321,7 +322,8 @@ typedef enum: FeInstKind {
     
     FE_NOT,
     FE_NEG,
-    FE_TRUNC, // integer downcast
+
+    FE_TRUNC,    // integer downcast
     FE_SIGNEXT,  // signed integer upcast
     FE_ZEROEXT,  // unsigned integer upcast
     FE_BITCAST,
@@ -779,7 +781,7 @@ typedef struct FeTarget {
     u64 stack_pointer_align;
 
     void (*ir_print_args)(FeDataBuffer* db, FeFunc* f, FeInst* inst);
-    void (*emit_asm)(FeDataBuffer* db, FeFunc* f);
+    void (*emit_asm)(FeDataBuffer* db, FeModule* m);
 } FeTarget;
 
 const FeTarget* fe_make_target(FeArch arch, FeSystem system);
@@ -794,6 +796,6 @@ FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class)
 FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr);
 
 void fe_codegen(FeFunc* f);
-void fe_emit_asm(FeDataBuffer* db, FeFunc* f);
+void fe_emit_asm(FeDataBuffer* db, FeModule* m);
 
 #endif

@@ -196,7 +196,7 @@ int main() {
 
     FeDataBuffer db; 
     fe_db_init(&db, 2048);
-    fe_emit_asm(&db, func);
+    fe_emit_asm(&db, mod);
     printf("%.*s", (int)db.len, db.at);
 
     fe_module_destroy(mod);

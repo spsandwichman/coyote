@@ -1,6 +1,7 @@
+#include <stdlib.h>
 #include <string.h>
 
-#include "iron.h"
+#include "iron/iron.h"
 
 static u8 extra_size_table[FE__INST_END] = {
     // default error value

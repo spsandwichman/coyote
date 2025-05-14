@@ -1,5 +1,8 @@
-#include "iron/iron.h"
+#include <stdlib.h>
 #include <string.h>
+
+#include "iron.h"
+#include "iron/iron.h"
 
 static const char* ty_name[] = {
     [FE_TY_VOID] = "void",
@@ -261,7 +264,7 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         ;
         FeInstCallDirect* dcall = fe_extra(inst);
         fe_db_writecstr(db, "\"");
-        fe_db_write(db, dcall->to_call->sym->name, dcall->to_call->sym->name_len);
+        fe_db_write(db, fe_compstr_data(dcall->to_call->sym->name), dcall->to_call->sym->name.len);
         fe_db_writecstr(db, "\", ");
         for_n(i, 0, dcall->len) {
             FeInst* arg = fe_call_arg(inst, i);
@@ -302,6 +305,7 @@ void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
     }
 
     switch (f->sym->bind) {
+    case FE_BIND_EXTERN: fe_db_writecstr(db, "extern "); break;
     case FE_BIND_GLOBAL: fe_db_writecstr(db, "global "); break;
     case FE_BIND_LOCAL:  fe_db_writecstr(db, "local "); break;
     case FE_BIND_SHARED_EXPORT: fe_db_writecstr(db, "shared_export "); break;
@@ -309,7 +313,7 @@ void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
     }
 
     // write function signature
-    fe_db_writef(db, "func \"%.*s\"", f->sym->name_len, f->sym->name);
+    fe_db_writef(db, "func \"%.*s\"", f->sym->name.len, fe_compstr_data(f->sym->name));
     if (f->sig->param_len) {
         fe_db_writecstr(db, " ");
         for_n(i, 0, f->sig->param_len) {
@@ -326,6 +330,11 @@ void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
             fe_db_writecstr(db, ty_name[fe_funcsig_return(f->sig, i)->ty]);
         }
     }
+
+    if (f->sym->bind == FE_BIND_EXTERN) {
+        return;
+    }
+
     // write function body
     fe_db_writecstr(db, " {\n");
     for_blocks(block, f) {

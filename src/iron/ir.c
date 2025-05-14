@@ -36,10 +36,9 @@ FeSymbol* fe_symbol_new(FeModule* m, const char* name, u16 len, FeSymbolBinding 
     }
     // put this in an arena of some sort later
     FeSymbol* sym = fe_malloc(sizeof(FeSymbol));
-    sym->kind = FE_SYMKIND_EXTERN;
+    sym->kind = FE_SYMKIND_NONE;
     sym->bind = bind;
-    sym->name = name;
-    sym->name_len = len;
+    sym->name = fe_compstr(name, len);
 
     return sym;
 }

@@ -1,7 +1,7 @@
-#include "iron.h"
 #include "iron/iron.h"
 
 bool is_canon_def(FeVirtualReg* inst_out, FeInst* inst) {
+    // upsilons are a kind of fake definition that get created during codegen as inputs for phi nodes.
     return (inst->kind == FE_UPSILON || inst_out->def == inst);
 }
 
