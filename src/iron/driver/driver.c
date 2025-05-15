@@ -177,6 +177,21 @@ FeFunc* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs
     return f;
 }
 
+FeFunc* make_symaddr_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
+    FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 0, 1);
+    fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
+
+    // make the function and its symbol
+    FeSymbol* f_sym = fe_symbol_new(mod, "symaddr_test", 0, FE_BIND_GLOBAL);
+    FeFunc* f = fe_func_new(mod, f_sym, f_sig, ipool, vregs);
+    FeBlock* entry = f->entry_block;
+
+    FeInst* symaddr = fe_append_end(entry, fe_inst_symaddr(f, FE_TY_I32, f_sym));
+    FeInst* ret = fe_append_end(entry, fe_inst_return(f));
+    fe_return_set_arg(ret, 0, symaddr);
+    
+    return f;
+}
 int main() {
     fe_init_signal_handler();
     FeInstPool ipool;
@@ -186,7 +201,7 @@ int main() {
 
     FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunc* func = make_branch_test(mod, &ipool, &vregs);
+    FeFunc* func = make_symaddr_test(mod, &ipool, &vregs);
 
     quick_print(func);
     fe_codegen(func);

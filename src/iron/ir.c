@@ -300,6 +300,7 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
     case FE_BOOKEND:
     case FE_PARAM:
     case FE_CONST:
+    case FE_SYMADDR:
     case FE_CASCADE_UNIQUE:
     case FE_CASCADE_VOLATILE:
     case FE_JUMP:
@@ -440,6 +441,38 @@ FeInst* fe_inst_const(FeFunc* f, FeTy ty, u64 val) {
     inst->kind = FE_CONST;
     inst->ty = ty;
     fe_extra_T(inst, FeInstConst)->val = val;
+    return inst;
+}
+
+FeInst* fe_inst_const_f64(FeFunc* f, f64 val) {
+    FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstConst));
+    inst->kind = FE_CONST;
+    inst->ty = FE_TY_F64;
+    fe_extra_T(inst, FeInstConst)->val_f64 = val;
+    return inst;
+}
+
+FeInst* fe_inst_const_f32(FeFunc* f, f32 val) {
+    FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstConst));
+    inst->kind = FE_CONST;
+    inst->ty = FE_TY_F32;
+    fe_extra_T(inst, FeInstConst)->val_f32 = val;
+    return inst;
+}
+
+FeInst* fe_inst_const_f16(FeFunc* f, f16 val) {
+    FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstConst));
+    inst->kind = FE_CONST;
+    inst->ty = FE_TY_F16;
+    fe_extra_T(inst, FeInstConst)->val_f16 = val;
+    return inst;
+}
+
+FeInst* fe_inst_symaddr(FeFunc* f, FeTy ty, FeSymbol* sym) {
+    FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstSymAddr));
+    inst->kind = FE_SYMADDR;
+    inst->ty = ty;
+    fe_extra_T(inst, FeInstSymAddr)->sym = sym;
     return inst;
 }
 
@@ -753,6 +786,7 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_MACH_PROJ] = VOL,
     [FE_PARAM] = VOL,
     [FE_CONST] = 0,
+    [FE_SYMADDR] = 0,
 
     [FE_IADD] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
     [FE_ISUB] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,

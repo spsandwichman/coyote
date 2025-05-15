@@ -293,6 +293,9 @@ typedef enum: FeInstKind {
     // Const
     FE_CONST,
 
+    // SymAddr
+    FE_SYMADDR,
+
     // Binop
     FE_IADD,
     FE_ISUB,
@@ -403,9 +406,16 @@ typedef struct {
     usize index;
 } FeInstParam;
 
-typedef struct {
+typedef union {
     u64 val;
+    f64 val_f64;
+    f32 val_f32;
+    f16 val_f16;
 } FeInstConst;
+
+typedef struct {
+    FeSymbol* sym;
+} FeInstSymAddr;
 
 typedef struct {
     FeInst* un;
@@ -595,6 +605,10 @@ FeBlock** fe_inst_list_terminator_successors(const FeTarget* t, FeInst* term, us
 FeTy fe_proj_ty(FeInst* tuple, usize index);
 
 FeInst* fe_inst_const(FeFunc* f, FeTy ty, u64 val);
+FeInst* fe_inst_const_f64(FeFunc* f, f64 val);
+FeInst* fe_inst_const_f32(FeFunc* f, f32 val);
+FeInst* fe_inst_const_f16(FeFunc* f, f16 val);
+FeInst* fe_inst_symaddr(FeFunc* f, FeTy ty, FeSymbol* sym);
 FeInst* fe_inst_unop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* val);
 FeInst* fe_inst_binop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs);
 FeInst* fe_inst_bare(FeFunc* f, FeTy ty, FeInstKind kind);

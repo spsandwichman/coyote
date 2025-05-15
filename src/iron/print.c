@@ -50,6 +50,8 @@ static const char* inst_name[FE__BASE_INST_END] = {
 
     [FE_CONST] = "const",
 
+    [FE_SYMADDR] = "symaddr",
+
     [FE_PARAM] = "param",
 
     [FE_PROJ] = "proj",
@@ -248,9 +250,19 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
             fe__emit_ir_ref(db, f, src);
         }
         break;
+    case FE_SYMADDR:
+        ;
+        FeSymbol* sym = fe_extra_T(inst, FeInstSymAddr)->sym;
+        fe_db_writecstr(db, "\"");
+        fe_db_write(db, fe_compstr_data(sym->name), sym->name.len);
+        fe_db_writecstr(db, "\"");
+        break;
     case FE_CONST:
         switch (inst->ty) {
         case FE_TY_BOOL: fe_db_writef(db, "%s", fe_extra_T(inst, FeInstConst)->val ? "true" : "false"); break;
+        case FE_TY_F64:  fe_db_writef(db, "%lf", (f64)fe_extra_T(inst, FeInstConst)->val_f64); break;
+        case FE_TY_F32:  fe_db_writef(db, "%lf", (f64)fe_extra_T(inst, FeInstConst)->val_f32); break;
+        case FE_TY_F16:  fe_db_writef(db, "%lf", (f64)fe_extra_T(inst, FeInstConst)->val_f16); break;
         case FE_TY_I64:  fe_db_writef(db, "0x%llx", (u64)fe_extra_T(inst, FeInstConst)->val); break;
         case FE_TY_I32:  fe_db_writef(db, "0x%llx", (u64)(u32)fe_extra_T(inst, FeInstConst)->val); break;
         case FE_TY_I16:  fe_db_writef(db, "0x%llx", (u64)(u16)fe_extra_T(inst, FeInstConst)->val); break;
