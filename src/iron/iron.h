@@ -681,6 +681,34 @@ void fe_arena_restore(FeArena* arena, FeArenaState save);
 
 // ----------------------------- passes ------------------------------
 
+typedef struct {
+    bool warning;
+
+    enum : u8 { // something's wrong with...
+        FE_VERIFY_INST,    // an instruction
+        FE_VERIFY_BLOCK,   // a block
+        FE_VERIFY_FUNC,    // a function
+        FE_VERIFY_FUNCSIG, // a function signature
+        FE_VERIFY_SYMBOL,  // a symbol
+    } kind;
+    char* message;
+    union {
+        FeInst*    inst;
+        FeBlock*   block;
+        FeFunc*    func;
+        FeFuncSig* funcsig;
+        FeSymbol*  symbol;
+    };
+} FeVerifyReport;
+
+typedef struct {
+    FeVerifyReport* reports;
+    u32 len;
+    u32 cap;
+} FeVerifyReportList;
+
+FeVerifyReportList fe_verify_module(FeModule* m);
+
 void fe_cfg_calculate(FeFunc* f);
 void fe_cfg_destroy(FeFunc* f);
 

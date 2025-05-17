@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 #define ORBIT_IMPLEMENTATION
-#include "orbit.h"
+#include "common/orbit.h"
 
 #include "lex.h"
 #include "parse.h"

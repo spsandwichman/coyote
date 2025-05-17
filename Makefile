@@ -3,13 +3,12 @@ IRON_SRC_PATHS = \
 	src/iron/opt/*.c \
 	src/iron/xr17032/*.c \
 
-SRCPATHS = \
-	$(IRON_SRC_PATHS) \
-	src/*.c \
+COYOTE_SRC_PATHS = \
+	src/coyote/*.c \
 	src/common/*.c \
 
-SRC = $(wildcard $(SRCPATHS))
-OBJECTS = $(SRC:src/%.c=build/%.o)
+COYOTE_SRC = $(wildcard $(COYOTE_SRC_PATHS))
+COYOTE_OBJECTS = $(COYOTE_SRC:src/%.c=build/%.o)
 
 IRON_SRC = $(wildcard $(IRON_SRC_PATHS))
 IRON_OBJECTS = $(IRON_SRC:src/%.c=build/%.o)
@@ -35,22 +34,23 @@ endif
 FILE_NUM = 0
 build/%.o: src/%.c
 	$(eval FILE_NUM=$(shell echo $$(($(FILE_NUM)+1))))
-	$(shell $(ECHO) 1>&2 -e "\e[0m[\e[32m$(FILE_NUM)/$(words $(SRC))\e[0m]\t Compiling \e[1m$<\e[0m")
+# $(shell $(ECHO) 1>&2 -e "\e[0m[\e[32m$(FILE_NUM)/$(words $(COYOTE_SRC))\e[0m]\t Compiling \e[1m$<\e[0m")
+	$(shell $(ECHO) 1>&2 -e "Compiling \e[1m$<\e[0m")
 	
 	@$(CC) -c -o $@ $< -MD $(INCLUDEPATHS) $(ALLFLAGS) $(OPT)
 
 .PHONY: coyote
 coyote: bin/coyote
-bin/coyote: $(OBJECTS)
-	@$(LD) $(OBJECTS) -o bin/coyote $(ALLFLAGS) -lm
+bin/coyote: bin/libiron.a $(COYOTE_OBJECTS)
+	@$(LD) bin/libiron.a $(COYOTE_OBJECTS) -o bin/coyote -lm
 
 .PHONY: iron
-iron: bin/iron
-bin/iron: bin/libiron.a src/iron/driver/driver.c
-	@$(CC) src/iron/driver/driver.c -MD bin/libiron.a -o bin/iron $(INCLUDEPATHS) $(CFLAGS) $(OPT) -lm
+iron-test: bin/iron-test
+bin/iron-test: bin/libiron.a src/iron/driver/driver.c
+	@$(CC) src/iron/driver/driver.c bin/libiron.a -o bin/iron-test $(INCLUDEPATHS) $(CFLAGS) $(OPT) -lm
 
 bin/libiron.o: $(IRON_OBJECTS)
-	@$(LD) $(IRON_OBJECTS) -r -o bin/libiron.o $(CFLAGS) -lm
+	@$(LD) $(IRON_OBJECTS) -r -o bin/libiron.o -lm
 
 .PHONY: libiron
 libiron: bin/libiron.a
@@ -63,6 +63,8 @@ clean:
 	@rm -rf bin/
 	@mkdir build/
 	@mkdir bin/
-	@mkdir -p $(dir $(OBJECTS))
+	@mkdir -p $(dir $(COYOTE_OBJECTS))
+	@mkdir -p $(dir $(IRON_OBJECTS))
 
--include $(OBJECTS:.o=.d)
+-include $(IRON_OBJECTS:.o=.d)
+-include $(COYOTE_OBJECTS:.o=.d)

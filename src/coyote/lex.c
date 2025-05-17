@@ -479,6 +479,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
         v.string = preproc_collect_complex_string(l);
         break;
     case TOK_IDENTIFIER:
+        ;
         string span = tok_span(t);
         if (string_eq(span, constr("JKL_FUNC_NAME"))) {
             
@@ -493,6 +494,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
         v.integer = eval_integer(t);
         break;
     case TOK_OPEN_PAREN:
+        ;
         Token op = lex_next_raw(l);
 
         if (op.kind == TOK_IDENTIFIER) {
@@ -736,6 +738,7 @@ static void emit_preproc_val(PreprocVal val, Vec(Token)* tokens, PreprocScope* s
         }
         break;
     case PPVAL_COMPLEX_STRING:
+        ;
         Lexer local_lexer = lexer_from_string(from_compact(val.string));
         PreprocScope* local_scope = &local_scopes[emit_depth - 1];
         if (local_scope->map.keys == nullptr) {
@@ -751,6 +754,7 @@ static void emit_preproc_val(PreprocVal val, Vec(Token)* tokens, PreprocScope* s
         macro_arg_pool.len = saved_ma_len; // allow reuse of pool space
         break;
     case PPVAL_STRING:
+        ;
         Token t;
         t.kind = TOK_STRING;
         t.len = val.string.len;
@@ -861,6 +865,7 @@ static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) 
     for (Token t = lex_next_raw(l); t.kind != TOK_EOF; t = lex_next_raw(l)) {
         switch (t.kind) {
         case TOK_IDENTIFIER:
+            ;
             string span = tok_span(t);
             if (replacement_exists(span, scope)) {
                 PreprocVal val = get_replacement_value(span, scope);
@@ -878,6 +883,7 @@ static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) 
             }
             break;
         case TOK_HASH:
+            ;
             u8 kind = preproc_dispatch(l, tokens, scope);
             switch (kind) {
             case 0:

@@ -2,7 +2,7 @@
 #define LEX_H
 
 #include <assert.h>
-#include "orbit.h"
+#include "common/orbit.h"
 #include "common/vec.h"
 #include "common/strmap.h"
 

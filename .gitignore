@@ -2,9 +2,9 @@
 *.a
 *.d
 *.exe
-coyote
-./iron
+
 .vscode
+build
+bin
 gmon.out
 .clangd
-bin
