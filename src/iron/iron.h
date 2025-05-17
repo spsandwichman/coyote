@@ -365,10 +365,8 @@ typedef enum: FeInstKind {
     // Phi
     FE_PHI,
 
-    // CallDirect
-    FE_CALL_DIRECT,
     // CallIndirect
-    FE_CALL_INDIRECT,
+    FE_CALL,
 
     FE__BASE_INST_END,
 
@@ -468,17 +466,6 @@ typedef struct {
     u16 len;
     u16 cap; // if cap == 0, use single.
     union {
-        FeInst*  single_arg;
-        FeInst** multi_arg;
-    };
-
-    FeFunc* to_call;
-} FeInstCallDirect;
-
-typedef struct {
-    u16 len;
-    u16 cap; // if cap == 0, use single.
-    union {
         struct {
             FeInst* callee;
             FeInst* arg;
@@ -487,7 +474,7 @@ typedef struct {
     };
 
     FeFuncSig* sig;
-} FeInstCallIndirect;
+} FeInstCall;
 
 typedef struct {
     FeInst* val;
@@ -613,8 +600,7 @@ FeInst* fe_inst_unop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* val);
 FeInst* fe_inst_binop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs);
 FeInst* fe_inst_bare(FeFunc* f, FeTy ty, FeInstKind kind);
 
-FeInst* fe_inst_call_direct(FeFunc* f, FeFunc* to_call);
-FeInst* fe_inst_call_indirect(FeFunc* f, FeInst* to_call, FeFuncSig* sig);
+FeInst* fe_inst_call(FeFunc* f, FeInst* callee, FeFuncSig* sig);
 FeInst* fe_call_arg(FeInst* call, u16 index);
 void fe_call_set_arg(FeInst* call, u16 index, FeInst* arg);
 FeInst* fe_call_indirect_callee(FeInst* call);
@@ -643,7 +629,7 @@ const char* fe_ty_name(FeTy ty);
 
 // check this assumption with some sort
 // with a runtime init function
-#define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstCallIndirect)
+#define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstCall)
 
 // --------------------------- allocation ----------------------------
 // TODO merge FeInstPool and FeArena into the same thing lol

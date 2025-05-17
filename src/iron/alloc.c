@@ -23,8 +23,7 @@ static u8 extra_size_table[FE__INST_END] = {
     [FE_JUMP] = sizeof(FeInstJump),
     [FE_RETURN] = sizeof(FeInstReturn),
     
-    [FE_CALL_DIRECT] = sizeof(FeInstCallDirect),
-    [FE_CALL_INDIRECT] = sizeof(FeInstCallIndirect),
+    [FE_CALL] = sizeof(FeInstCall),
 
     [FE_MACH_STACK_SPILL] = sizeof(FeMachStackSpill),
     [FE_MACH_STACK_RELOAD] = sizeof(FeMachStackReload),

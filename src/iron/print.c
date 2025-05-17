@@ -113,8 +113,7 @@ static const char* inst_name[FE__BASE_INST_END] = {
 
     [FE_PHI] = "phi",
 
-    [FE_CALL_DIRECT] = "call_direct",
-    [FE_CALL_INDIRECT] = "call_indirect",
+    [FE_CALL] = "call",
 };
 
 // idea stolen from TB lmao
@@ -222,6 +221,32 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
             fe__emit_ir_ref(db, f, fe_return_arg(inst, i));
         }
         break;
+    case FE_CALL:
+        ;
+        FeInstCall* call = fe_extra(inst);
+        if (call->cap == 0) {
+            fe__emit_ir_ref(db, f, call->single.callee);
+            fe_db_writecstr(db, " (");
+            if (call->len != 0) {
+                fe__emit_ir_ref(db, f, call->single.arg);
+                fe_db_writecstr(db, ": ");
+                fe_db_writecstr(db, fe_ty_name(call->single.arg->ty));
+            }
+            fe_db_writecstr(db, ")");
+        } else {
+            fe__emit_ir_ref(db, f, call->multi[0]);
+            fe_db_writecstr(db, " (");
+            for_n(i, 0, call->len) {
+                if (i != 0) fe_db_writecstr(db, ", ");
+                FeInst* arg = fe_call_arg(inst, i);
+                fe__emit_ir_ref(db, f, arg);
+                fe_db_writecstr(db, ": ");
+                fe_db_writecstr(db, fe_ty_name(arg->ty));
+            }
+            fe_db_writecstr(db, ")");
+        }
+
+        break;
     case FE_BRANCH:
         ;
         FeInstBranch* branch = fe_extra(inst);
@@ -270,20 +295,6 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         default:
             fe_db_writef(db, "[TODO]");
             break;
-        }
-        break;
-    case FE_CALL_DIRECT:
-        ;
-        FeInstCallDirect* dcall = fe_extra(inst);
-        fe_db_writecstr(db, "\"");
-        fe_db_write(db, fe_compstr_data(dcall->to_call->sym->name), dcall->to_call->sym->name.len);
-        fe_db_writecstr(db, "\", ");
-        for_n(i, 0, dcall->len) {
-            FeInst* arg = fe_call_arg(inst, i);
-            if (i != 0) fe_db_writecstr(db, ", ");
-            fe__emit_ir_ref(db, f, arg);
-            fe_db_writecstr(db, ": ");
-            fe_db_writecstr(db, ty_name[arg->ty]);
         }
         break;
     case FE_MACH_REG:

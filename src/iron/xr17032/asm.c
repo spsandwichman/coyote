@@ -77,7 +77,7 @@ static void emit_branch(FeFunc* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
 }
 
 static char* mem_operand_size(FeInstKind kind) {
-    auto xr_kind = (XrInstKind)kind;
+    XrInstKind xr_kind = (XrInstKind)kind;
     switch (xr_kind) {
     case XR_LOAD8_IMM:
     case XR_LOAD8_REG:
@@ -98,7 +98,7 @@ static char* mem_operand_size(FeInstKind kind) {
     case XR_STORE32_REG:
         return "long";
     default: 
-        return "";
+        return "???";
     }
 }
 

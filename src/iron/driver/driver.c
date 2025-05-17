@@ -86,7 +86,8 @@ FeFunc* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
             param,
             const1
         ));
-        FeInst* call = fe_append_end(if_false, fe_inst_call_direct(fact, fact));
+        FeInst* fact_symaddr = fe_append_end(if_false, fe_inst_symaddr(fact, FE_TY_I32, fact->sym));
+        FeInst* call = fe_append_end(if_false, fe_inst_call(fact, fact_symaddr, fact->sig));
         fe_call_set_arg(call, 0, isub);
         FeInst* imul = fe_append_end(if_false, fe_inst_binop(fact, 
             FE_TY_I32, FE_IMUL,
@@ -201,7 +202,7 @@ int main() {
 
     FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunc* func = make_symaddr_test(mod, &ipool, &vregs);
+    FeFunc* func = make_factorial(mod, &ipool, &vregs);
 
     quick_print(func);
     fe_codegen(func);
