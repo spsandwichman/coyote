@@ -1,4 +1,5 @@
 #include "lex.h"
+#include "common/strmap.h"
 #include "common/vec.h"
 
 const char* token_kind[_TOK_COUNT] = {
@@ -423,9 +424,6 @@ static PreprocVal get_replacement_value(string key, PreprocScope* scope) {
 static void put_replacement_value(string key, PreprocScope* scope, PreprocVal val) {
     vec_append(&preproc_val_pool, val);
     // place at innermost scope
-    printf(str_fmt" -> %d\n", str_arg(key), val.kind);
-    fflush(stdout);
-
     strmap_put(&scope->map, key, (void*)(preproc_val_pool.len - 1));
 }
 
@@ -672,6 +670,7 @@ static void preproc_macro(Lexer* l, PreprocScope* scope) {
     PreprocVal macro = {
         .kind = PPVAL_MACRO,
         .macro = {
+            // .scope = scope,
             .body_index = body_index,
             .params_index = macro_params_index,
             .params_len = params_len,
@@ -744,22 +743,15 @@ static void emit_preproc_val(PreprocVal val, Vec(Token)* tokens, PreprocScope* s
         ;
         Lexer local_lexer = lexer_from_string(from_compact(val.string));
         // PreprocScope* local_scope = &local_scopes[emit_depth - 1];
-        PreprocScope* local_scope = malloc(sizeof(PreprocScope));
-        local_scope->parent = scope;
-        strmap_init(&local_scope->map, 4);
-        // if (local_scope->map.keys == nullptr) {
-        //     strmap_init(&local_scope->map, 4);
-        //     // local_scope->parent =  &global_scope;
-        // } else {
-        //     strmap_reset(&local_scope->map);
-        // }
-        // usize saved_ppv_len = preproc_val_pool.len;
-        // usize saved_ma_len = macro_arg_pool.len;
-        // printf("AAAA ["str_fmt"]\n", from_compact(val.string).len, from_compact(val.string).raw);
-        lex_with_preproc(&local_lexer, tokens, local_scope);
-        // preproc_val_pool.len = saved_ppv_len; // allow reuse of pool space
-        // macro_arg_pool.len = saved_ma_len; // allow reuse of pool space
-        free(local_scope);
+        PreprocScope local_scope = {};
+        local_scope.parent = scope;
+        if (val.is_macro_arg) { // prevent name conflicts/infinite recursion bullshit
+            local_scope.parent = scope->parent;
+        }
+        strmap_init(&local_scope.map, 4);
+
+        lex_with_preproc(&local_lexer, tokens, &local_scope);
+        strmap_destroy(&local_scope.map);
         break;
     case PPVAL_STRING:
         ;
@@ -817,14 +809,9 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
     }
     assert(macro.kind == PPVAL_MACRO);
 
-    PreprocScope* local_scope = malloc(sizeof(PreprocScope));
-    local_scope->parent = scope;
-    // if (local_scope->map.keys == nullptr) {
-        strmap_init(&local_scope->map, 4);
-        // local_scope->parent =  &global_scope;
-    // } else {
-        // strmap_reset(&local_scope->map);
-    // }
+    PreprocScope local_scope = {};
+    local_scope.parent = scope;
+    strmap_init(&local_scope.map, 4);
 
     // collect args as complex strings, define them in the new scope
 
@@ -849,16 +836,16 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
             TODO("error: too many parameters, expected %u", macro.macro.params_len);
         }
         string param_name = tok_span(macro_arg_pool.at[macro.macro.params_index + arg_len]);
-        put_replacement_value(param_name, local_scope, arg);
+        put_replacement_value(param_name, &local_scope, arg);
         ++arg_len;
     }
 
     PreprocVal body = preproc_val_pool.at[macro.macro.body_index];
     Lexer local_lexer = lexer_from_string(from_compact(body.string));
-    lex_with_preproc(&local_lexer, tokens, local_scope);
+    lex_with_preproc(&local_lexer, tokens, &local_scope);
 
+    strmap_destroy(&local_scope.map);
     preproc_val_pool.len = saved_ppv_len; // allow reuse of pool space
-    free(local_scope);
     --emit_depth;
 }
 

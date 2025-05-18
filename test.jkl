@@ -1,8 +1,4 @@
-#MACRO Foo ( Foo_arg ) [ Foo_arg + 1 ]
-#MACRO Bar ( Bar_arg ) [ Foo(Bar_arg+2) ]
+#MACRO foo(arg) [ arg + 1 ]
+#MACRO bar(arg) [ foo(arg + 2) ]
 
-FN bruh(): WORD
-    Bar( fooooooo ) := 1
-    RETURN fooooooo
-END
-
+x := bar(10)

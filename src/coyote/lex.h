@@ -230,6 +230,11 @@ enum {
     PPVAL_MACRO,
 };
 
+typedef struct PreprocScope {
+    StrMap map;
+    struct PreprocScope* parent;
+} PreprocScope;
+
 typedef struct {
     u64 is_macro_arg : 1;
     u64 kind : 7;
@@ -239,6 +244,7 @@ typedef struct {
         CompactString string;
         i64 integer;
         struct {
+            // PreprocScope* parentscope;
             u64 params_index: 24;
             u64 params_len : 8;
             u64 body_index : 32;
@@ -247,13 +253,6 @@ typedef struct {
 } PreprocVal;
 
 Vec_typedef(PreprocVal);
-
-typedef struct PreprocScope {
-    StrMap map;
-    struct PreprocScope* parent;
-} PreprocScope;
-
-
 
 typedef enum : u8 {
     REPORT_ERROR,
