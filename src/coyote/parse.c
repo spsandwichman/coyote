@@ -176,6 +176,9 @@ void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) 
     }
 
     printf(str_fmt"\n", (int)expanded_snippet.len, expanded_snippet.at);
+    for_n(i, 0, (usize)expanded_snippet_highlight_start) {
+        printf(" ");
+    }
     printf("^");
     for_n(i, 1, expanded_snippet_highlight_len) {
         printf("~");

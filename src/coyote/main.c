@@ -37,8 +37,8 @@ int main(int argc, char** argv) {
             // printf("%s ", token_kind[t->kind]);
             continue;
         }
-        printf(str_fmt, str_arg(tok_span(*t)));
-        // token_error(&ctx, i, i + 3, "error on 'x'");
+        // printf(str_fmt, str_arg(tok_span(*t)));
+        token_error(&ctx, i + 1, i + 7, "error on 'x'");
         // break;
         printf(" ");
     }

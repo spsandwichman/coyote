@@ -244,7 +244,6 @@ typedef struct {
         CompactString string;
         i64 integer;
         struct {
-            // PreprocScope* parentscope;
             u64 params_index: 24;
             u64 params_len : 8;
             u64 body_index : 32;

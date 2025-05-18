@@ -668,6 +668,8 @@ static void preproc_macro(Lexer* l, PreprocScope* scope) {
     usize body_index = preproc_val_pool.len - 1;
 
     PreprocVal macro = {
+        .len = name.len,
+        .raw = name.raw,
         .kind = PPVAL_MACRO,
         .macro = {
             // .scope = scope,
@@ -742,16 +744,21 @@ static void emit_preproc_val(PreprocVal val, Vec(Token)* tokens, PreprocScope* s
     case PPVAL_COMPLEX_STRING:
         ;
         Lexer local_lexer = lexer_from_string(from_compact(val.string));
-        // PreprocScope* local_scope = &local_scopes[emit_depth - 1];
-        PreprocScope local_scope = {};
-        local_scope.parent = scope;
+        // PreprocScope _local_scope_ = {};
+        // PreprocScope* local_scope = &_local_scope_;
+        PreprocScope* local_scope = &local_scopes[emit_depth - 1];
+        local_scope->parent = scope;
         if (val.is_macro_arg) { // prevent name conflicts/infinite recursion bullshit
-            local_scope.parent = scope->parent;
+            local_scope->parent = scope->parent;
         }
-        strmap_init(&local_scope.map, 4);
+        if (local_scope->map.vals) {
+            strmap_reset(&local_scope->map);
+        } else {
+            strmap_init(&local_scope->map, 4);
+        }
 
-        lex_with_preproc(&local_lexer, tokens, &local_scope);
-        strmap_destroy(&local_scope.map);
+        lex_with_preproc(&local_lexer, tokens, local_scope);
+        // strmap_destroy(&local_scope->map);
         break;
     case PPVAL_STRING:
         ;
@@ -809,9 +816,15 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
     }
     assert(macro.kind == PPVAL_MACRO);
 
-    PreprocScope local_scope = {};
-    local_scope.parent = scope;
-    strmap_init(&local_scope.map, 4);
+    // PreprocScope _local_scope_ = {};
+    // PreprocScope* local_scope = &_local_scope_;
+    PreprocScope* local_scope = &local_scopes[emit_depth - 1];
+    local_scope->parent = scope;
+    if (local_scope->map.vals) {
+        strmap_reset(&local_scope->map);
+    } else {
+        strmap_init(&local_scope->map, 4);
+    }
 
     // collect args as complex strings, define them in the new scope
 
@@ -836,15 +849,15 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
             TODO("error: too many parameters, expected %u", macro.macro.params_len);
         }
         string param_name = tok_span(macro_arg_pool.at[macro.macro.params_index + arg_len]);
-        put_replacement_value(param_name, &local_scope, arg);
+        put_replacement_value(param_name, local_scope, arg);
         ++arg_len;
     }
 
     PreprocVal body = preproc_val_pool.at[macro.macro.body_index];
     Lexer local_lexer = lexer_from_string(from_compact(body.string));
-    lex_with_preproc(&local_lexer, tokens, &local_scope);
+    lex_with_preproc(&local_lexer, tokens, local_scope);
 
-    strmap_destroy(&local_scope.map);
+    // strmap_destroy(&local_scope->map);
     preproc_val_pool.len = saved_ppv_len; // allow reuse of pool space
     --emit_depth;
 }
