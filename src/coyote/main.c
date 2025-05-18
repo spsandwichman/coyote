@@ -29,6 +29,10 @@ int main(int argc, char** argv) {
     Context ctx = lex_entrypoint(&f);
     for_n(i, 0, ctx.tokens_len) {
         Token* t = &ctx.tokens[i];
+        if (t->kind == TOK_NEWLINE) {
+            printf("\n");
+            continue;
+        }
         if (_TOK_LEX_IGNORE < t->kind && t->kind < _TOK_PREPROC_TRANSPARENT_END) {
             // printf("%s ", token_kind[t->kind]);
             continue;

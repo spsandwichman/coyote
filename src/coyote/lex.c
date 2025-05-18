@@ -392,12 +392,14 @@ Vec(Token) macro_arg_pool;
 Vec(PreprocVal) preproc_val_pool;
 
 static bool replacement_exists_immediate(string key, PreprocScope* scope) {
+    if (scope == nullptr) return false;
     return STRMAP_NOT_FOUND != strmap_get(&scope->map, key);
 }
 
 static bool replacement_exists(string key, PreprocScope* scope) {
+    if (scope == nullptr) return false;
     return replacement_exists_immediate(key, scope) 
-        || (scope->parent != nullptr && replacement_exists(key, scope->parent));
+        || replacement_exists(key, scope->parent);
 }
 
 static void remove_replacement(string key, PreprocScope* scope) {
@@ -421,6 +423,9 @@ static PreprocVal get_replacement_value(string key, PreprocScope* scope) {
 static void put_replacement_value(string key, PreprocScope* scope, PreprocVal val) {
     vec_append(&preproc_val_pool, val);
     // place at innermost scope
+    printf(str_fmt" -> %d\n", str_arg(key), val.kind);
+    fflush(stdout);
+
     strmap_put(&scope->map, key, (void*)(preproc_val_pool.len - 1));
 }
 
@@ -481,9 +486,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
     case TOK_IDENTIFIER:
         ;
         string span = tok_span(t);
-        if (string_eq(span, constr("JKL_FUNC_NAME"))) {
-            
-        } else if (replacement_exists(span, scope)) {
+        if (replacement_exists(span, scope)) {
             v = get_replacement_value(span, scope);
         } else {
             TODO("error: preprocessor symbol undefined");
@@ -740,18 +743,23 @@ static void emit_preproc_val(PreprocVal val, Vec(Token)* tokens, PreprocScope* s
     case PPVAL_COMPLEX_STRING:
         ;
         Lexer local_lexer = lexer_from_string(from_compact(val.string));
-        PreprocScope* local_scope = &local_scopes[emit_depth - 1];
-        if (local_scope->map.keys == nullptr) {
-            strmap_init(&local_scope->map, 4);
-            local_scope->parent =  &global_scope;
-        } else {
-            strmap_reset(&local_scope->map);
-        }
-        usize saved_ppv_len = preproc_val_pool.len;
-        usize saved_ma_len = macro_arg_pool.len;
+        // PreprocScope* local_scope = &local_scopes[emit_depth - 1];
+        PreprocScope* local_scope = malloc(sizeof(PreprocScope));
+        local_scope->parent = scope;
+        strmap_init(&local_scope->map, 4);
+        // if (local_scope->map.keys == nullptr) {
+        //     strmap_init(&local_scope->map, 4);
+        //     // local_scope->parent =  &global_scope;
+        // } else {
+        //     strmap_reset(&local_scope->map);
+        // }
+        // usize saved_ppv_len = preproc_val_pool.len;
+        // usize saved_ma_len = macro_arg_pool.len;
+        // printf("AAAA ["str_fmt"]\n", from_compact(val.string).len, from_compact(val.string).raw);
         lex_with_preproc(&local_lexer, tokens, local_scope);
-        preproc_val_pool.len = saved_ppv_len; // allow reuse of pool space
-        macro_arg_pool.len = saved_ma_len; // allow reuse of pool space
+        // preproc_val_pool.len = saved_ppv_len; // allow reuse of pool space
+        // macro_arg_pool.len = saved_ma_len; // allow reuse of pool space
+        free(local_scope);
         break;
     case PPVAL_STRING:
         ;
@@ -767,10 +775,11 @@ static void emit_preproc_val(PreprocVal val, Vec(Token)* tokens, PreprocScope* s
     --emit_depth;
 }
 
-static CompactString collect_macro_arg(Lexer* l) {
+static CompactString collect_macro_arg(Lexer* l, PreprocScope* scope) {
     string span;
     span.raw = &l->src.raw[l->cursor];
     span.len = l->cursor;
+    usize cap = 0;
 
     usize bracket_depth = 0;
     for (Token t = lex_next_raw(l);; t = lex_next_raw(l)) {
@@ -779,7 +788,16 @@ static CompactString collect_macro_arg(Lexer* l) {
             break;
         }
 
+
         switch (t.kind) {
+        // case TOK_IDENTIFIER:
+            // if (!replacement_exists(tok_span(t), scope)) {
+            //     break;
+            // }
+            // // we have to expand this. break out the backing buffer if necessary
+            // if (cap == 0) {
+
+            // }
         case TOK_OPEN_PAREN: ++bracket_depth; break;
         case TOK_CLOSE_PAREN: --bracket_depth; break;
         }
@@ -799,13 +817,14 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
     }
     assert(macro.kind == PPVAL_MACRO);
 
-    PreprocScope* local_scope = &local_scopes[emit_depth - 1];
-    if (local_scope->map.keys == nullptr) {
+    PreprocScope* local_scope = malloc(sizeof(PreprocScope));
+    local_scope->parent = scope;
+    // if (local_scope->map.keys == nullptr) {
         strmap_init(&local_scope->map, 4);
-        local_scope->parent =  &global_scope;
-    } else {
-        strmap_reset(&local_scope->map);
-    }
+        // local_scope->parent =  &global_scope;
+    // } else {
+        // strmap_reset(&local_scope->map);
+    // }
 
     // collect args as complex strings, define them in the new scope
 
@@ -819,7 +838,7 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
     // consume arg list
     usize arg_len = 0;
     while (l->src.raw[l->cursor - 1] != ')') {
-        CompactString arg_span = collect_macro_arg(l);
+        CompactString arg_span = collect_macro_arg(l, scope);
         PreprocVal arg = {
             .kind = PPVAL_COMPLEX_STRING,
             .is_macro_arg = true,
@@ -839,6 +858,7 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
     lex_with_preproc(&local_lexer, tokens, local_scope);
 
     preproc_val_pool.len = saved_ppv_len; // allow reuse of pool space
+    free(local_scope);
     --emit_depth;
 }
 

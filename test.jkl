@@ -1,8 +1,8 @@
-
-#DEFINE x [ z ]
-
+#MACRO Foo ( Foo_arg ) [ Foo_arg + 1 ]
+#MACRO Bar ( Bar_arg ) [ Foo(Bar_arg+2) ]
 
 FN bruh(): WORD
-    x := 1
-    RETURN x
+    Bar( fooooooo ) := 1
+    RETURN fooooooo
 END
+
