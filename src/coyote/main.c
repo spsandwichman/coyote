@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     for_n(i, 0, ctx.tokens_len) {
         Token* t = &ctx.tokens[i];
         if (t->kind == TOK_NEWLINE) {
-            printf("\n");
+            // printf("\n");
             continue;
         }
         if (_TOK_LEX_IGNORE < t->kind && t->kind < _TOK_PREPROC_TRANSPARENT_END) {
@@ -38,8 +38,8 @@ int main(int argc, char** argv) {
             continue;
         }
         // printf(str_fmt, str_arg(tok_span(*t)));
-        token_error(&ctx, i + 1, i + 7, "error on 'x'");
+        token_error(&ctx, i, i + 6, "grumble grumble");
         // break;
-        printf(" ");
+        // printf(" ");
     }
 }

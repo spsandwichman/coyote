@@ -1,11 +1,12 @@
+#include <stdint.h>
+#include <string.h>
+
 #include "parse.h"
 #include "common/str.h"
 #include "common/util.h"
 #include "common/vec.h"
 #include "iron/iron.h"
 #include "lex.h"
-#include <stdint.h>
-#include <string.h>
 
 static struct {
     TyBufSlot* at;
@@ -133,6 +134,54 @@ void vec_char_append_many(Vec(char)* vec, const char* data, usize len) {
 }
 
 void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) {
+    Vec_typedef(ReportLine);
+    Vec(ReportLine) reports = vec_new(ReportLine, 8);
+
+    i32 unmatched_ends = 0;
+    for (i64 i = (i64)start_index; i > 0; --i) {
+        Token t = ctx->tokens[i];
+
+        ReportLine report;
+        report.kind = REPORT_NOTE;
+
+        switch (t.kind) {
+        case TOK_PREPROC_MACRO_PASTE:
+            if (unmatched_ends != 0) {
+                unmatched_ends--;
+                break;
+            }
+            SrcFile* from = where_from(ctx, tok_span(t));
+            if (!from) {
+                CRASH("unable to locate macro paste span source file");
+            }
+            report.msg = strprintf("using macro '"str_fmt"'", str_arg(tok_span(t)));
+            report.path = from->path;
+            report.src = from->src;
+            report.snippet = tok_span(t);
+            vec_append(&reports, report);
+            break;
+        case TOK_PREPROC_PASTE_END:
+            unmatched_ends++;
+            break;
+        }
+    }
+
+    // find "real line" snippet
+    unmatched_ends = 0;
+    for (i64 i = (i64)end_index; i < ctx->tokens_len; ++i) {
+        Token t = ctx->tokens[i];
+        if (t.kind == TOK_PREPROC_PASTE_END) {
+            unmatched_ends++;
+        }
+        if (reports.len == unmatched_ends) {
+            
+        }
+    }
+
+    for_n(i, 0, reports.len) {
+        report_line(&reports.at[i]);
+    }
+
     // construct the line.
     u32 expanded_snippet_begin_index = start_index;
     while (true) {
@@ -175,17 +224,35 @@ void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) 
         vec_append(&expanded_snippet, ' ');
     }
 
-    printf(str_fmt"\n", (int)expanded_snippet.len, expanded_snippet.at);
-    for_n(i, 0, (usize)expanded_snippet_highlight_start) {
-        printf(" ");
-    }
-    printf("^");
-    for_n(i, 1, expanded_snippet_highlight_len) {
-        printf("~");
-    }
-    printf("\n");
+    string src = {
+        .raw = expanded_snippet.at,
+        .len = expanded_snippet.len,
+    };
+    string snippet = {
+        .raw = expanded_snippet.at + expanded_snippet_highlight_start,
+        .len = expanded_snippet_highlight_len,
+    };
 
-    exit(0);
+    ReportLine rep = {
+        .kind = REPORT_ERROR,
+        .msg = str(msg),
+        .path = str("internal"),
+        .snippet = snippet,
+        .src = src,
+    };
+
+    report_line(&rep);
+
+    // printf(str_fmt"\n", (int)expanded_snippet.len, expanded_snippet.at);
+    // for_n(i, 0, (usize)expanded_snippet_highlight_start) {
+    //     printf(" ");
+    // }
+    // printf("^");
+    // for_n(i, 1, expanded_snippet_highlight_len) {
+    //     printf("~");
+    // }
+    // printf("\n");
+    // exit(0);
 }
 
 void p_advance(Parser* p) {

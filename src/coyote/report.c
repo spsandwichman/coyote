@@ -1,67 +1,99 @@
-#include "common/str.h"
 #include "lex.h"
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
+#include <wingdi.h>
 
-#ifdef NO_COLOR
-#   define Reset ""
-#   define Bold ""
-#   define Dim ""
-#   define Italic ""
-#   define Underline ""
+#include "common/ansi.h"
 
-#   define Black ""
-#   define Red ""
-#   define Green ""
-#   define Yellow ""
-#   define Blue ""
-#   define Magenta ""
-#   define Cyan ""
-#   define White ""
-#   define Default ""
+static u32 line_number(string src, string snippet) {
+    u32 line = 1;
+    char* current = src.raw;
+    while (current != snippet.raw) {
+        if (*current == '\n') line++;
+        current++;
+    }
 
-#   define BG_Black ""
-#   define BG_Red ""
-#   define BG_Green ""
-#   define BG_Yellow ""
-#   define BG_Blue ""
-#   define BG_Magenta ""
-#   define BG_Cyan ""
-#   define BG_White ""
-#   define BG_Default ""
-#else
-#   define Reset "\x1b[0m"
-#   define Bold "\x1b[1m"
-#   define Dim "\x1b[2m"
-#   define Italic "\x1b[3m"
-#   define Underline "\x1b[4m"
+    return line;
+}
 
-#   define Black "\x1b[30m"
-#   define Red "\x1b[31m"
-#   define Green "\x1b[32m"
-#   define Yellow "\x1b[33m"
-#   define Blue "\x1b[34m"
-#   define Magenta "\x1b[35m"
-#   define Cyan "\x1b[36m"
-#   define White "\x1b[37m"
-#   define Default "\x1b[39m"
+static u32 col_number(string src, string snippet) {
+    u32 col = 1;
+    char* current = src.raw;
+    while (current != snippet.raw) {
+        if (*current == '\n') col = 0;
+        col++;
+        current++;
+    }
 
-#   define BG_Black "\x1b[40m"
-#   define BG_Red "\x1b[41m"
-#   define BG_Green "\x1b[42m"
-#   define BG_Yellow "\x1b[43m"
-#   define BG_Blue "\x1b[44m"
-#   define BG_Magenta "\x1b[45m"
-#   define BG_Cyan "\x1b[46m"
-#   define BG_White "\x1b[47m"
-#   define BG_Default "\x1b[49m"
-#endif
+    return col;
+}
 
 void report_line(ReportLine* report) {
+
+    const char* color = White;
+
     switch (report->kind) {
-    case REPORT_ERROR: printf(Bold Red"ERROR"Reset); break;
-    case REPORT_WARNING: printf(Bold Yellow"WARN"Reset); break;
-    case REPORT_NOTE: printf(Bold Cyan"NOTE"Reset); break;
+    case REPORT_ERROR: printf(Bold Red"ERROR"Reset); color = Red; break;
+    case REPORT_WARNING: printf(Bold Yellow"WARN"Reset); color = Yellow; break;
+    case REPORT_NOTE: printf(Bold Cyan"NOTE"Reset); color = Cyan; break;
+    }
+
+    u32 line_num = line_number(report->src, report->snippet);
+    u32 col_num  = col_number(report->src, report->snippet);
+
+    printf(" ["Bold str_fmt Reset":%u:%u] ", str_arg(report->path), line_num, col_num);
+    printf(str_fmt, str_arg(report->msg));
+    printf("\n");
+
+    string line = report->snippet;
+    // expand line backwards
+    while (true) {
+        if (line.raw == report->src.raw) break;
+        if (*line.raw == '\n') {
+            line.raw++;
+            break;
+        }
+        line.raw--;
+    }
+    // expand line forwards
+    while (true) {
+        if (line.raw + line.len == report->src.raw + report->src.len) break;
+        if (line.raw[line.len] == '\n') {
+            // line.len--;
+            break;
+        }
+        line.len++;
+    }
+
+    printf("| ");
+
+    for_n(i, 0, line.len) {
+        if (line.raw + i == report->snippet.raw) {
+            printf(Bold "%s", color);
+        }
+        if (line.raw + i == report->snippet.raw + report->snippet.len) {
+            printf(Reset);
+        }
+        printf("%c", line.raw[i]);
+    }
+    printf("\n| ");
+    for_n(i, 0, line.len) {
+        if (line.raw + i < report->snippet.raw) {
+            printf(" ");
+        }
+        if (line.raw + i == report->snippet.raw) {
+            printf(Bold "%s^", color);
+        }
+        if (line.raw + i == report->snippet.raw + report->snippet.len) {
+            printf(Reset"\n");
+            break;
+        }
+        if (line.raw + i > report->snippet.raw) {
+            printf("~");
+        }
+    }
+
+    if (report->kind == REPORT_ERROR) {
+        exit(1);
     }
 }

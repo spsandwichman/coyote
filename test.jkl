@@ -1,4 +1,4 @@
 #MACRO foo(arg) [ arg + 1 ]
 #MACRO bar(arg) [ foo(arg + 2) ]
 
-baz := bar(10)
+bar(10) = 1

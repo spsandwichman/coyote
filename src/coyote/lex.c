@@ -890,14 +890,17 @@ static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) 
             if (replacement_exists(span, scope)) {
                 PreprocVal val = get_replacement_value(span, scope);
                 if (val.kind == PPVAL_MACRO) {
-                    vec_append(tokens, preproc_token(TOK_PREPROC_MACRO_PASTE, span));
+                    string from_span;
+                    from_span.len = val.len;
+                    from_span.raw = (char*)(i64)val.raw;
+                    vec_append(tokens, preproc_token(TOK_PREPROC_MACRO_PASTE, from_span));
                     collect_macro_args_and_emit(l, val, tokens, scope);
-                    vec_append(tokens, preproc_token_no_span(TOK_PREPROC_PASTE_END));
+                    vec_append(tokens, preproc_token(TOK_PREPROC_PASTE_END, span));
                 } else {
                     vec_append(tokens, preproc_token(val.is_macro_arg ? TOK_PREPROC_MACRO_ARG_PASTE 
                                                                       : TOK_PREPROC_DEFINE_PASTE, span));
                     emit_preproc_val(val, tokens, scope);
-                    vec_append(tokens, preproc_token_no_span(TOK_PREPROC_PASTE_END));
+                    vec_append(tokens, preproc_token(TOK_PREPROC_PASTE_END, span));
                 }
                 continue;
             }
