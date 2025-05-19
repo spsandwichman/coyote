@@ -173,7 +173,7 @@ enum {
     _TOK_LEX_IGNORE,
 
         TOK_PREPROC_MACRO_PASTE, // before a macro is invoked in source code
-        TOK_PREPROC_MACRO_ARG_PASTE, // before an argument to a macro gets replaced in the macro's body
+        // TOK_PREPROC_MACRO_ARG_PASTE, // before an argument to a macro gets replaced in the macro's body
         TOK_PREPROC_DEFINE_PASTE, // before a define's replacement gets pasted
         TOK_PREPROC_INCLUDE_PASTE, // before a file is included
         TOK_PREPROC_PASTE_END, // marks the end of a paste action
@@ -192,6 +192,7 @@ VecPtr_typedef(SrcFile);
 typedef struct {
     Token* tokens;
     u32 tokens_len;
+    // u32 preproc_depth;
 
     VecPtr(SrcFile) sources;
 } Context;
@@ -265,6 +266,10 @@ typedef struct {
     string path; 
     string snippet; 
     string msg;
+
+    bool use_reconstructed;
+    string reconstructed_line;
+    string reconstructed_spittet;
 } ReportLine;
 
 void report_line(ReportLine* line);

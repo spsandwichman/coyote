@@ -101,6 +101,61 @@ FeFunc* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
     return fact;
 }
 
+FeFunc* make_factorial2(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
+
+    // set up function to call
+    FeFuncSig* fact_sig = fe_funcsig_new(FE_CCONV_JACKAL, 1, 1);
+    fe_funcsig_param(fact_sig, 0)->ty = FE_TY_I32;
+    fe_funcsig_return(fact_sig, 0)->ty = FE_TY_I32;
+
+    // make the function and its symbol
+    FeSymbol* fact_sym = fe_symbol_new(mod, "factorial", 0, FE_BIND_GLOBAL);
+    FeFunc* fact = fe_func_new(mod, fact_sym, fact_sig, ipool, vregs);
+
+    // construct the function's body
+    FeBlock* entry = fact->entry_block;
+    FeBlock* if_true = fe_block_new(fact);
+    FeBlock* if_false = fe_block_new(fact);
+    FeInst* param = fe_func_param(fact, 0);
+
+    { // entry block
+        FeInst* const0 = fe_append_end(entry, fe_inst_const(fact, FE_TY_I32, 0));
+        FeInst* eq = fe_append_end(entry, fe_inst_binop(fact,
+            FE_TY_I32, FE_EQ,
+            param,
+            const0
+        ));
+        fe_append_end(entry, fe_inst_branch(fact, eq, if_true, if_false));
+        // fe_append_end(entry, fe_inst_jump(fact, if_false));
+    }
+    { // if_true block
+        FeInst* const1 = fe_append_end(if_true, fe_inst_const(fact, FE_TY_I32, 1));
+        FeInst* ret = fe_append_end(if_true, fe_inst_return(fact));
+        fe_return_set_arg(ret, 0, const1);
+    }
+    {  // if_false block
+        FeInst* const1 = fe_append_end(if_false, fe_inst_const(fact, FE_TY_I32, 1));
+        FeInst* isub = fe_append_end(if_false, fe_inst_binop(fact,
+            FE_TY_I32, FE_ISUB,
+            param,
+            const1
+        ));
+        // FeInst* fact_symaddr = fe_append_end(if_false, fe_inst_symaddr(fact, FE_TY_I32, fact->sym));
+        // FeInst* call = fe_append_end(if_false, fe_inst_call(fact, fact_symaddr, fact->sig));
+        // FeInst* call = fe_append_end(if_false, fe_inst_unop(fact, FE_TY_I32, FE_MOV, isub));
+        // fe_call_set_arg(call, 0, isub);
+        FeInst* imul = fe_append_end(if_false, fe_inst_binop(fact,
+            FE_TY_I32, FE_IMUL,
+            param,
+            isub
+        ));
+
+        FeInst* ret = fe_append_end(if_false, fe_inst_return(fact));
+        fe_return_set_arg(ret, 0, imul);
+    }
+    return fact;
+}
+
 FeFunc* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
     // set up function to call
@@ -202,7 +257,7 @@ int main() {
 
     FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunc* func = make_factorial(mod, &ipool, &vregs);
+    FeFunc* func = make_factorial2(mod, &ipool, &vregs);
 
     quick_print(func);
     fe_codegen(func);

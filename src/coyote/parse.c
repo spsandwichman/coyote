@@ -133,7 +133,28 @@ void vec_char_append_many(Vec(char)* vec, const char* data, usize len) {
     }
 }
 
+static usize preproc_depth(Context* ctx, u32 index) {
+    usize depth = 0;
+    for_n(i, 0, index) {
+        Token t = ctx->tokens[i];
+        switch (t.kind) {
+        case TOK_PREPROC_MACRO_PASTE:
+        case TOK_PREPROC_DEFINE_PASTE:
+        case TOK_PREPROC_INCLUDE_PASTE:
+            depth++;
+            break;
+        case TOK_PREPROC_PASTE_END:
+            depth--;
+            break;
+        }
+    }
+    return depth;
+}
+
 void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) {
+    // find out if we're in a macro somewhere
+    bool inside_preproc = preproc_depth(ctx, start_index) != 0 || preproc_depth(ctx, end_index) != 0;
+
     Vec_typedef(ReportLine);
     Vec(ReportLine) reports = vec_new(ReportLine, 8);
 
@@ -166,82 +187,109 @@ void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) 
         }
     }
 
-    // find "real line" snippet
-    unmatched_ends = 0;
-    for (i64 i = (i64)end_index; i < ctx->tokens_len; ++i) {
-        Token t = ctx->tokens[i];
-        if (t.kind == TOK_PREPROC_PASTE_END) {
-            unmatched_ends++;
+    // find main line snippet
+    SrcFile* main_file = ctx->sources.at[0];
+    if (inside_preproc) {
+        string main_highlight = {};
+        for_n(i, end_index, ctx->tokens_len) {
+            Token t = ctx->tokens[i];
+            if (t.kind == TOK_PREPROC_PASTE_END && token_is_within(main_file, tok_raw(t))) {
+                main_highlight = tok_span(t);
+                break;
+            }
         }
-        if (reports.len == unmatched_ends) {
-            
+        ReportLine main_line_report = {
+            .kind = REPORT_NOTE,
+            .msg = str(msg),
+            .path = main_file->path,
+            .src = main_file->src,
+            .snippet = main_highlight,
+        };
+
+        vec_append(&reports, main_line_report);
+
+        for_n(i, 0, reports.len) {
+            report_line(&reports.at[i]);
         }
+
+        // construct the line
+        u32 expanded_snippet_begin_index = start_index;    
+        while (true) {
+            u8 kind = ctx->tokens[expanded_snippet_begin_index].kind;
+            if (kind == TOK_NEWLINE) {
+                expanded_snippet_begin_index += 1;
+                break;
+            }
+            if (expanded_snippet_begin_index == 0) {
+                break;
+            }
+            expanded_snippet_begin_index -= 1;
+        }
+        u32 expanded_snippet_end_index = end_index;
+        while (true) {
+            u8 kind = ctx->tokens[expanded_snippet_end_index].kind;
+            if (kind == TOK_NEWLINE || expanded_snippet_end_index == ctx->tokens_len - 1) {
+                break;
+            }
+            expanded_snippet_end_index += 1;
+        }
+
+        u32 expanded_snippet_highlight_start = 0;
+        u32 expanded_snippet_highlight_len = 0;
+
+        Vec(char) expanded_snippet = vec_new(char, 256);
+
+        for_n_eq(i, expanded_snippet_begin_index, expanded_snippet_end_index) {
+            if (i == start_index) {
+                expanded_snippet_highlight_start = expanded_snippet.len;
+            }
+            Token t = ctx->tokens[i];
+            if (_TOK_LEX_IGNORE < t.kind) {
+                continue;
+            }
+            vec_char_append_many(&expanded_snippet, tok_raw(t), t.len);
+            if (i == end_index) {
+                expanded_snippet_highlight_len = expanded_snippet.len - expanded_snippet_highlight_start;
+            }
+            vec_append(&expanded_snippet, ' ');
+        }
+
+        string src = {
+            .raw = expanded_snippet.at,
+            .len = expanded_snippet.len,
+        };
+        string snippet = {
+            .raw = expanded_snippet.at + expanded_snippet_highlight_start,
+            .len = expanded_snippet_highlight_len,
+        };
+
+        ReportLine rep = {
+            .kind = REPORT_ERROR,
+            .msg = str(msg),
+            .path = main_file->path,
+            .snippet = snippet,
+            .src = src,
+        };
+
+        report_line(&rep);
+    } else {
+        string start_span = tok_span(ctx->tokens[start_index]);
+        string end_span = tok_span(ctx->tokens[end_index]);
+        string span = {
+            .raw = start_span.raw,
+            .len = (usize)end_span.raw - (usize)start_span.raw + end_span.len,
+        };
+        ReportLine rep = {
+            .kind = REPORT_ERROR,
+            .msg = str(msg),
+            .path = main_file->path,
+            .snippet = span,
+            .src = main_file->src,
+        };
+
+        report_line(&rep);
     }
 
-    for_n(i, 0, reports.len) {
-        report_line(&reports.at[i]);
-    }
-
-    // construct the line.
-    u32 expanded_snippet_begin_index = start_index;
-    while (true) {
-        u8 kind = ctx->tokens[expanded_snippet_begin_index].kind;
-        if (kind == TOK_NEWLINE) {
-            expanded_snippet_begin_index += 1;
-            break;
-        }
-        if (expanded_snippet_begin_index == 0) {
-            break;
-        }
-        expanded_snippet_begin_index -= 1;
-    }
-    u32 expanded_snippet_end_index = end_index;
-    while (true) {
-        u8 kind = ctx->tokens[expanded_snippet_end_index].kind;
-        if (kind == TOK_NEWLINE || expanded_snippet_end_index == ctx->tokens_len - 1) {
-            break;
-        }
-        expanded_snippet_end_index += 1;
-    }
-
-    u32 expanded_snippet_highlight_start = 0;
-    u32 expanded_snippet_highlight_len = 0;
-
-    Vec(char) expanded_snippet = vec_new(char, 256);
-
-    for_n_eq(i, expanded_snippet_begin_index, expanded_snippet_end_index) {
-        if (i == start_index) {
-            expanded_snippet_highlight_start = expanded_snippet.len;
-        }
-        Token t = ctx->tokens[i];
-        if (_TOK_LEX_IGNORE < t.kind) {
-            continue;
-        }
-        vec_char_append_many(&expanded_snippet, tok_raw(t), t.len);
-        if (i == end_index) {
-            expanded_snippet_highlight_len = expanded_snippet.len - expanded_snippet_highlight_start;
-        }
-        vec_append(&expanded_snippet, ' ');
-    }
-
-    string src = {
-        .raw = expanded_snippet.at,
-        .len = expanded_snippet.len,
-    };
-    string snippet = {
-        .raw = expanded_snippet.at + expanded_snippet_highlight_start,
-        .len = expanded_snippet_highlight_len,
-    };
-
-    ReportLine rep = {
-        .kind = REPORT_ERROR,
-        .msg = str(msg),
-        .path = str("internal"),
-        .snippet = snippet,
-        .src = src,
-    };
-
-    report_line(&rep);
 
     // printf(str_fmt"\n", (int)expanded_snippet.len, expanded_snippet.at);
     // for_n(i, 0, (usize)expanded_snippet_highlight_start) {

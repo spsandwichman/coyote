@@ -65,7 +65,7 @@ const char* token_kind[_TOK_COUNT] = {
     #undef T
 
     [TOK_PREPROC_MACRO_PASTE]     = "MACRO_PASTE",
-    [TOK_PREPROC_MACRO_ARG_PASTE] = "MACRO_ARG_PASTE",
+    // [TOK_PREPROC_MACRO_ARG_PASTE] = "MACRO_ARG_PASTE",
     [TOK_PREPROC_DEFINE_PASTE]    = "DEFINE_PASTE",
     [TOK_PREPROC_INCLUDE_PASTE]   = "INCLUDE_PASTE",
     [TOK_PREPROC_PASTE_END]       = "PASTE_END",
@@ -895,12 +895,16 @@ static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) 
                     from_span.raw = (char*)(i64)val.raw;
                     vec_append(tokens, preproc_token(TOK_PREPROC_MACRO_PASTE, from_span));
                     collect_macro_args_and_emit(l, val, tokens, scope);
+                    span.len = (usize)l->cursor - (usize)span.raw + (usize)l->src.raw;
                     vec_append(tokens, preproc_token(TOK_PREPROC_PASTE_END, span));
                 } else {
-                    vec_append(tokens, preproc_token(val.is_macro_arg ? TOK_PREPROC_MACRO_ARG_PASTE 
-                                                                      : TOK_PREPROC_DEFINE_PASTE, span));
+                    if (!val.is_macro_arg) {
+                        vec_append(tokens, preproc_token(TOK_PREPROC_DEFINE_PASTE, span));
+                    }
                     emit_preproc_val(val, tokens, scope);
-                    vec_append(tokens, preproc_token(TOK_PREPROC_PASTE_END, span));
+                    if (!val.is_macro_arg) {
+                        vec_append(tokens, preproc_token(TOK_PREPROC_PASTE_END, span));
+                    }
                 }
                 continue;
             }
@@ -953,6 +957,7 @@ Context lex_entrypoint(SrcFile* f) {
     vec_shrink(&tokens);
 
     Context ctx = {
+        // .preproc_depth = 0,
         .tokens = tokens.at,
         .tokens_len = tokens.len,
         .sources = vecptr_new(SrcFile, 16),

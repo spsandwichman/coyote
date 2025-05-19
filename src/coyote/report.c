@@ -76,6 +76,7 @@ void report_line(ReportLine* report) {
         }
         printf("%c", line.raw[i]);
     }
+    printf(Reset);
     printf("\n| ");
     for_n(i, 0, line.len) {
         if (line.raw + i < report->snippet.raw) {
@@ -85,15 +86,16 @@ void report_line(ReportLine* report) {
             printf(Bold "%s^", color);
         }
         if (line.raw + i == report->snippet.raw + report->snippet.len) {
-            printf(Reset"\n");
+            printf("\n");
             break;
         }
         if (line.raw + i > report->snippet.raw) {
             printf("~");
         }
     }
+    printf(Reset);
 
     if (report->kind == REPORT_ERROR) {
-        exit(1);
+        exit(3);
     }
 }

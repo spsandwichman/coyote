@@ -38,7 +38,8 @@ int main(int argc, char** argv) {
             continue;
         }
         // printf(str_fmt, str_arg(tok_span(*t)));
-        token_error(&ctx, i, i + 6, "grumble grumble");
+        usize offset = 0;
+        token_error(&ctx, i + offset, i + offset, "grumble grumble");
         // break;
         // printf(" ");
     }

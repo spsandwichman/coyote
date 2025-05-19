@@ -298,6 +298,7 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
         }
         return chain;
     }
+    case FE_MOV:
     case FE_MACH_MOV:
     case FE_PHI:
     case FE_UPSILON:
