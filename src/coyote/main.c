@@ -38,8 +38,7 @@ int main(int argc, char** argv) {
             continue;
         }
         // printf(str_fmt, str_arg(tok_span(*t)));
-        usize offset = 0;
-        token_error(&ctx, i + offset, i + offset, "grumble grumble");
+        token_error(&ctx, i, i, "expression is not an l-value");
         // break;
         // printf(" ");
     }

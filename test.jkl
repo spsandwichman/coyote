@@ -1,9 +1,7 @@
-// #MACRO bar(arg) [ foo(arg + 2) ]
-#MACRO foo(arg) [ arg + 1 ]
+#MACRO bar ( arg ) [ foo(arg + 2) ]
+#MACRO foo ( arg ) [ arg + 1 ]
 
-foo(10) = 1
-
-wow okay
+bar(10) = 1
 
 ////////
 

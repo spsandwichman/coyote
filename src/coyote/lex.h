@@ -267,9 +267,8 @@ typedef struct {
     string snippet; 
     string msg;
 
-    bool use_reconstructed;
     string reconstructed_line;
-    string reconstructed_spittet;
+    string reconstructed_snippet;
 } ReportLine;
 
 void report_line(ReportLine* line);

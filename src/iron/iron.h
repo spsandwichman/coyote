@@ -244,7 +244,7 @@ typedef struct FeCFGNode {
     FeBlock* block;
     u16 out_len;
     u16 in_len;
-    u16 rev_post;
+    u16 post_order;
 
     FeCFGNode** ins;
 } FeCFGNode;

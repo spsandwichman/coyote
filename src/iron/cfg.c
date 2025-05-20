@@ -1,11 +1,12 @@
 #include "iron/iron.h"
 
-static void number(FeCFGNode* n, usize* rev_post) {
-    if (n->rev_post != 0) return;
+static void number(FeCFGNode* n, usize* post_order) {
+    if (n->post_order != 0) return;
+    n->post_order = 0xFFFF;
     for_n(i, 0, n->out_len) {
-        number(fe_cfgn_out(n, i), rev_post);
+        number(fe_cfgn_out(n, i), post_order);
     }
-    n->rev_post = ++*rev_post;
+    n->post_order = ++*post_order;
 }
 
 void fe_cfg_destroy(FeFunc* f) {
@@ -33,7 +34,7 @@ void fe_cfg_calculate(FeFunc* f) {
             cfgn->block = b;
             cfgn->in_len = 0;
             cfgn->out_len = 0;
-            cfgn->rev_post = 0;
+            cfgn->post_order = 0;
             cfgn->ins = nullptr;
         }
     }
@@ -85,9 +86,9 @@ void fe_cfg_calculate(FeFunc* f) {
     // for (FeBlock* b = f->entry_block; b != nullptr; b = b->list_next) {
     //     FeCFGNode* n = b->cfg_node;
 
-    //     printf("  B%u -> { ", n->rev_post);
+    //     printf("  B%u -> { ", n->post_order);
     //     for_n(i, 0, n->out_len) {
-    //         printf("B%u ", fe_cfgn_out(n, i)->rev_post);
+    //         printf("B%u ", fe_cfgn_out(n, i)->post_order);
     //     }
     //     printf("}\n");
     // }

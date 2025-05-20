@@ -162,7 +162,7 @@ void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) 
     for (i64 i = (i64)start_index; i > 0; --i) {
         Token t = ctx->tokens[i];
 
-        ReportLine report;
+        ReportLine report = {};
         report.kind = REPORT_NOTE;
 
         switch (t.kind) {
@@ -187,30 +187,25 @@ void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) 
         }
     }
 
+    
     // find main line snippet
     SrcFile* main_file = ctx->sources.at[0];
     if (inside_preproc) {
+        for_n(i, 0, reports.len) {
+            report_line(&reports.at[i]);
+        }
+
         string main_highlight = {};
         for_n(i, end_index, ctx->tokens_len) {
             Token t = ctx->tokens[i];
-            if (t.kind == TOK_PREPROC_PASTE_END && token_is_within(main_file, tok_raw(t))) {
+            if (t.kind == TOK_PREPROC_PASTE_END && preproc_depth(ctx, i + 1) == 0) {
                 main_highlight = tok_span(t);
                 break;
             }
         }
-        ReportLine main_line_report = {
-            .kind = REPORT_NOTE,
-            .msg = str(msg),
-            .path = main_file->path,
-            .src = main_file->src,
-            .snippet = main_highlight,
-        };
 
-        vec_append(&reports, main_line_report);
+        // vec_append(&reports, main_line_report);
 
-        for_n(i, 0, reports.len) {
-            report_line(&reports.at[i]);
-        }
 
         // construct the line
         u32 expanded_snippet_begin_index = start_index;    
@@ -263,12 +258,22 @@ void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) 
             .len = expanded_snippet_highlight_len,
         };
 
+        
+        // ReportLine main_line_report = {
+        //     .kind = REPORT_NOTE,
+        //     .msg = str(msg),
+        //     .snippet = main_highlight,
+        // };
+
         ReportLine rep = {
             .kind = REPORT_ERROR,
             .msg = str(msg),
             .path = main_file->path,
-            .snippet = snippet,
-            .src = src,
+            .src = main_file->src,
+            .snippet = main_highlight,
+
+            .reconstructed_line = src,
+            .reconstructed_snippet = snippet,
         };
 
         report_line(&rep);

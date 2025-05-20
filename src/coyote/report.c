@@ -28,6 +28,82 @@ static u32 col_number(string src, string snippet) {
     return col;
 }
 
+static void print_snippet(string line, string snippet, const char* color, usize pad) {
+    
+    printf("| ");
+
+    for_n(i, 0, line.len) {
+        if (line.raw + i == snippet.raw) {
+            printf(Bold "%s", color);
+        }
+        if (line.raw + i == snippet.raw + snippet.len) {
+            printf(Reset);
+        }
+        printf("%c", line.raw[i]);
+    }
+    printf(Reset);
+    printf("\n");
+    for_n(i, 0, pad) {
+        printf(" ");
+    }
+    printf("| ");
+    for_n(i, 0, line.len) {
+        if (line.raw + i < snippet.raw) {
+            printf(" ");
+        }
+        if (line.raw + i == snippet.raw) {
+            printf(Bold "%s^", color);
+        }
+        if (line.raw + i == snippet.raw + snippet.len) {
+            printf("\n");
+            break;
+        }
+        if (line.raw + i > snippet.raw) {
+            printf("~");
+        }
+    }
+    printf(Reset);
+}
+
+bool is_whitespace(char c) {
+    switch (c) {
+    case ' ':
+    case '\r':
+    case '\n':
+    case '\t':
+    case '\v':
+        return true;
+    }
+    return false;
+}
+
+string snippet_line(string src, string snippet) {
+    string line = snippet;
+    // expand line backwards
+    while (true) {
+        if (line.raw == src.raw) break;
+        if (*line.raw == '\n') {
+            line.raw++;
+            break;
+        }
+        line.raw--;
+    }
+    // trim leading whitespace
+    while (is_whitespace(line.raw[0])) {
+        line.raw++;
+    }
+    // expand line forwards
+    while (true) {
+        if (line.raw + line.len == src.raw + src.len) break;
+        if (line.raw[line.len] == '\n') {
+            // line.len--;
+            break;
+        }
+        line.len++;
+    }
+    return line;
+}
+
 void report_line(ReportLine* report) {
 
     const char* color = White;
@@ -45,55 +121,18 @@ void report_line(ReportLine* report) {
     printf(str_fmt, str_arg(report->msg));
     printf("\n");
 
-    string line = report->snippet;
-    // expand line backwards
-    while (true) {
-        if (line.raw == report->src.raw) break;
-        if (*line.raw == '\n') {
-            line.raw++;
-            break;
-        }
-        line.raw--;
+    if (report->reconstructed_line.raw != nullptr) {
+        printf("%4u ", line_num);
+        // printf("     ");
+        string line = snippet_line(report->reconstructed_line, report->reconstructed_snippet);
+        print_snippet(line, report->reconstructed_snippet, color, 5);
+        printf("expanded from: "Reset"\n");
     }
-    // expand line forwards
-    while (true) {
-        if (line.raw + line.len == report->src.raw + report->src.len) break;
-        if (line.raw[line.len] == '\n') {
-            // line.len--;
-            break;
-        }
-        line.len++;
-    }
-
-    printf("| ");
-
-    for_n(i, 0, line.len) {
-        if (line.raw + i == report->snippet.raw) {
-            printf(Bold "%s", color);
-        }
-        if (line.raw + i == report->snippet.raw + report->snippet.len) {
-            printf(Reset);
-        }
-        printf("%c", line.raw[i]);
-    }
-    printf(Reset);
-    printf("\n| ");
-    for_n(i, 0, line.len) {
-        if (line.raw + i < report->snippet.raw) {
-            printf(" ");
-        }
-        if (line.raw + i == report->snippet.raw) {
-            printf(Bold "%s^", color);
-        }
-        if (line.raw + i == report->snippet.raw + report->snippet.len) {
-            printf("\n");
-            break;
-        }
-        if (line.raw + i > report->snippet.raw) {
-            printf("~");
-        }
-    }
-    printf(Reset);
+    
+    printf("%4u ", line_num);
+    string line = snippet_line(report->src, report->snippet);
+    print_snippet(line, report->snippet, color, 5);
+    
 
     if (report->kind == REPORT_ERROR) {
         exit(3);
