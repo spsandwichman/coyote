@@ -606,6 +606,10 @@ static void preproc_define(Lexer* l, PreprocScope* scope) {
 
     // consume value
     PreprocVal v = preproc_collect_value(l, scope);
+    v.source = (CompactString){   
+        .len = name.len,
+        .raw = name.raw,
+    };
 
     if (replacement_exists_immediate(tok_span(name), scope)) {
         TODO("error: redefinition in current scope");
@@ -668,9 +672,11 @@ static void preproc_macro(Lexer* l, PreprocScope* scope) {
     usize body_index = preproc_val_pool.len - 1;
 
     PreprocVal macro = {
-        .len = name.len,
-        .raw = name.raw,
         .kind = PPVAL_MACRO,
+        .source = (CompactString){   
+            .len = name.len,
+            .raw = name.raw,
+        },
         .macro = {
             // .scope = scope,
             .body_index = body_index,
@@ -890,16 +896,16 @@ static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) 
             if (replacement_exists(span, scope)) {
                 PreprocVal val = get_replacement_value(span, scope);
                 if (val.kind == PPVAL_MACRO) {
-                    string from_span;
-                    from_span.len = val.len;
-                    from_span.raw = (char*)(i64)val.raw;
-                    vec_append(tokens, preproc_token(TOK_PREPROC_MACRO_PASTE, from_span));
+                    // string from_span;
+                    // from_span.len = val.len;
+                    // from_span.raw = (char*)(i64)val.raw;
+                    vec_append(tokens, preproc_token(TOK_PREPROC_MACRO_PASTE, from_compact(val.source)));
                     collect_macro_args_and_emit(l, val, tokens, scope);
                     span.len = (usize)l->cursor - (usize)span.raw + (usize)l->src.raw;
                     vec_append(tokens, preproc_token(TOK_PREPROC_PASTE_END, span));
                 } else {
                     if (!val.is_macro_arg) {
-                        vec_append(tokens, preproc_token(TOK_PREPROC_DEFINE_PASTE, span));
+                        vec_append(tokens, preproc_token(TOK_PREPROC_DEFINE_PASTE, from_compact(val.source)));
                     }
                     emit_preproc_val(val, tokens, scope);
                     if (!val.is_macro_arg) {
@@ -915,6 +921,16 @@ static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) 
             switch (kind) {
             case 0:
                 break;
+            case TOK_KW_IF: {
+                // consume a preproc val
+                PreprocVal cond_val = preproc_collect_value(l, scope);
+                if (cond_val.kind != PPVAL_INTEGER) {
+                    TODO("#IF condition is not an integer");
+                }
+                bool cond = cond_val.integer == 0;
+                u32 if_count = 1;
+                TODO("YUH");
+            } break;
             default:
                 UNREACHABLE;
             }

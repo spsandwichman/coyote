@@ -37,9 +37,9 @@ int main(int argc, char** argv) {
             // printf("%s ", token_kind[t->kind]);
             continue;
         }
-        // printf(str_fmt, str_arg(tok_span(*t)));
-        token_error(&ctx, i, i, "expression is not an l-value");
+        printf(str_fmt, str_arg(tok_span(*t)));
+        // token_error(&ctx, i, i + 2, "expression is not an l-value");
         // break;
-        // printf(" ");
+        printf(" ");
     }
 }

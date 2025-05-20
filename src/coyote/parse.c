@@ -258,13 +258,6 @@ void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) 
             .len = expanded_snippet_highlight_len,
         };
 
-        
-        // ReportLine main_line_report = {
-        //     .kind = REPORT_NOTE,
-        //     .msg = str(msg),
-        //     .snippet = main_highlight,
-        // };
-
         ReportLine rep = {
             .kind = REPORT_ERROR,
             .msg = str(msg),

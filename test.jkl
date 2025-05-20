@@ -1,15 +1,6 @@
-#MACRO bar ( arg ) [ foo(arg + 2) ]
-#MACRO foo ( arg ) [ arg + 1 ]
+#DEFINE x 1
 
-bar(10) = 1
+#IF x
+y := x
+#END
 
-////////
-
-// NOTE [file:line] expanded from macro 'foo'
-// | #MACRO foo(arg) [ arg + 1 ]
-// |        ^~~
-// ERROR [file:line:col] cannot assign to immutable expression
-// | foo(10) = 1
-// | ^~~~~~~
-// | 10 + 1 = 1
-// | ^~~~~~

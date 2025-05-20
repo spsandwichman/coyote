@@ -1,8 +1,7 @@
-#include "lex.h"
 #include <stdint.h>
 #include <stdio.h>
-#include <wingdi.h>
 
+#include "lex.h"
 #include "common/ansi.h"
 
 static u32 line_number(string src, string snippet) {

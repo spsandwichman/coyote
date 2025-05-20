@@ -241,6 +241,7 @@ typedef struct {
     u64 kind : 7;
     u64 len : 8;
     i64 raw : 48; // non-zero if can be reconstructed from a token.
+    CompactString source; // where this thing comes from
     union {
         CompactString string;
         i64 integer;
