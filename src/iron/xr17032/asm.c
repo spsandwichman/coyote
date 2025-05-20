@@ -212,7 +212,7 @@ void xr_emit_assembly(FeDataBuffer* db, FeModule* m) {
     fe_db_writecstr(db, ".section text\n\n");
     for_funcs(f, m) {
         // number all instructions and blocks
-        u32 block_counter = 0;
+        u32 block_counter = 1;
         for_blocks(block, f) {
             block->flags = block_counter++;
             for_inst(inst, block) {

@@ -91,7 +91,7 @@ usize fe_db_writef(FeDataBuffer* buf, const char* fmt, ...) {
     static char chars[1000];
     memset(chars, 0, sizeof(chars));
 
-    usize len = vsprintf(chars, fmt, varargs);
+    usize len = vsnprintf(chars, sizeof(chars), fmt, varargs);
     fe_db_writecstr(buf, chars);
     return len;
 }
