@@ -232,13 +232,15 @@ void fe_inst_add_use(FeInst* def, FeInst* use) {
         def->use_cap *= 2;
         def->uses = fe_realloc(def->uses, sizeof(def->uses[0]) * def->use_cap);
     }
-    def->uses[def->use_len++] = use;
+    def->uses[def->use_len] = use;
+    def->use_len += 1;
 }
 
 void fe_inst_unordered_remove_use(FeInst* def, FeInst* use) {
     for_n(i, 0, def->use_len) {
         if (def->uses[i] == use) {
-            def->uses[i] = def->uses[--def->use_len];
+            def->use_len -= 1;
+            def->uses[i] = def->uses[def->use_len];
             break;
         }
     }
@@ -365,6 +367,7 @@ void fe_inst_free(FeFunc* f, FeInst* inst) {
     }
     if (inst->uses != nullptr) {
         fe_free(inst->uses);
+        inst->uses = nullptr;
     }
     fe_ipool_free(f->ipool, inst);
 }
