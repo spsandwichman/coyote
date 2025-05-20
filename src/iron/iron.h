@@ -310,7 +310,7 @@ typedef enum: FeInstKind {
     
     FE_ILT, FE_ULT,
     FE_ILE, FE_ULE,
-    FE_EQ,
+    FE_IEQ,
     
     FE_FADD,
     FE_FSUB,
@@ -365,7 +365,7 @@ typedef enum: FeInstKind {
     // Phi
     FE_PHI,
 
-    // CallIndirect
+    // Call
     FE_CALL,
 
     FE__BASE_INST_END,
@@ -381,7 +381,10 @@ typedef struct FeInst {
     FeTy ty;
     // expect this to be overwritten by different passes for different things
     u32 flags;
-    u32 use_count;
+    u16 use_len;
+    u16 use_cap;
+    FeInst** uses;
+
     FeVReg vr_out;
 
     // CIRCULAR
@@ -585,7 +588,7 @@ void fe_chain_replace_pos(FeInst* from, FeInstChain to);
 void fe_chain_destroy(FeFunc* f, FeInstChain chain);
 
 void fe_inst_free(FeFunc* f, FeInst* inst);
-void fe_inst_update_uses(FeFunc* f);
+void fe_inst_calculate_uses(FeFunc* f);
 FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out);
 FeBlock** fe_inst_list_terminator_successors(const FeTarget* t, FeInst* term, usize* len_out);
 

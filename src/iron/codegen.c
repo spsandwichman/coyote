@@ -68,7 +68,7 @@ void fe_codegen(FeFunc* f) {
 
     const FeTarget* target = f->mod->target;
 
-    fe_inst_update_uses(f);
+    fe_inst_calculate_uses(f);
 
     usize START = 1;
     // assign each instruction an index starting from 1.

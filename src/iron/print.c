@@ -75,7 +75,7 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_ULT] = "ult",
     [FE_ILE] = "ile",
     [FE_ULE] = "ule",
-    [FE_EQ]  = "eq",
+    [FE_IEQ] = "ieq",
 
     [FE_FADD] = "fadd",
     [FE_FSUB] = "fsub",

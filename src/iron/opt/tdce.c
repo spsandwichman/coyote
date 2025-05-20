@@ -45,7 +45,7 @@ void fe_opt_tdce(FeFunc* f) {
     init_worklist(&to_free);
 
     // update every instruction's use count
-    fe_inst_update_uses(f);
+    fe_inst_calculate_uses(f);
 
     for_blocks(block, f) {
         for_inst(inst, block) {

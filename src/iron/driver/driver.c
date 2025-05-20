@@ -68,7 +68,7 @@ FeFunc* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
     { // entry block
         FeInst* const0 = fe_append_end(entry, fe_inst_const(fact, FE_TY_I32, 0));
         FeInst* eq = fe_append_end(entry, fe_inst_binop(fact, 
-            FE_TY_I32, FE_EQ,
+            FE_TY_I32, FE_IEQ,
             param,
             const0
         ));
@@ -121,7 +121,7 @@ FeFunc* make_factorial2(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
     { // entry block
         FeInst* const0 = fe_append_end(entry, fe_inst_const(fact, FE_TY_I32, 0));
         FeInst* eq = fe_append_end(entry, fe_inst_binop(fact,
-            FE_TY_I32, FE_EQ,
+            FE_TY_I32, FE_IEQ,
             param,
             const0
         ));
@@ -176,7 +176,7 @@ FeFunc* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) 
     { // entry block
         FeInst* const0 = fe_append_end(entry, fe_inst_const(f, FE_TY_I32, 0));
         FeInst* eq = fe_append_end(entry, fe_inst_binop(f, 
-            FE_TY_I32, FE_EQ,
+            FE_TY_I32, FE_IEQ,
             param,
             const0
         ));

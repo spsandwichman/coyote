@@ -81,6 +81,7 @@ static void preassign(FeFunc* f, FeInst* inst, FeBlock* block, u16 real_reg) {
 FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
     void* extra = fe_extra(inst);
     FeInstBinop* binop = extra;
+    const FeTarget* target = f->mod->target;
 
     switch (inst->kind) {
     case FE_PARAM: {
@@ -204,7 +205,7 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
             fe_extra_T(shift, XrRegReg)->shift_kind = XR_SHIFT_LSH;
             return fe_chain_new(shift);
         }
-    case FE_EQ: {
+    case FE_IEQ: {
         //  %2 = eq %0, %1
         // ->
         //  %2 = xr.sub  %0, %1
@@ -225,7 +226,7 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
         FeBlock* if_true = fe_extra_T(inst, FeInstBranch)->if_true;
         FeBlock* if_false = fe_extra_T(inst, FeInstBranch)->if_false;
         ;
-        if (condition->kind == FE_EQ) {
+        if (condition->kind == FE_IEQ) {
             FeInstBinop* cmp_eq = fe_extra(condition);
 
             FeInst* beq = create_mach(f, XR_BEQ, FE_TY_VOID, sizeof(XrRegBranch));
@@ -304,7 +305,7 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
     case FE_UPSILON:
         return fe_chain_new(inst);
     }
-    fe_runtime_crash("xr_isel: unable to select inst kind %u", inst->kind);
+    fe_runtime_crash("xr_isel: unable to select inst kind %s (%u)", fe_inst_name(target, inst->kind), inst->kind);
     return fe_chain_new(inst);
 }
 

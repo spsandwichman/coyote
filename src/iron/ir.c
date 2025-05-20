@@ -219,12 +219,30 @@ void fe_func_destroy(FeFunc *f) {
 FeInst* fe_func_param(FeFunc* f, u16 index) {
     return f->params[index];
 }
-void fe_inst_update_uses(FeFunc* f) {
+
+void fe_inst_add_use(FeInst* def, FeInst* use) {
+
+}
+
+void fe_inst_unordered_remove_use(FeInst* def, FeInst* use) {
+    for_n(i, 0, def->use_len) {
+        if (def->uses[i] == use) {
+            def->uses[i] = def->uses[--def->use_len];
+            break;
+        }
+    }
+}
+
+void fe_inst_calculate_uses(FeFunc* f) {
     const FeTarget* t = f->mod->target;
 
     for_blocks(block, f) {
         for_inst(inst, block) {
-            inst->use_count = 0;
+            inst->use_len = 0;
+            if (!inst->uses) {
+                inst->use_cap = 8;
+                inst->uses = fe_malloc(sizeof(inst->uses[0]) * inst->use_cap);
+            }
         }
     }
     for_blocks(block, f) {
@@ -232,7 +250,7 @@ void fe_inst_update_uses(FeFunc* f) {
             usize len;
             FeInst** inputs = fe_inst_list_inputs(t, inst, &len);
             for_n (i, 0, len) {
-                inputs[i]->use_count++;
+                inputs[i]->use_len++;
             }
         }
     }
@@ -735,7 +753,7 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_ULT]  = INT_IN | SAME_INS | BOOL_OUT,
     [FE_ILE]  = INT_IN | SAME_INS | BOOL_OUT,
     [FE_ULE]  = INT_IN | SAME_INS | BOOL_OUT,
-    [FE_EQ]   = INT_IN | VEC_IN | SAME_INS | BOOL_OUT | COMMU,
+    [FE_IEQ]   = INT_IN | VEC_IN | SAME_INS | BOOL_OUT | COMMU,
 
     [FE_FADD] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | FAST_ASSOC,
     [FE_FSUB] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
