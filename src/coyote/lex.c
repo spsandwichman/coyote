@@ -195,11 +195,32 @@ static Lexer lexer_from_string(string src) {
     return l;
 }
 
-// lex next token without preprocessor modification.
-static Token lex_next_raw(Lexer* l) {
+
+static void skip_whitespace(Lexer* l) {
     while (!l->eof && is_whitespace(l->current)) {
         advance(l);
     }
+}
+
+static char* span_begin(Lexer* l) {
+    char* c = &l->src.raw[l->cursor];
+    while (is_whitespace(*c)) {
+        c++;
+    }
+    return c;
+}
+
+static string span_end(Lexer* l, char* begin) {
+    char* c = &l->src.raw[l->cursor];
+    while (is_whitespace(*c)) {
+        c--;
+    }
+    return (string){.raw = begin, .len = (usize)c - (usize)begin};
+}
+
+// lex next token without preprocessor modification.
+static Token lex_next_raw(Lexer* l) {
+    skip_whitespace(l);
 
     if (l->eof) return eof_token(l);
     switch (l->current) {
