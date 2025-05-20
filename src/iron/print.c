@@ -361,11 +361,9 @@ void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
     // write function body
     fe_db_writecstr(db, " {\n");
     for_blocks(block, f) {
-        if (block != f->entry_block) {
-            fe_db_writecstr(db, "  ");
-            fe__emit_ir_block_label(db, f, block);
-            fe_db_writecstr(db, "\n");
-        }
+        fe_db_writecstr(db, "  ");
+        fe__emit_ir_block_label(db, f, block);
+        fe_db_writecstr(db, "\n");
         
         // print live-in set if present
         if (block->live) {

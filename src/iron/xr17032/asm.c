@@ -243,10 +243,8 @@ void xr_emit_assembly(FeDataBuffer* db, FeModule* m) {
         }
 
         for_blocks(block, f) {
-            if (block->flags != 0) {
-                emit_block_name(db, block);
-                fe_db_writecstr(db, ":\n");
-            }
+            emit_block_name(db, block);
+            fe_db_writecstr(db, ":\n");
 
             for_inst(inst, block) {
                 emit_inst(f, block, db, inst);

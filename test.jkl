@@ -1,6 +1,5 @@
 #DEFINE x 1
 
 #IF x
-y := x
+    y := x
 #END
-
