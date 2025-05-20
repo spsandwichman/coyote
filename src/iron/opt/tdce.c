@@ -59,7 +59,7 @@ void fe_opt_tdce(FeFunc* f) {
             // continue;
         // }
 
-        if (inst->use_count == 0 && !fe_inst_has_trait(inst->kind, FE_TRAIT_VOLATILE)) {
+        if (inst->use_len == 0 && !fe_inst_has_trait(inst->kind, FE_TRAIT_VOLATILE)) {
             // get rid of it!!!!!!!!!!!!
             worklist_push(&dead, inst);
             inst->flags = TDCE_DEAD_LMAO;
@@ -71,8 +71,8 @@ void fe_opt_tdce(FeFunc* f) {
                 if (inputs[i]->flags == TDCE_DEAD_LMAO) {
                     continue;
                 }
-                inputs[i]->use_count--;
-                if (inputs[i]->use_count == 0) {
+                inputs[i]->use_len--;
+                if (inputs[i]->use_len == 0) {
                     worklist_push(&wl, inputs[i]);
                 }
             }

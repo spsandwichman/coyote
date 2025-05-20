@@ -221,7 +221,18 @@ FeInst* fe_func_param(FeFunc* f, u16 index) {
 }
 
 void fe_inst_add_use(FeInst* def, FeInst* use) {
-
+    if (def->uses == nullptr) {
+        def->use_len = 1;
+        def->use_cap = 8;
+        def->uses = fe_malloc(sizeof(def->uses[0]) * def->use_cap);
+        def->uses[0] = use;
+        return;
+    }
+    if (def->use_cap == def->use_len) {
+        def->use_cap *= 2;
+        def->uses = fe_realloc(def->uses, sizeof(def->uses[0]) * def->use_cap);
+    }
+    def->uses[def->use_len++] = use;
 }
 
 void fe_inst_unordered_remove_use(FeInst* def, FeInst* use) {
@@ -239,10 +250,6 @@ void fe_inst_calculate_uses(FeFunc* f) {
     for_blocks(block, f) {
         for_inst(inst, block) {
             inst->use_len = 0;
-            if (!inst->uses) {
-                inst->use_cap = 8;
-                inst->uses = fe_malloc(sizeof(inst->uses[0]) * inst->use_cap);
-            }
         }
     }
     for_blocks(block, f) {
@@ -250,7 +257,7 @@ void fe_inst_calculate_uses(FeFunc* f) {
             usize len;
             FeInst** inputs = fe_inst_list_inputs(t, inst, &len);
             for_n (i, 0, len) {
-                inputs[i]->use_len++;
+                fe_inst_add_use(inputs[i], inst);
             }
         }
     }
@@ -355,6 +362,9 @@ void fe_inst_free(FeFunc* f, FeInst* inst) {
     if (inst->kind == FE_PHI) {
         fe_free(fe_extra_T(inst, FeInstPhi)->blocks);
         fe_free(fe_extra_T(inst, FeInstPhi)->vals);
+    }
+    if (inst->uses != nullptr) {
+        fe_free(inst->uses);
     }
     fe_ipool_free(f->ipool, inst);
 }
@@ -551,7 +561,7 @@ void fe_return_set_arg(FeInst* ret, u16 index, FeInst* arg) {
         fe_runtime_crash("index >= ret->len");
     }
     
-    // arg->use_count++; // since we dont do it earlier...
+    // arg->use_len++; // since we dont do it earlier...
 
     if (r->cap == 0) {
         r->single = arg;
