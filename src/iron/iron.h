@@ -299,7 +299,7 @@ typedef enum: FeInstKind {
     // Binop
     FE_IADD,
     FE_ISUB,
-    FE_IMUL, FE_UMUL, 
+    FE_IMUL, 
     FE_IDIV, FE_UDIV,
     FE_IREM, FE_UREM,
     FE_AND,

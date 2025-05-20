@@ -60,7 +60,6 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_IADD] = "iadd",
     [FE_ISUB] = "isub",
     [FE_IMUL] = "imul",
-    [FE_UMUL] = "umul",
     [FE_IDIV] = "idiv",
     [FE_UDIV] = "udiv",
     [FE_IREM] = "irem",
