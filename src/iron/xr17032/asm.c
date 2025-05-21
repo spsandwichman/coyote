@@ -14,7 +14,7 @@ static const char* reg(FeFunc* f, FeInst* inst) {
     }
     FeVirtualReg* vr = fe_vreg(f->vregs, inst->vr_out);
     if (vr->real == FE_VREG_REAL_UNASSIGNED) {
-        static char buf[10];
+        thread_local static char buf[10];
         snprintf(buf, 10, "<%u>", inst->vr_out);
         return buf;
     }

@@ -88,7 +88,7 @@ usize fe_db_writef(FeDataBuffer* buf, const char* fmt, ...) {
     va_list varargs;
     va_start(varargs, fmt);
 
-    static char chars[1000];
+    thread_local static char chars[1000];
     memset(chars, 0, sizeof(chars));
 
     usize len = vsnprintf(chars, sizeof(chars), fmt, varargs);
