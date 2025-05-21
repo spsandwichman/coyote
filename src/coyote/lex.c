@@ -477,10 +477,15 @@ static i64 eval_integer(Token t) {
     bool is_negative = raw[0] == '-';
 
     for (usize i = is_negative; i < t.len; ++i) {
-        // i.
+        val *= 10;
+        isize char_val = raw[i] - '0';
+        if (char_val < 0 || char_val > 9) {
+            TODO("invalid digit");
+        }
+        val += raw[i] - '0';
     }
 
-    return 123;
+    return is_negative ? -val : val;
 }
 
 // resolve escape sequences, etc.
@@ -708,13 +713,95 @@ static void preproc_macro(Lexer* l, PreprocScope* scope) {
     put_replacement_value(tok_span(name), scope, macro);
 }
 
-// static void preproc_if(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
-//     PreprocVal cond_val = preproc_collect_value(l, scope);
-//     if (cond_val.kind != PPVAL_INTEGER) {
-//         TODO("error: expected integer");
-//     }
-//     UNREACHABLE;
-// }
+static void preproc_if(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
+    
+    PreprocVal cond_val = preproc_collect_value(l, scope);
+    if (cond_val.kind != PPVAL_INTEGER) {
+        TODO("#IF condition is not an integer");
+    }
+    bool case_succeeds = cond_val.integer != 0;
+    // if this case suceeds, we include everything inside and then discard everything else
+    if (case_succeeds) {
+        // get the rest of this case
+        Token last = lex_with_preproc(l, tokens, scope);
+
+        // discard everything else until the last #END
+        if (last.kind == TOK_KW_END) {
+            return;
+        }
+        u32 depth = 1;
+        while (last.kind != TOK_KW_END || depth != 0) {
+            last = lex_next_raw(l);
+            if (last.kind == TOK_EOF) {
+                TODO("unexpected EOF");
+                return;
+            }
+            if (last.kind != TOK_HASH) {
+                continue;
+            }
+            last = lex_next_raw(l);
+            switch (last.kind) {
+            case TOK_KW_IF:
+                depth++;
+                break;
+            case TOK_KW_END:
+                depth--;
+                break;
+            case TOK_EOF:
+                TODO("unexpected EOF");
+                return;
+            }
+        }
+    } else {
+        // skip this case.
+        // if there's an other case, evaluate it
+        u32 depth = 1;
+        Token t;
+        while (depth != 0) {
+            t = lex_next_raw(l);
+            if (t.kind == TOK_EOF) {
+                break;
+            } else if (t.kind != TOK_HASH) {
+                continue;
+            }
+
+            t = lex_next_raw(l);
+            switch (t.kind) {
+            case TOK_KW_IF:
+                depth++;
+                break;
+            case TOK_KW_ELSE:
+            case TOK_KW_ELSEIF:
+                if (depth == 1) {
+                    depth = 0;
+                }
+                break;
+            case TOK_KW_END:
+                depth--;
+                break;
+            }
+        }
+        // printf("%s\n", token_kind[t.kind]);
+        switch (t.kind) {
+        case TOK_KW_END:
+            return;
+        case TOK_KW_ELSE:
+            // get the rest
+            Token last = lex_with_preproc(l, tokens, scope);
+
+            // expect END
+            if (last.kind != TOK_KW_END) {
+                TODO("expected #END");
+            }
+            break;
+        case TOK_KW_ELSEIF:
+            preproc_if(l, tokens, scope);
+            break;
+        default:
+            TODO("expected #ELSEIF, #ELSE, or #END");
+        }
+    }
+}
 
 static Token preproc_dispatch(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
 
@@ -723,6 +810,8 @@ static Token preproc_dispatch(Lexer* l, Vec(Token)* tokens, PreprocScope* scope)
     Token t = lex_next_raw(l);
     switch (t.kind) {
     case TOK_KW_IF:
+        preproc_if(l, tokens, scope);
+        break;
     case TOK_KW_ELSE:
     case TOK_KW_ELSEIF:
     case TOK_KW_END:
@@ -884,7 +973,7 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
     Lexer local_lexer = lexer_from_string(from_compact(body.string));
     lex_with_preproc(&local_lexer, tokens, local_scope);
 
-    // strmap_destroy(&local_scope->map);
+    strmap_destroy(&local_scope->map);
     preproc_val_pool.len = saved_ppv_len; // allow reuse of pool space
     --emit_depth;
 }
@@ -948,40 +1037,6 @@ static Token lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope)
             case TOK_KW_ELSEIF:
             case TOK_KW_END:
                 return t; // pass it up the stack
-            case TOK_KW_IF: {
-                // consume the condition
-                PreprocVal cond_val = preproc_collect_value(l, scope);
-                if (cond_val.kind != PPVAL_INTEGER) {
-                    TODO("#IF condition is not an integer");
-                }
-                bool case_succeeds = cond_val.integer != 0;
-                if (case_succeeds) {
-                    // continue lexing.
-                    lex_with_preproc(l, tokens, scope);
-                } else {
-                    // skip past this case.
-                    // i recognize this is kinda bullshit code
-                    u32 if_depth = 1;
-                    t = lex_next_raw(l);
-                    while (if_depth != 0) {
-                        if (t.kind == TOK_HASH) {
-                            t = lex_next_raw(l);
-                            switch (t.kind) {
-                            case TOK_KW_IF:
-                                if_depth++;
-                                break;
-                            case TOK_KW_END:
-                            case TOK_KW_ELSE:
-                            case TOK_KW_ELSEIF:
-                                if_depth--;
-                                break;
-                            }
-                        }
-                    }
-                }
-                // if this case didnt succeed, we have to go back
-                // if the current case succeeded, we just skip past the rest of em.
-            } break;
             default:
                 UNREACHABLE;
             }
