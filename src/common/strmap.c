@@ -1,6 +1,7 @@
 #include "strmap.h"
 
 #define MAX_SEARCH 30
+#define TOMBSTONE (void*)0xDEADBEEFDEADBEEF
 
 static u64 FNV_1a(string key) {
     const u64 FNV_OFFSET = 14695981039346656037ull;
@@ -31,19 +32,12 @@ void strmap_destroy(StrMap* hm) {
 void strmap_put(StrMap* hm, string key, void* val) {
     if (hm == nullptr) return;
     if (is_null_str(key)) return;
-    size_t hash_index = FNV_1a(key) % hm->cap;
-
-    // free slot
-    if (hm->keys[hash_index].raw == nullptr || string_eq(hm->keys[hash_index], key)) {
-        hm->keys[hash_index] = key;
-        hm->vals[hash_index] = val;
-        return;
-    }
+    size_t hash = FNV_1a(key);
 
     // search for nearby free slot
-    for_n(index, 1, min(MAX_SEARCH, hm->cap)) {
-        size_t i = (index + hash_index) % hm->cap;
-        if ((hm->keys[i].raw == nullptr) || string_eq(hm->keys[i], key)) {
+    for_n(index, 0, min(MAX_SEARCH, hm->cap)) {
+        size_t i = (index + hash) % hm->cap;
+        if (hm->keys[i].raw == TOMBSTONE || hm->keys[i].raw == nullptr || string_eq(hm->keys[i], key)) {
             hm->keys[i] = key;
             hm->vals[i] = val;
             return;
@@ -88,22 +82,16 @@ void* strmap_get(StrMap* hm, string key) {
 
 void strmap_remove(StrMap* hm, string key) {
     if (!key.raw) return;
-    size_t hash_index = FNV_1a(key) % hm->cap;
-
-    // key found in first slot
-    if (string_eq(hm->keys[hash_index], key)) {
-        hm->keys[hash_index] = NULL_STR;
-        hm->vals[hash_index] = nullptr;
-        return;
-    }
+    size_t key_hash = FNV_1a(key) % hm->cap;
 
     // linear search next slots
-    for_n(index, 1, min(MAX_SEARCH, hm->cap)) {
-        size_t i = (index + hash_index) % hm->cap;
+    for_n(index, 0, min(MAX_SEARCH, hm->cap)) {
+        size_t i = (index + key_hash) % hm->cap;
         if (hm->keys[i].raw == nullptr) return;
         if (string_eq(hm->keys[i], key)) {
-            hm->keys[hash_index] = NULL_STR;
-            hm->vals[hash_index] = nullptr;
+            hm->keys[i].len = 0;
+            hm->keys[i].raw = TOMBSTONE;
+            hm->vals[i] = nullptr;
             return;
         }
     }

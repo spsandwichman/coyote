@@ -408,7 +408,7 @@ static Token lex_next_raw(Lexer* l) {
 
 // ------------------------- PREPROCESSOR ------------------------- 
 
-static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope);
+static Token lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope);
 
 Vec(Token) macro_arg_pool;
 Vec(PreprocVal) preproc_val_pool;
@@ -716,7 +716,7 @@ static void preproc_macro(Lexer* l, PreprocScope* scope) {
 //     UNREACHABLE;
 // }
 
-static u8 preproc_dispatch(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
+static Token preproc_dispatch(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
 
     // todo: add preproc keywords to the hash table
 
@@ -728,7 +728,7 @@ static u8 preproc_dispatch(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
     case TOK_KW_END:
         // the host lexer needs to take care of this,
         // pass it back.
-        return t.kind;
+        return t;
     }
     
     string span = tok_span(t);
@@ -741,7 +741,7 @@ static u8 preproc_dispatch(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
     } else {
         // TODO("error: unrecognized directive");
     }
-    return 0;
+    return (Token){}; // its fine lol
 }
 
 usize emit_depth = 0;
@@ -908,8 +908,10 @@ static Token preproc_token_no_span(u8 kind) {
     return t;
 }
 
-static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
-    for (Token t = lex_next_raw(l); t.kind != TOK_EOF; t = lex_next_raw(l)) {
+// returns the last token it sees.
+static Token lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
+    Token t = lex_next_raw(l);
+    for (; t.kind != TOK_EOF; t = lex_next_raw(l)) {
         switch (t.kind) {
         case TOK_IDENTIFIER:
             ;
@@ -938,30 +940,56 @@ static void lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) 
             break;
         case TOK_HASH:
             ;
-            u8 kind = preproc_dispatch(l, tokens, scope);
-            switch (kind) {
+            Token t = preproc_dispatch(l, tokens, scope);
+            switch (t.kind) {
             case 0:
                 break;
+            case TOK_KW_ELSE:
+            case TOK_KW_ELSEIF:
+            case TOK_KW_END:
+                return t; // pass it up the stack
             case TOK_KW_IF: {
-                // consume a preproc val
+                // consume the condition
                 PreprocVal cond_val = preproc_collect_value(l, scope);
                 if (cond_val.kind != PPVAL_INTEGER) {
                     TODO("#IF condition is not an integer");
                 }
-                bool cond = cond_val.integer == 0;
-                u32 if_count = 1;
-                TODO("YUH");
+                bool case_succeeds = cond_val.integer != 0;
+                if (case_succeeds) {
+                    // continue lexing.
+                    lex_with_preproc(l, tokens, scope);
+                } else {
+                    // skip past this case.
+                    // i recognize this is kinda bullshit code
+                    u32 if_depth = 1;
+                    t = lex_next_raw(l);
+                    while (if_depth != 0) {
+                        if (t.kind == TOK_HASH) {
+                            t = lex_next_raw(l);
+                            switch (t.kind) {
+                            case TOK_KW_IF:
+                                if_depth++;
+                                break;
+                            case TOK_KW_END:
+                            case TOK_KW_ELSE:
+                            case TOK_KW_ELSEIF:
+                                if_depth--;
+                                break;
+                            }
+                        }
+                    }
+                }
+                // if this case didnt succeed, we have to go back
+                // if the current case succeeded, we just skip past the rest of em.
             } break;
             default:
                 UNREACHABLE;
             }
             continue;
-        // case TOK_NEWLINE: // discard newlines for now
-            // continue;
         }
-
         vec_append(tokens, t);
     }
+    return t;
 }
 
 Context lex_entrypoint(SrcFile* f) {
