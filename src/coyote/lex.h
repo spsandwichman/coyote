@@ -1,10 +1,7 @@
 #ifndef LEX_H
 #define LEX_H
 
-#include <assert.h>
-#include "common/orbit.h"
-#include "common/vec.h"
-#include "common/strmap.h"
+#include "coyote.h"
 
 #define _LEX_KEYWORDS_ \
     T(AND) \
@@ -19,7 +16,6 @@
     T(ELSEIF) \
     T(END) \
     T(ENUM) \
-    T(EXTERN) \
     T(FALSE) \
     T(FN) \
     T(FNPTR) \
@@ -33,7 +29,6 @@
     T(NULLPTR) \
     T(OUT) \
     T(PACKED) \
-    T(PUBLIC) \
     T(RETURN) \
     T(SIZEOF) \
     T(OFFSETOF) \
@@ -51,8 +46,12 @@
     T(WHILE) \
     T(BARRIER) \
     T(NOTHING) \
-    T(EXPORT) \
+    \
+    T(PUBLIC) \
     T(PRIVATE) \
+    T(EXPORT) \
+    T(EXTERN) \
+    \
     T(UQUAD) \
     T(QUAD) \
     T(UWORD) \
@@ -117,7 +116,7 @@ enum {
     TOK_MOD_EQ,     // %=
     TOK_AND_EQ,     // &=
     TOK_OR_EQ,      // |=
-    TOK_DOLLAR_EQ,  // $=
+    TOK_XOR_EQ,     // $=
     TOK_LSHIFT_EQ,  // <<=
     TOK_RSHIFT_EQ,  // >>=
 
@@ -128,7 +127,7 @@ enum {
     TOK_MOD,        // %
     TOK_AND,        // &
     TOK_OR,         // |
-    TOK_DOLLAR,     // $
+    TOK_XOR,        // $
     TOK_LSHIFT,     // <<
     TOK_RSHIFT,     // >>
 
@@ -190,16 +189,19 @@ extern const char* token_kind[_TOK_COUNT];
 
 VecPtr_typedef(SrcFile);
 typedef struct {
+    Token current;
     Token* tokens;
     u32 tokens_len;
-    // u32 preproc_depth;
+    u32 cursor;
 
     VecPtr(SrcFile) sources;
-} Context;
+
+    Arena arena;
+} Parser;
 
 Vec_typedef(Token);
 
-Context lex_entrypoint(SrcFile* f);
+Parser lex_entrypoint(SrcFile* f);
 string tok_span(Token t);
 
 #define MAX_MACRO_ARGS 255

@@ -132,7 +132,6 @@ void report_line(ReportLine* report) {
     string line = snippet_line(report->src, report->snippet);
     print_snippet(line, report->snippet, color, 5);
     
-
     if (report->kind == REPORT_ERROR) {
         exit(3);
     }

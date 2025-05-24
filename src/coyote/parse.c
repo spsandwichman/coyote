@@ -1,14 +1,15 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "parse.h"
 #include "common/str.h"
 #include "common/util.h"
 #include "common/vec.h"
-#include "iron/iron.h"
+#include "coyote.h"
 #include "lex.h"
 
-static struct {
+thread_local static struct {
     TyBufSlot* at;
     TyIndex* ptrs;
     u32 len;
@@ -18,7 +19,7 @@ static struct {
 #define TY(index, T) ((T*)&tybuf.at[index])
 #define TY_KIND(index) ((TyBase*)&tybuf.at[index])->kind
 
-static void tg_init() {
+void ty_init() {
     tybuf.len = 0;
     tybuf.cap = 1024;
     tybuf.at = malloc(sizeof(tybuf.at[0]) * tybuf.cap);
@@ -36,8 +37,8 @@ static void tg_init() {
     tybuf.len = TY_UQUAD + TY_PTR + 1;
 }
 
-#define tg_allocate(T) tg__allocate(sizeof(T), alignof(T) == 8)
-static TyIndex tg__allocate(usize size, bool align64) {
+#define ty_allocate(T) ty__allocate(sizeof(T), alignof(T) == 8)
+static TyIndex ty__allocate(usize size, bool align64) {
     usize old_len = tybuf.len;
 
     usize slots = size / sizeof(TyBufSlot);
@@ -57,13 +58,13 @@ static TyIndex tg__allocate(usize size, bool align64) {
     return pos;
 }
 
-static TyIndex tg_get_ptr(TyIndex t) {
+static TyIndex ty_get_ptr(TyIndex t) {
     if (t < TY_PTR) {
         return t + TY_PTR;
     }
     if (tybuf.ptrs[t] == 0) {
         // we have to create a pointer type since none exists.
-        TyIndex ptr = tg_allocate(TyPtr);
+        TyIndex ptr = ty_allocate(TyPtr);
         TY(ptr, TyPtr)->kind = TY_PTR;
         TY(ptr, TyPtr)->to = t;
         
@@ -85,10 +86,9 @@ static bool ty_is_scalar(TyIndex t) {
     return false;
 }
 
-static usize target_ptr_size = 4;
-static TyIndex target_intptr  = TY_LONG;
-static TyIndex target_uintptr = TY_ULONG;
-static FeTy target_fe_uintptr = FE_TY_I32;
+thread_local static usize target_ptr_size = 4;
+thread_local static TyIndex target_word  = TY_LONG;
+thread_local static TyIndex target_uword = TY_ULONG;
 
 static usize ty_size(TyIndex t) {
     switch (t) {
@@ -115,7 +115,7 @@ static bool token_is_within(SrcFile* f, char* raw) {
         && (uintptr_t)f->src.raw + f->src.len > (uintptr_t)raw;
 }
 
-static SrcFile* where_from(Context* ctx, string span) {
+static SrcFile* where_from(Parser* ctx, string span) {
     for_n (i, 0, ctx->sources.len) {
         SrcFile* f = ctx->sources.at[i];
         if (token_is_within(f, span.raw)) {
@@ -127,13 +127,13 @@ static SrcFile* where_from(Context* ctx, string span) {
 
 Vec_typedef(char);
 
-void vec_char_append_many(Vec(char)* vec, const char* data, usize len) {
+static void vec_char_append_many(Vec(char)* vec, const char* data, usize len) {
     for_n(i, 0, len) {
         vec_append(vec, data[i]);
     }
 }
 
-static usize preproc_depth(Context* ctx, u32 index) {
+static usize preproc_depth(Parser* ctx, u32 index) {
     usize depth = 0;
     for_n(i, 0, index) {
         Token t = ctx->tokens[i];
@@ -151,7 +151,7 @@ static usize preproc_depth(Context* ctx, u32 index) {
     return depth;
 }
 
-void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) {
+void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, const char* msg) {
     // find out if we're in a macro somewhere
     bool inside_preproc = preproc_depth(ctx, start_index) != 0 || preproc_depth(ctx, end_index) != 0;
 
@@ -259,7 +259,7 @@ void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) 
         };
 
         ReportLine rep = {
-            .kind = REPORT_ERROR,
+            .kind = kind,
             .msg = str(msg),
             .path = main_file->path,
             .src = main_file->src,
@@ -278,7 +278,7 @@ void token_error(Context* ctx, u32 start_index, u32 end_index, const char* msg) 
             .len = (usize)end_span.raw - (usize)start_span.raw + end_span.len,
         };
         ReportLine rep = {
-            .kind = REPORT_ERROR,
+            .kind = kind,
             .msg = str(msg),
             .path = main_file->path,
             .snippet = span,
@@ -294,4 +294,132 @@ void p_advance(Parser* p) {
         ++p->cursor;
     } while (_TOK_LEX_IGNORE < p->tokens[p->cursor].kind);
     p->current = p->tokens[p->cursor];
+}
+
+bool match(Parser* p, u8 kind) {
+    return p->current.kind == kind;
+}
+
+void parse_error(Parser* p, u32 index, ReportKind kind, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    thread_local static char buf[128];
+    vsprintf_s(buf, sizeof(buf), fmt, args);
+
+    va_end(args);
+
+    token_error(p, kind, index, index, buf);
+}
+
+void expect_advance(Parser* p, u8 kind) {
+    if (kind != p->current.kind) {
+        parse_error(p, REPORT_ERROR, p->cursor, "expected '%s', got '%s'", token_kind[kind], token_kind[p->current.kind]);
+    }
+    p_advance(p);
+}
+
+static Expr* new_expr_(Parser* p, u8 kind, TyIndex ty, usize size) {
+    Expr* expr = arena_alloc(&p->arena, size, alignof(Expr));
+    expr->kind = kind;
+    expr->ty = ty;
+    expr->token_index = p->cursor;
+    return expr;
+}
+
+#define new_expr(p, kind, ty, field) \
+    new_expr_(p, kind, ty, offsetof(Expr, extra) + sizeof(((Expr*)nullptr)->field))
+
+static i64 eval_integer(Parser* p, Token t, u32 index) {
+    i64 val = 0;
+    char* raw = tok_raw(t);
+    bool is_negative = raw[0] == '-';
+
+    for (usize i = is_negative; i < t.len; ++i) {
+        val *= 10;
+        isize char_val = raw[i] - '0';
+        if (char_val < 0 || char_val > 9) {
+            // TODO("invalid digit");
+            parse_error(p, index, REPORT_ERROR, "invalid digit '%c'", raw[i]);
+        }
+        val += raw[i] - '0';
+    }
+
+    return is_negative ? -val : val;
+}
+
+TyIndex parse_type_terminal(Parser* p) {
+    switch (p->current.kind) {
+    case TOK_KW_VOID:  return TY_VOID;
+    case TOK_KW_BYTE:  return TY_BYTE;
+    case TOK_KW_UBYTE: return TY_UBYTE;
+    case TOK_KW_INT:   return TY_INT;
+    case TOK_KW_UINT:  return TY_UINT;
+    case TOK_KW_LONG:  return TY_LONG;
+    case TOK_KW_ULONG: return TY_ULONG;
+    case TOK_KW_QUAD:  return TY_QUAD;
+    case TOK_KW_UQUAD: return TY_UQUAD;
+    case TOK_KW_WORD:  return target_word;
+    case TOK_KW_UWORD: return target_uword;
+    case TOK_OPEN_PAREN:
+        p_advance(p);
+        TyIndex inner = parse_type(p);
+        expect_advance(p, TOK_CLOSE_PAREN);
+        return inner;
+    case TOK_CARET:
+        p_advance(p);
+        return ty_get_ptr(parse_type_terminal(p));
+    default:
+        parse_error(p, p->cursor, REPORT_ERROR, "expected type");
+    }
+    return TY_VOID;
+}
+
+TyIndex parse_type(Parser* p) {
+    return parse_type_terminal(p);
+}
+
+Expr* parse_atom_terminal(Parser* p) {
+    string span = tok_span(p->current);
+    switch (p->current.kind) {
+    case TOK_OPEN_PAREN:
+        p_advance(p);
+        Expr* inner = parse_expr(p);
+        expect_advance(p, TOK_CLOSE_PAREN);
+        return inner;
+    case TOK_INTEGER:
+        Expr* int_lit = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        int_lit->literal = eval_integer(p, p->current, p->cursor);
+        p_advance(p);
+        return int_lit;
+    case TOK_KW_TRUE:
+        Expr* true_lit = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        true_lit->literal = 1;
+        p_advance(p);
+        return true_lit;
+    case TOK_KW_FALSE:
+        Expr* false_lit = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        false_lit->literal = 0;
+        p_advance(p);
+        return false_lit;
+    case TOK_KW_NULLPTR:
+        Expr* nullptr_lit = new_expr(p, EXPR_LITERAL, ty_get_ptr(TY_VOID), literal);
+        nullptr_lit->literal = 0;
+        p_advance(p);
+        return nullptr_lit;
+    case TOK_KW_SIZEOF:
+        Expr* size = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        p_advance(p);
+        TyIndex type = parse_type(p); 
+        size->literal = ty_size(type);
+        return size;
+    default:
+        parse_error(p, p->cursor, REPORT_ERROR, "expected expression, got '%s'", token_kind[p->current.kind]);
+    }
+
+    return nullptr;
+}
+
+Expr* parse_expr(Parser* p) {
+    return parse_atom_terminal(p);
 }

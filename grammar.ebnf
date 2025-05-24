@@ -23,9 +23,9 @@ compound =
     ;
 
 decl =
+    | [storageclass] fndecl
     | [storageclass] ident ":" type ["=" (expr | compound)]
     | [storageclass] ident ":" "=" (expr | compound)
-    | [storageclass] fndecl
     | EXTERN ident ":" type     (* EXTERN parses differently so it cant go in storageclass *)
     | EXTERN FN fnproto 
     | typedecl
@@ -47,14 +47,14 @@ variant = ident | ident "=" expr;             (* enums *)
 
 assignop = 
     | "=" 
-    | "+=" | "-=" | "*=" | "/=" | "%=" 
+    | "+=" | "-=" | "*=" | "/=" | "%="
     | "&=" | "|=" | "$=" | "<<=" | ">>="
     ;
 
 stmt = 
+    | decl
     | expr
     | expr assignop expr
-    | decl
     | BARRIER
     | BREAK
     | CONTINUE
@@ -62,7 +62,7 @@ stmt =
     | RETURN expr
     | "@" ident       (* label *)
     | GOTO ident
-    | NOTHING         (* blank statement *)
+    | NOTHING         (* blank *)
     | IF expr THEN {stmt} (END | else)
     | WHILE expr DO {stmt} END
     ;
@@ -93,11 +93,15 @@ unary =
     | atomic
     ;
 
-atomic = 
+atomic_terminal = 
     | ident | literal | TRUE | FALSE | NULLPTR
     | "(" expr ")"
-    | OFFSETOF ident "." ident {"." ident}
+    | OFFSETOF type "." ident {"." ident}
     | SIZEOF type
+    ;
+
+atomic = 
+    | atomic_terminal
     | atomic "[" expr "]"
     | atomic "^"
     | atomic "." ident
@@ -112,6 +116,7 @@ type =
     ;
 
 basetype = 
+    | WORD | UWORD
     | QUAD | UQUAD | LONG | ULONG | INT | UINT | BYTE | UBYTE | VOID
     | ident
     | "(" type ")"

@@ -1,5 +1,6 @@
 #include "lex.h"
 #include "common/strmap.h"
+#include "common/util.h"
 #include "common/vec.h"
 
 const char* token_kind[_TOK_COUNT] = {
@@ -34,7 +35,7 @@ const char* token_kind[_TOK_COUNT] = {
     [TOK_MOD] =        "%",
     [TOK_DOT] =        ".",
     [TOK_AT] =         "@",
-    [TOK_DOLLAR] =     "$",
+    [TOK_XOR] =     "$",
     [TOK_LSHIFT] =     "<<",
     [TOK_RSHIFT] =     ">>",
     [TOK_TILDE] =      "~",
@@ -50,7 +51,7 @@ const char* token_kind[_TOK_COUNT] = {
     [TOK_MOD_EQ] =    "%=",
     [TOK_AND_EQ] =    "&=",
     [TOK_OR_EQ] =     "|=",
-    [TOK_DOLLAR_EQ] = "$=",
+    [TOK_XOR_EQ] = "$=",
     [TOK_LSHIFT_EQ] = "<<=",
     [TOK_RSHIFT_EQ] = ">>=",
 
@@ -292,9 +293,9 @@ static Token lex_next_raw(Lexer* l) {
                 return construct_and_advance(l, TOK_MOD, 1);
         case '$':
             if (peek(l, 1) == '=')
-                return construct_and_advance(l, TOK_DOLLAR_EQ, 2);
+                return construct_and_advance(l, TOK_XOR_EQ, 2);
             else
-                return construct_and_advance(l, TOK_DOLLAR, 1);
+                return construct_and_advance(l, TOK_XOR, 1);
         case '&':
             if (peek(l, 1) == '=')
                 return construct_and_advance(l, TOK_AND_EQ, 2);
@@ -349,7 +350,8 @@ static Token lex_next_raw(Lexer* l) {
                 seen_slash = c == '\\';
                 c = peek(l, length);
             }
-            length++;
+            // length++;
+            l->cursor++;
             if (length > LEX_MAX_TOKEN_LEN) {
                 TODO("token is longer than max token len");
             }
@@ -575,7 +577,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
             case TOK_MOD:    v.integer = lhs.integer % rhs.integer; break;
             case TOK_AND:    v.integer = lhs.integer & rhs.integer; break;
             case TOK_OR:     v.integer = lhs.integer | rhs.integer; break;
-            case TOK_DOLLAR: v.integer = lhs.integer ^ rhs.integer; break;
+            case TOK_XOR: v.integer = lhs.integer ^ rhs.integer; break;
             case TOK_LSHIFT: v.integer = lhs.integer << rhs.integer; break;
             case TOK_RSHIFT: v.integer = lhs.integer >> rhs.integer; break;
             case TOK_EQ_EQ:      v.integer = lhs.integer == rhs.integer; break;
@@ -1047,7 +1049,7 @@ static Token lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope)
     return t;
 }
 
-Context lex_entrypoint(SrcFile* f) {
+Parser lex_entrypoint(SrcFile* f) {
     // init keyword perfect hash table
     for (usize i = _TOK_KEYWORDS_BEGIN + 1; i < _TOK_KEYWORDS_END; ++i) {
         const char* keyword = token_kind[i];
@@ -1076,12 +1078,22 @@ Context lex_entrypoint(SrcFile* f) {
 
     vec_shrink(&tokens);
 
-    Context ctx = {
-        // .preproc_depth = 0,
+    Parser ctx = {
         .tokens = tokens.at,
         .tokens_len = tokens.len,
         .sources = vecptr_new(SrcFile, 16),
+        .cursor = 0,
     };
+    arena_init(&ctx.arena);
+
+    for_n(i, 0, tokens.len) {
+        if (tokens.at[i].kind < _TOK_LEX_IGNORE) {
+            ctx.current = tokens.at[i];
+            ctx.cursor = i;
+            break;
+        }
+    }
+
     vec_append(&ctx.sources, f);
 
     return ctx;

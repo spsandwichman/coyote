@@ -1,14 +1,1 @@
-#DEFINE a 0
-#DEFINE b 2
-
-
-#IF a
-    y := 1
-#ELSEIF (== b 2)
-    y := 2
-#ELSE
-    y := 3
-#END
-
-
-justmakingsurethisishere
+1 + 2
