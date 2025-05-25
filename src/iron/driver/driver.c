@@ -1,7 +1,6 @@
 #include "iron/iron.h"
 #include <stdio.h>
 
-
 static void quick_print(FeFunc* f) {
     FeDataBuffer db;
     fe_db_init(&db, 512);
@@ -254,7 +253,7 @@ FeFunc* make_algsimp_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs)
     fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
 
     // make the function and its symbol
-    FeSymbol* f_sym = fe_symbol_new(mod, "symaddr_test", 0, FE_BIND_GLOBAL);
+    FeSymbol* f_sym = fe_symbol_new(mod, "algsimp_test", 0, FE_BIND_GLOBAL);
     FeFunc* f = fe_func_new(mod, f_sym, f_sig, ipool, vregs);
     FeBlock* entry = f->entry_block;
 

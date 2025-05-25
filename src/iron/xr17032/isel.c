@@ -1,7 +1,5 @@
 #include "iron/iron.h"
 #include "xr.h"
-#include <stdatomic.h>
-#include <string.h>
 
 static bool is_const_zero(FeInst* inst) {
     return inst->kind == FE_CONST && fe_extra_T(inst, FeInstConst)->val == 0;

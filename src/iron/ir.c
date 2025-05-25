@@ -1,7 +1,5 @@
 #include "iron.h"
 #include "iron/iron.h"
-#include <string.h>
-
 
 static const char* inst_name(FeInst* inst) {
     FeInst* bookend = inst;

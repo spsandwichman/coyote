@@ -1,5 +1,4 @@
-#include <iron/iron.h>
-#include <string.h>
+#include "iron/iron.h"
 
 // algsimp - algebraic simplification
 
