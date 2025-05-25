@@ -101,24 +101,29 @@ thread_local static char sprintf_buf[512];
 
 static void _ty_name(Vec(char)* v, TyIndex t) {
     switch (TY_KIND(t)) {
-    case TY__INVALID: return vec_char_append_str(v, "INVALID"); return;
-    case TY_VOID:     return vec_char_append_str(v, "VOID"); return;
-    case TY_BYTE:     return vec_char_append_str(v, "BYTE"); return;
-    case TY_UBYTE:    return vec_char_append_str(v, "UBYTE"); return;
-    case TY_INT:      return vec_char_append_str(v, "INT"); return;
-    case TY_UINT:     return vec_char_append_str(v, "UINT"); return;
-    case TY_LONG:     return vec_char_append_str(v, "LONG"); return;
-    case TY_ULONG:    return vec_char_append_str(v, "ULONG"); return;
-    case TY_QUAD:     return vec_char_append_str(v, "QUAD"); return;
-    case TY_UQUAD:    return vec_char_append_str(v, "UQUAD"); return;
+    case TY__INVALID: vec_char_append_str(v, "INVALID"); return;
+    case TY_VOID:     vec_char_append_str(v, "VOID"); return;
+    case TY_BYTE:     vec_char_append_str(v, "BYTE"); return;
+    case TY_UBYTE:    vec_char_append_str(v, "UBYTE"); return;
+    case TY_INT:      vec_char_append_str(v, "INT"); return;
+    case TY_UINT:     vec_char_append_str(v, "UINT"); return;
+    case TY_LONG:     vec_char_append_str(v, "LONG"); return;
+    case TY_ULONG:    vec_char_append_str(v, "ULONG"); return;
+    case TY_QUAD:     vec_char_append_str(v, "QUAD"); return;
+    case TY_UQUAD:    vec_char_append_str(v, "UQUAD"); return;
     case TY_PTR:
         vec_char_append_str(v, "^");
+        _ty_name(v, ty_get_ptr_target(t));
+        return;
     default: vec_char_append_str(v, "???");
     }
 }
 
 const char* ty_name(TyIndex t) {
-    
+    Vec(char) buf = vec_new(char, 16);
+    _ty_name(&buf, t);
+    vec_append(&buf, 0);
+    return buf.at;
 }
 
 static bool ty_is_scalar(TyIndex t) {
