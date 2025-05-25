@@ -29,39 +29,39 @@ static u32 col_number(string src, string snippet) {
 
 static void print_snippet(string line, string snippet, const char* color, usize pad) {
     
-    printf("| ");
+    fprintf(stderr, "| ");
 
     for_n(i, 0, line.len) {
         if (line.raw + i == snippet.raw) {
-            printf(Bold "%s", color);
+            fprintf(stderr, Bold "%s", color);
         }
         if (line.raw + i == snippet.raw + snippet.len) {
-            printf(Reset);
+            fprintf(stderr, Reset);
         }
-        printf("%c", line.raw[i]);
+        fprintf(stderr, "%c", line.raw[i]);
     }
-    printf(Reset);
-    printf("\n");
+    fprintf(stderr, Reset);
+    fprintf(stderr, "\n");
     for_n(i, 0, pad) {
-        printf(" ");
+        fprintf(stderr, " ");
     }
-    printf("| ");
+    fprintf(stderr, "| ");
     for_n(i, 0, line.len) {
         if (line.raw + i < snippet.raw) {
-            printf(" ");
+            fprintf(stderr, " ");
         }
         if (line.raw + i == snippet.raw) {
-            printf(Bold "%s^", color);
+            fprintf(stderr, Bold "%s^", color);
         }
         if (line.raw + i == snippet.raw + snippet.len) {
-            printf("\n");
+            fprintf(stderr, "\n");
             break;
         }
         if (line.raw + i > snippet.raw) {
-            printf("~");
+            fprintf(stderr, "~");
         }
     }
-    printf(Reset);
+    fprintf(stderr, Reset);
 }
 
 bool is_whitespace(char c) {
@@ -108,27 +108,27 @@ void report_line(ReportLine* report) {
     const char* color = White;
 
     switch (report->kind) {
-    case REPORT_ERROR: printf(Bold Red"ERROR"Reset); color = Red; break;
-    case REPORT_WARNING: printf(Bold Yellow"WARN"Reset); color = Yellow; break;
-    case REPORT_NOTE: printf(Bold Cyan"NOTE"Reset); color = Cyan; break;
+    case REPORT_ERROR: fprintf(stderr, Bold Red"ERROR"Reset); color = Red; break;
+    case REPORT_WARNING: fprintf(stderr, Bold Yellow"WARN"Reset); color = Yellow; break;
+    case REPORT_NOTE: fprintf(stderr, Bold Cyan"NOTE"Reset); color = Cyan; break;
     }
 
     u32 line_num = line_number(report->src, report->snippet);
     u32 col_num  = col_number(report->src, report->snippet);
 
-    printf(" ["Bold str_fmt Reset":%u:%u] ", str_arg(report->path), line_num, col_num);
-    printf(str_fmt, str_arg(report->msg));
-    printf("\n");
+    fprintf(stderr, " ["Bold str_fmt Reset":%u:%u] ", str_arg(report->path), line_num, col_num);
+    fprintf(stderr, str_fmt, str_arg(report->msg));
+    fprintf(stderr, "\n");
 
     if (report->reconstructed_line.raw != nullptr) {
-        printf("%4u ", line_num);
-        // printf("     ");
+        fprintf(stderr, "%4u ", line_num);
+        // fprintf(stderr, "     ");
         string line = snippet_line(report->reconstructed_line, report->reconstructed_snippet);
         print_snippet(line, report->reconstructed_snippet, color, 5);
-        printf("expanded from: "Reset"\n");
+        fprintf(stderr, "expanded from: "Reset"\n");
     }
     
-    printf("%4u ", line_num);
+    fprintf(stderr, "%4u ", line_num);
     string line = snippet_line(report->src, report->snippet);
     print_snippet(line, report->snippet, color, 5);
     

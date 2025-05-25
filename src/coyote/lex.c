@@ -109,8 +109,8 @@ static void advance_n(Lexer* l, usize n) {
 static Token eof_token(Lexer* l) {
     Token t;
     t.kind = TOK_EOF;
-    t.len = 1;
-    t.raw = (i64)&l->src.raw[l->src.len - 1];
+    t.len = 0;
+    t.raw = (i64)&l->src.raw[l->src.len];
     return t;
 }
 
@@ -350,12 +350,14 @@ static Token lex_next_raw(Lexer* l) {
                 seen_slash = c == '\\';
                 c = peek(l, length);
             }
-            // length++;
+            // length--;
             l->cursor++;
             if (length > LEX_MAX_TOKEN_LEN) {
                 TODO("token is longer than max token len");
             }
-            return construct_and_advance(l, TOK_STRING, length);
+            Token string_token = construct_and_advance(l, TOK_STRING, length-1);
+            advance(l);
+            return string_token;
         }
         case '\'': {
             usize length = 1;
@@ -481,9 +483,9 @@ static i64 eval_integer(Token t) {
     for (usize i = is_negative; i < t.len; ++i) {
         val *= 10;
         isize char_val = raw[i] - '0';
-        if (char_val < 0 || char_val > 9) {
-            TODO("invalid digit");
-        }
+        // if (char_val < 0 || char_val > 9) {
+        //     TODO("invalid digit");
+        // }
         val += raw[i] - '0';
     }
 
@@ -1072,6 +1074,8 @@ Parser lex_entrypoint(SrcFile* f) {
 
     lex_with_preproc(&l, &tokens, &global_scope);
 
+    vec_append(&tokens, eof_token(&l));
+
     strmap_destroy(&global_scope.map);
     vec_destroy(&preproc_val_pool);
     vec_destroy(&macro_arg_pool);
@@ -1084,7 +1088,14 @@ Parser lex_entrypoint(SrcFile* f) {
         .sources = vecptr_new(SrcFile, 16),
         .cursor = 0,
     };
+    ctx.global_scope = malloc(sizeof(ParseScope));
+    ctx.global_scope->sub = nullptr;
+    ctx.global_scope->super = nullptr;
+    strmap_init(&ctx.global_scope->map, 128);
+    ctx.current_scope = ctx.global_scope;
+    
     arena_init(&ctx.arena);
+
 
     for_n(i, 0, tokens.len) {
         if (tokens.at[i].kind < _TOK_LEX_IGNORE) {

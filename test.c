@@ -1,2 +1,2 @@
 #include <stdint.h>
-uintptr_t x;
+uintptr_t foo[1];

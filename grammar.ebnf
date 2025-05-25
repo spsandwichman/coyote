@@ -105,6 +105,7 @@ atomic =
     | atomic "[" expr "]"
     | atomic "^"
     | atomic "." ident
+    | atomic "^." ident (* technically different in the parser *)
     | atomic "(" list<argument> ")"
     ;
 

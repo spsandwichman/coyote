@@ -12,6 +12,9 @@ _VecGeneric* _vec_new(size_t stride, size_t initial_cap) {
 }
 
 void _vec_init(_VecGeneric* v, size_t stride, size_t initial_cap) {
+    if (initial_cap < 2) {
+        initial_cap = 2;
+    }
     v->at = malloc(stride * initial_cap);
     v->cap = initial_cap;
     v->len = 0;

@@ -7,12 +7,13 @@
 typedef struct StrMap {
     string* keys;
     void** vals;
-    size_t cap; // capacity
+    u32 cap; // capacity
+    u32 size; // number of items
 } StrMap;
 
 #define STRMAP_NOT_FOUND ((void*)0xDEADBEEF)
 
-void strmap_init(StrMap* sm, size_t capacity);
+void strmap_init(StrMap* sm, u32 capacity);
 void strmap_reset(StrMap* sm);
 void strmap_destroy(StrMap* sm);
 void strmap_put(StrMap* sm, string key, void* val);

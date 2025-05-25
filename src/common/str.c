@@ -21,12 +21,7 @@ string strprintf(char* format, ...) {
 
 string string_concat(string a, string b) {
     string c = string_alloc(a.len + b.len);
-    for (size_t i = 0; i < a.len; ++i) {
-        c.raw[i] = a.raw[i];
-    }
-    for (size_t i = 0; i < a.len; ++i) {
-        c.raw[a.len + i] = b.raw[i];
-    }
+    string_concat_buf(c, a, b);
     return c;
 }
 
@@ -34,8 +29,8 @@ void string_concat_buf(string buf, string a, string b) {
     for (size_t i = 0; i < a.len; ++i) {
         buf.raw[i] = a.raw[i];
     }
-    for (size_t i = 0; i < a.len; ++i) {
-        buf.raw[i] = a.raw[i];
+    for (size_t i = 0; i < b.len; ++i) {
+        buf.raw[i + a.len] = b.raw[i];
     }
 }
 

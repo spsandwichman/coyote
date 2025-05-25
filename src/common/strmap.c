@@ -15,7 +15,8 @@ static u64 FNV_1a(string key) {
     return hash;
 }
 
-void strmap_init(StrMap* hm, size_t capacity) {
+void strmap_init(StrMap* hm, u32 capacity) {
+    hm->size = 0;
     hm->cap = capacity;
     hm->vals = malloc(sizeof(hm->vals[0]) * hm->cap);
     hm->keys = malloc(sizeof(hm->keys[0]) * hm->cap);
@@ -34,10 +35,16 @@ void strmap_put(StrMap* hm, string key, void* val) {
     if (is_null_str(key)) return;
     size_t hash = FNV_1a(key);
 
+
     // search for nearby free slot
     for_n(index, 0, min(MAX_SEARCH, hm->cap)) {
         size_t i = (index + hash) % hm->cap;
-        if (hm->keys[i].raw == TOMBSTONE || hm->keys[i].raw == nullptr || string_eq(hm->keys[i], key)) {
+        if (hm->keys[i].raw == TOMBSTONE || hm->keys[i].raw == nullptr) {
+            ++hm->size;
+            hm->keys[i] = key;
+            hm->vals[i] = val;
+            return;
+        } else if (string_eq(hm->keys[i], key)) {
             hm->keys[i] = key;
             hm->vals[i] = val;
             return;
@@ -92,6 +99,7 @@ void strmap_remove(StrMap* hm, string key) {
             hm->keys[i].len = 0;
             hm->keys[i].raw = TOMBSTONE;
             hm->vals[i] = nullptr;
+            --hm->size;
             return;
         }
     }

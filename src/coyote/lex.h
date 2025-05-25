@@ -188,11 +188,21 @@ static_assert(_TOK_COUNT < (1 << 7));
 extern const char* token_kind[_TOK_COUNT];
 
 VecPtr_typedef(SrcFile);
+typedef struct ParseScope ParseScope;
+typedef struct ParseScope {
+    StrMap map;
+    ParseScope* super;
+    ParseScope* sub;
+} ParseScope;
+
 typedef struct {
     Token current;
     Token* tokens;
     u32 tokens_len;
     u32 cursor;
+
+    ParseScope* global_scope;
+    ParseScope* current_scope;
 
     VecPtr(SrcFile) sources;
 

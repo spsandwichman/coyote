@@ -21,6 +21,7 @@ typedef enum : u8 {
     TY_UQUAD,   // u64
 
     TY_PTR,
+    TY_ARRAY,
     TY_STRUCT,
     TY_STRUCT_PACKED,
     TY_UNION,
@@ -46,6 +47,12 @@ typedef struct {
 
 typedef struct {
     u8 kind;
+    TyIndex to;
+    u32 len;
+} TyArray;
+
+typedef struct {
+    u8 kind;
     TyIndex aliasing;
 } TyAlias;
 
@@ -61,6 +68,7 @@ typedef struct {
     u8 len; // should never be a limitation O.O
     u16 size;
     u8 align;
+    CompactString name;
     Ty_RecordMember member[];
 } TyRecord;
 
@@ -89,8 +97,9 @@ typedef enum : u8 {
 typedef struct {
     CompactString name;
 
-    StorageKind storage;
     EntityKind kind;
+    StorageKind storage;
+    TyIndex ty;
 
     Stmt* decl;
 } Entity;
@@ -98,6 +107,8 @@ typedef struct {
 typedef enum : u8 {
     
     STMT_EXPR,
+
+    STMT_VAR_DECL,
 
     STMT_ASSIGN,
     STMT_ASSIGN_ADD,
@@ -121,13 +132,12 @@ typedef enum : u8 {
 
     STMT_WHILE,
 
-
     STMT_LABEL,
     STMT_GOTO,
 } StmtKind;
 
 typedef struct StmtList {
-    u32 len;
+    u32 len; 
     Stmt* stmts;
 } StmtList;
 
@@ -136,7 +146,14 @@ typedef struct Stmt {
     u32 token_index;
     
     union { // allocated in the arena as-needed
+        usize extra[0];
+        
         Expr* expr;
+
+        struct {
+            Entity* var;
+            Expr* expr;
+        } var_decl;
 
         struct {
             Expr* lhs;
@@ -233,6 +250,7 @@ typedef struct Expr {
     };
 } Expr;
 
+Stmt* parse_stmt(Parser* p);
 Expr* parse_expr(Parser* p);
 TyIndex parse_type(Parser* p);
 

@@ -1,12 +1,6 @@
-any deviation from the original language-defined semantics should be explicitly
-enabled, and never be default behavior. fortunately, the language does allow a
-fair bit of wiggle room in ambigous situations, which can be optimized.
-
 integer types are pretty much suggestions everywhere except in memory and aggregates,
 where they're forced to have a consistent size. A UBYTE local variable does
 not guarantee that the value of the local is 0..=255
-coyote will force integer bit width, which opens up some optimzations for 
-small-bit arithmetic and constant evaluation stuff
 
 aggregate types cannot be directly used as values. local variables can BE
 aggregates, but they cannot be directly assigned to.
