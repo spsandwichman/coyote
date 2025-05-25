@@ -20,6 +20,8 @@ enum {
     BOOL_OUT    = FE_TRAIT_BOOL_OUT_TY,
     
     MOV_HINT    = FE_TRAIT_REG_MOV_HINT,
+    BINOP       = FE_TRAIT_BINOP,
+    UNOP        = FE_TRAIT_UNOP,
 };
 
 #endif // IRON_SHORT_TRAITS_H

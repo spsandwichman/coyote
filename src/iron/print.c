@@ -50,12 +50,12 @@ static const char* inst_name[FE__BASE_INST_END] = {
 
     [FE_CONST] = "const",
 
-    [FE_SYMADDR] = "symaddr",
+    [FE_SYM_ADDR] = "sym-addr",
 
     [FE_PARAM] = "param",
 
     [FE_PROJ] = "proj",
-    [FE_MACH_PROJ] = "proj_volatile",
+    [FE_MACH_PROJ] = "mach-proj",
 
     [FE_IADD] = "iadd",
     [FE_ISUB] = "isub",
@@ -84,27 +84,27 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_FREM] = "frem",
 
     [FE_MOV] = "mov",
-    [FE_MACH_MOV] = "mach_mov",
+    [FE_MACH_MOV] = "mach-mov",
     [FE_UPSILON] = "upsilon",
     [FE_NOT] = "not",
     [FE_NEG] = "neg",
     [FE_TRUNC] = "trunc",
-    [FE_SIGNEXT] = "signext",
-    [FE_ZEROEXT] = "zeroext",
+    [FE_SIGN_EXT] = "sign-ext",
+    [FE_ZERO_EXT] = "zero-ext",
     [FE_I2F] = "i2f",
     [FE_F2I] = "f2i",
 
     [FE_LOAD] = "load",
-    [FE_LOAD_UNIQUE] = "load_unique",
-    [FE_LOAD_VOLATILE] = "load_volatile",
+    [FE_LOAD_UNIQUE] = "load-u",
+    [FE_LOAD_VOLATILE] = "load-v",
 
     [FE_STORE] = "store",
-    [FE_STORE_UNIQUE] = "store_unique",
-    [FE_STORE_VOLATILE] = "store_volatile",
+    [FE_STORE_UNIQUE] = "store-u",
+    [FE_STORE_VOLATILE] = "store-v",
 
-    [FE_CASCADE_UNIQUE] = "cascade_unique",
-    [FE_CASCADE_VOLATILE] = "cascade_volatile",
-    [FE_MACH_REG] = "mach_reg",
+    [FE_CASCADE_UNIQUE] = "cascade-u",
+    [FE_CASCADE_VOLATILE] = "cascade-v",
+    [FE_MACH_REG] = "mach-reg",
 
     [FE_BRANCH] = "branch",
     [FE_JUMP] = "jump",
@@ -274,7 +274,7 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
             fe__emit_ir_ref(db, f, src);
         }
         break;
-    case FE_SYMADDR:
+    case FE_SYM_ADDR:
         ;
         FeSymbol* sym = fe_extra_T(inst, FeInstSymAddr)->sym;
         fe_db_writecstr(db, "\"");

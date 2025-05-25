@@ -442,9 +442,6 @@ void xr_final_touchups(FeFunc* f) {
     u32 block_counter = 0;
     for_blocks(block, f) {
         block->flags = block_counter++;
-        // for_inst(inst, block) {
-        //     inst->flags = 0;
-        // }
     }
 
     // optimize/remove branches

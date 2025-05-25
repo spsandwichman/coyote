@@ -318,7 +318,7 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
     case FE_BOOKEND:
     case FE_PARAM:
     case FE_CONST:
-    case FE_SYMADDR:
+    case FE_SYM_ADDR:
     case FE_CASCADE_UNIQUE:
     case FE_CASCADE_VOLATILE:
     case FE_JUMP:
@@ -487,9 +487,9 @@ FeInst* fe_inst_const_f16(FeFunc* f, f16 val) {
     return inst;
 }
 
-FeInst* fe_inst_symaddr(FeFunc* f, FeTy ty, FeSymbol* sym) {
+FeInst* fe_inst_sym_addr(FeFunc* f, FeTy ty, FeSymbol* sym) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstSymAddr));
-    inst->kind = FE_SYMADDR;
+    inst->kind = FE_SYM_ADDR;
     inst->ty = ty;
     fe_extra_T(inst, FeInstSymAddr)->sym = sym;
     return inst;
@@ -747,44 +747,44 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_MACH_PROJ] = VOL,
     [FE_PARAM] = VOL,
     [FE_CONST] = 0,
-    [FE_SYMADDR] = 0,
+    [FE_SYM_ADDR] = 0,
 
-    [FE_IADD] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
-    [FE_ISUB] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
-    [FE_IMUL] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
-    [FE_IDIV] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
-    [FE_UDIV] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
-    [FE_IREM] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
-    [FE_UREM] = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
-    [FE_AND]  = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
-    [FE_OR]   = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
-    [FE_XOR]  = INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
-    [FE_SHL]  = INT_IN | VEC_IN | SAME_IN_OUT,
-    [FE_USR]  = INT_IN | VEC_IN | SAME_IN_OUT,
-    [FE_ISR]  = INT_IN | VEC_IN | SAME_IN_OUT,
-    [FE_ILT]  = INT_IN | SAME_INS | BOOL_OUT,
-    [FE_ULT]  = INT_IN | SAME_INS | BOOL_OUT,
-    [FE_ILE]  = INT_IN | SAME_INS | BOOL_OUT,
-    [FE_ULE]  = INT_IN | SAME_INS | BOOL_OUT,
-    [FE_IEQ]   = INT_IN | VEC_IN | SAME_INS | BOOL_OUT | COMMU,
+    [FE_IADD] = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
+    [FE_ISUB] = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
+    [FE_IMUL] = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
+    [FE_IDIV] = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
+    [FE_UDIV] = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
+    [FE_IREM] = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
+    [FE_UREM] = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
+    [FE_AND]  = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
+    [FE_OR]   = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
+    [FE_XOR]  = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,
+    [FE_SHL]  = BINOP | INT_IN | VEC_IN | SAME_IN_OUT,
+    [FE_USR]  = BINOP | INT_IN | VEC_IN | SAME_IN_OUT,
+    [FE_ISR]  = BINOP | INT_IN | VEC_IN | SAME_IN_OUT,
+    [FE_ILT]  = BINOP | INT_IN | SAME_INS | BOOL_OUT,
+    [FE_ULT]  = BINOP | INT_IN | SAME_INS | BOOL_OUT,
+    [FE_ILE]  = BINOP | INT_IN | SAME_INS | BOOL_OUT,
+    [FE_ULE]  = BINOP | INT_IN | SAME_INS | BOOL_OUT,
+    [FE_IEQ]  = BINOP | INT_IN | VEC_IN | SAME_INS | BOOL_OUT | COMMU,
 
-    [FE_FADD] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | FAST_ASSOC,
-    [FE_FSUB] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
-    [FE_FMUL] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | FAST_ASSOC,
-    [FE_FDIV] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
-    [FE_FREM] = FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
+    [FE_FADD] = BINOP | FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | FAST_ASSOC,
+    [FE_FSUB] = BINOP | FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
+    [FE_FMUL] = BINOP | FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | FAST_ASSOC,
+    [FE_FDIV] = BINOP | FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
+    [FE_FREM] = BINOP | FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
 
-    [FE_MOV]      = SAME_IN_OUT,
-    [FE_MACH_MOV] = VOL | SAME_IN_OUT | MOV_HINT,
-    [FE_UPSILON]  = VOL | SAME_IN_OUT | MOV_HINT,
-    [FE_NOT]   = INT_IN | SAME_IN_OUT,
-    [FE_NEG]   = INT_IN | SAME_IN_OUT,
-    [FE_TRUNC] = INT_IN,
-    [FE_SIGNEXT] = INT_IN,
-    [FE_ZEROEXT] = INT_IN,
-    [FE_BITCAST] = 0,
-    [FE_I2F] = INT_IN,
-    [FE_F2I] = FLT_IN,
+    [FE_MOV]      = UNOP | SAME_IN_OUT,
+    [FE_MACH_MOV] = UNOP | VOL | SAME_IN_OUT | MOV_HINT,
+    [FE_UPSILON]  = UNOP | VOL | SAME_IN_OUT | MOV_HINT,
+    [FE_NOT]   = UNOP | INT_IN | SAME_IN_OUT,
+    [FE_NEG]   = UNOP | INT_IN | SAME_IN_OUT,
+    [FE_TRUNC] = UNOP | INT_IN,
+    [FE_SIGN_EXT] = UNOP | INT_IN,
+    [FE_ZERO_EXT] = UNOP | INT_IN,
+    [FE_BITCAST] = UNOP | 0,
+    [FE_I2F] = UNOP | INT_IN,
+    [FE_F2I] = UNOP | FLT_IN,
 
     [FE_LOAD_VOLATILE] = VOL,
 
@@ -812,4 +812,27 @@ bool fe_inst_has_trait(FeInstKind kind, FeTrait trait) {
 
 void fe__load_trait_table(usize start_index, FeTrait* table, usize len) {
     memcpy(&inst_traits[start_index], table, sizeof(table[0]) * len);
+}
+
+void fe_wl_init(FeWorklist* wl) {
+    wl->cap = 256;
+    wl->len = 0;
+    wl->at = fe_malloc(sizeof(wl->at[0]) * wl->cap);
+}
+
+void fe_wl_push(FeWorklist* wl, FeInst* inst) {
+    if (wl->len == wl->cap) {
+        wl->cap += wl->cap >> 1;
+        wl->at = fe_realloc(wl->at, sizeof(wl->at[0]) * wl->cap);
+    }
+    wl->at[wl->len++] = inst;
+}
+
+FeInst* fe_wl_pop(FeWorklist* wl) {
+    return wl->at[--wl->len];
+}
+
+void fe_wl_destroy(FeWorklist* wl) {
+    fe_free(wl->at);
+    *wl = (FeWorklist){0};
 }

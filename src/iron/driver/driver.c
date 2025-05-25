@@ -86,7 +86,7 @@ FeFunc* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
             param,
             const1
         ));
-        FeInst* fact_symaddr = fe_append_end(if_false, fe_inst_symaddr(fact, FE_TY_I32, fact->sym));
+        FeInst* fact_symaddr = fe_append_end(if_false, fe_inst_sym_addr(fact, FE_TY_I32, fact->sym));
         FeInst* call = fe_append_end(if_false, fe_inst_call(fact, fact_symaddr, fact->sig));
         fe_call_set_arg(call, 0, isub);
         FeInst* imul = fe_append_end(if_false, fe_inst_binop(fact, 
@@ -140,7 +140,7 @@ FeFunc* make_factorial2(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
             param,
             const1
         ));
-        // FeInst* fact_symaddr = fe_append_end(if_false, fe_inst_symaddr(fact, FE_TY_I32, fact->sym));
+        // FeInst* fact_symaddr = fe_append_end(if_false, fe_inst_sym_addr(fact, FE_TY_I32, fact->sym));
         // FeInst* call = fe_append_end(if_false, fe_inst_call(fact, fact_symaddr, fact->sig));
         // FeInst* call = fe_append_end(if_false, fe_inst_unop(fact, FE_TY_I32, FE_MOV, isub));
         // fe_call_set_arg(call, 0, isub);
@@ -242,12 +242,35 @@ FeFunc* make_symaddr_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs)
     FeFunc* f = fe_func_new(mod, f_sym, f_sig, ipool, vregs);
     FeBlock* entry = f->entry_block;
 
-    FeInst* symaddr = fe_append_end(entry, fe_inst_symaddr(f, FE_TY_I32, f_sym));
+    FeInst* symaddr = fe_append_end(entry, fe_inst_sym_addr(f, FE_TY_I32, f_sym));
     FeInst* ret = fe_append_end(entry, fe_inst_return(f));
     fe_return_set_arg(ret, 0, symaddr);
     
     return f;
 }
+
+FeFunc* make_algsimp_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
+    FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 0, 1);
+    fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
+
+    // make the function and its symbol
+    FeSymbol* f_sym = fe_symbol_new(mod, "symaddr_test", 0, FE_BIND_GLOBAL);
+    FeFunc* f = fe_func_new(mod, f_sym, f_sig, ipool, vregs);
+    FeBlock* entry = f->entry_block;
+
+    FeInst* const1 = fe_append_end(entry, fe_inst_const(f, FE_TY_I32, 10));
+    FeInst* const2 = fe_append_end(entry, fe_inst_const(f, FE_TY_I32, 20));
+    FeInst* add = fe_append_end(entry, fe_inst_binop(f, FE_TY_I32, 
+        FE_ISUB,
+        const1, const2
+    ));
+    FeInst* ret = fe_append_end(entry, fe_inst_return(f));
+    fe_return_set_arg(ret, 0, add);
+    
+    return f;
+}
+
+
 int main() {
     fe_init_signal_handler();
     FeInstPool ipool;
@@ -257,8 +280,10 @@ int main() {
 
     FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunc* func = make_factorial2(mod, &ipool, &vregs);
+    FeFunc* func = make_algsimp_test(mod, &ipool, &vregs);
 
+    quick_print(func);
+    fe_opt_algsimp(func);
     quick_print(func);
     fe_codegen(func);
     quick_print(func);

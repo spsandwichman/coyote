@@ -294,7 +294,7 @@ typedef enum: FeInstKind {
     FE_CONST,
 
     // SymAddr
-    FE_SYMADDR,
+    FE_SYM_ADDR,
 
     // Binop
     FE_IADD,
@@ -327,8 +327,8 @@ typedef enum: FeInstKind {
     FE_NEG,
 
     FE_TRUNC,    // integer downcast
-    FE_SIGNEXT,  // signed integer upcast
-    FE_ZEROEXT,  // unsigned integer upcast
+    FE_SIGN_EXT,  // signed integer upcast
+    FE_ZERO_EXT,  // unsigned integer upcast
     FE_BITCAST,
     FE_I2F, // integer to float
     FE_F2I, // float to integer
@@ -532,6 +532,10 @@ typedef enum : u16 {
     // reg->reg move; allocator should hint
     // the output and input to be the same
     FE_TRAIT_REG_MOV_HINT     = 1u << 11,
+    // is an algebraic binary operation
+    FE_TRAIT_BINOP            = 1u << 12,
+    // is an algebraic unary operation
+    FE_TRAIT_UNOP             = 1u << 13,
 } FeTrait;
 
 FeTrait fe_inst_traits(FeInstKind kind);
@@ -589,6 +593,9 @@ void fe_chain_destroy(FeFunc* f, FeInstChain chain);
 
 void fe_inst_free(FeFunc* f, FeInst* inst);
 void fe_inst_calculate_uses(FeFunc* f);
+void fe_inst_add_use(FeInst* def, FeInst* use);
+void fe_inst_unordered_remove_use(FeInst* def, FeInst* use);
+
 FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out);
 FeBlock** fe_inst_list_terminator_successors(const FeTarget* t, FeInst* term, usize* len_out);
 
@@ -598,7 +605,7 @@ FeInst* fe_inst_const(FeFunc* f, FeTy ty, u64 val);
 FeInst* fe_inst_const_f64(FeFunc* f, f64 val);
 FeInst* fe_inst_const_f32(FeFunc* f, f32 val);
 FeInst* fe_inst_const_f16(FeFunc* f, f16 val);
-FeInst* fe_inst_symaddr(FeFunc* f, FeTy ty, FeSymbol* sym);
+FeInst* fe_inst_sym_addr(FeFunc* f, FeTy ty, FeSymbol* sym);
 FeInst* fe_inst_unop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* val);
 FeInst* fe_inst_binop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs);
 FeInst* fe_inst_bare(FeFunc* f, FeTy ty, FeInstKind kind);
@@ -633,6 +640,20 @@ const char* fe_ty_name(FeTy ty);
 // check this assumption with some sort
 // with a runtime init function
 #define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstCall)
+
+
+typedef struct FeWorklist {
+    FeInst** at;
+    u32 len;
+    u32 cap;
+} FeWorklist;
+
+
+void fe_wl_init(FeWorklist* wl);
+void fe_wl_push(FeWorklist* wl, FeInst* inst);
+FeInst* fe_wl_pop(FeWorklist* wl);
+void fe_wl_destroy(FeWorklist* wl);
+
 
 // --------------------------- allocation ----------------------------
 // TODO merge FeInstPool and FeArena into the same thing lol
