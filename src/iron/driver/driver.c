@@ -259,12 +259,17 @@ FeFunc* make_algsimp_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs)
 
     FeInst* const1 = fe_append_end(entry, fe_inst_const(f, FE_TY_I32, 10));
     FeInst* const2 = fe_append_end(entry, fe_inst_const(f, FE_TY_I32, 20));
+    FeInst* const3 = fe_append_end(entry, fe_inst_const(f, FE_TY_I32, 30));
     FeInst* add = fe_append_end(entry, fe_inst_binop(f, FE_TY_I32, 
-        FE_ISUB,
+        FE_IADD,
         const1, const2
     ));
+    FeInst* mul = fe_append_end(entry, fe_inst_binop(f, FE_TY_I32, 
+        FE_IDIV,
+        add, const3
+    ));
     FeInst* ret = fe_append_end(entry, fe_inst_return(f));
-    fe_return_set_arg(ret, 0, add);
+    fe_return_set_arg(ret, 0, mul);
     
     return f;
 }

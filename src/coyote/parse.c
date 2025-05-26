@@ -13,7 +13,6 @@
 
 Vec_typedef(char);
 
-
 static void vec_char_append_str(Vec(char)* vec, const char* data) {
     usize len = strlen(data);
     for_n(i, 0, len) {
@@ -97,7 +96,6 @@ static TyIndex ty_get_ptr(TyIndex t) {
     }
 }
 
-thread_local static char sprintf_buf[512];
 
 static void _ty_name(Vec(char)* v, TyIndex t) {
     switch (TY_KIND(t)) {
@@ -140,7 +138,6 @@ static bool ty_is_scalar(TyIndex t) {
     return false;
 }
 
-
 static bool ty_is_integer(TyIndex t) {
     if (t == TY_VOID) {
         return false;
@@ -166,6 +163,7 @@ static bool ty_is_signed(TyIndex t) {
 thread_local static usize target_ptr_size = 4;
 thread_local static TyIndex target_word  = TY_LONG;
 thread_local static TyIndex target_uword = TY_ULONG;
+#define TY_VOIDPTR (TY_VOID + TY_PTR)
 
 static usize ty_size(TyIndex t) {
     switch (t) {
@@ -188,6 +186,48 @@ static usize ty_size(TyIndex t) {
         return 0;
     }
     TODO("AAAA");
+}
+
+static bool ty_equal(TyIndex t1, TyIndex t2) {
+    if (t1 == t2) {
+        return true;
+    }
+    while (TY_KIND(t1) == TY_ALIAS) {
+        t1 = TY(t1, TyAlias)->aliasing;
+    }
+    while (TY_KIND(t2) == TY_ALIAS) {
+        t2 = TY(t2, TyAlias)->aliasing;
+    }
+    return t1 == t2;
+}
+
+static bool ty_compatible(TyIndex dst, TyIndex src, bool src_is_constant) {
+    if (dst == src) {
+        return true;
+    }
+    while (TY_KIND(dst) == TY_ALIAS) {
+        dst = TY(dst, TyAlias)->aliasing;
+    }
+    while (TY_KIND(src) == TY_ALIAS) {
+        src = TY(src, TyAlias)->aliasing;
+    }
+    if (dst == src) {
+        return true;
+    }
+
+    if (ty_is_integer(dst) && ty_is_integer(src)) {
+        // signedness cannot mix
+        return src_is_constant || ty_is_signed(dst) == ty_is_signed(src);
+    }
+
+    if (TY_KIND(dst) == TY_PTR && (src == TY_VOIDPTR || src_is_constant)) {
+        return true;
+    }
+    if (TY_KIND(src) == TY_PTR && (dst == TY_VOIDPTR || dst == target_uword)) {
+        return true;
+    }
+
+    return false;
 }
 
 void enter_scope(Parser* p) {
@@ -222,6 +262,7 @@ Entity* new_entity(Parser* p, string ident, EntityKind kind) {
     Entity* entity = arena_alloc(&p->arena, sizeof(Entity), alignof(Entity));
     entity->name = to_compact(ident);
     entity->kind = kind;
+    entity->ty = TY__INVALID;
     strmap_put(&p->current_scope->map, ident, entity);
     return entity;
 }
@@ -412,6 +453,9 @@ void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, c
 
 static void advance(Parser* p) {
     do { // skip past "transparent" tokens.
+        if (p->tokens[p->cursor].kind == TOK_EOF) {
+            break;
+        }
         ++p->cursor;
         switch (p->tokens[p->cursor].kind) {
         case TOK_PREPROC_DEFINE_PASTE:
@@ -430,20 +474,24 @@ static Token peek(Parser* p, usize n) {
     u32 cursor = p->cursor;
     for_n(_, 0, n) {
         do { // skip past "transparent" tokens.
+            if (p->tokens[cursor].kind == TOK_EOF) {
+                return p->tokens[cursor];
+            }
             ++cursor;
-            if (p->tokens[cursor].kind == TOK_EOF) return p->tokens[cursor];
         } while (_TOK_LEX_IGNORE < p->tokens[cursor].kind);
     }
     return p->tokens[cursor];
 }
 
-bool match(Parser* p, u8 kind) {
+static bool match(Parser* p, u8 kind) {
     return p->current.kind == kind;
 }
 
-void parse_error(Parser* p, u32 start, u32 end, ReportKind kind, const char* fmt, ...) {
+static void parse_error(Parser* p, u32 start, u32 end, ReportKind kind, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
+
+    thread_local static char sprintf_buf[512];
 
     vsprintf_s(sprintf_buf, sizeof(sprintf_buf), fmt, args);
 
@@ -452,10 +500,14 @@ void parse_error(Parser* p, u32 start, u32 end, ReportKind kind, const char* fmt
     token_error(p, kind, start, end, sprintf_buf);
 }
 
-void expect_advance(Parser* p, u8 kind) {
+static void expect(Parser* p, u8 kind) {
     if (kind != p->current.kind) {
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "expected '%s', got '%s'", token_kind[kind], token_kind[p->current.kind]);
     }
+}
+
+static void expect_advance(Parser* p, u8 kind) {
+    expect(p, kind);
     advance(p);
 }
 
@@ -492,6 +544,7 @@ u32 expr_leftmost_token(Expr* expr) {
     switch (expr->kind) {
     case EXPR_LITERAL:
     case EXPR_STR_LITERAL:
+    case EXPR_NOT:
         return expr->token_index;
     case EXPR_DEREF:
         return expr_leftmost_token(expr->unary);
@@ -504,9 +557,10 @@ u32 expr_rightmost_token(Expr* expr) {
     switch (expr->kind) {
     case EXPR_LITERAL:
     case EXPR_STR_LITERAL:
-        return expr->token_index;
     case EXPR_DEREF:
         return expr->token_index;
+    case EXPR_NOT:
+        return expr_rightmost_token(expr->unary);
     default:
         TODO("unknown expr kind");
     }
@@ -515,7 +569,7 @@ u32 expr_rightmost_token(Expr* expr) {
 #define error_at_expr(p, expr, report_kind, msg, ...) \
     parse_error(p, expr_leftmost_token(expr), expr_rightmost_token(expr), report_kind, msg __VA_OPT__(,) __VA_ARGS__)
 
-TyIndex parse_type_terminal(Parser* p) {
+TyIndex parse_type_terminal(Parser* p, bool allow_incomplete) {
     switch (p->current.kind) {
     case TOK_KW_VOID:  advance(p); return TY_VOID;
     case TOK_KW_BYTE:  advance(p); return TY_BYTE;
@@ -530,21 +584,43 @@ TyIndex parse_type_terminal(Parser* p) {
     case TOK_KW_UWORD: advance(p); return target_uword;
     case TOK_OPEN_PAREN:
         advance(p);
-        TyIndex inner = parse_type(p);
+        TyIndex inner = parse_type(p, allow_incomplete);
         expect_advance(p, TOK_CLOSE_PAREN);
         return inner;
     case TOK_CARET:
         advance(p);
-        return ty_get_ptr(parse_type_terminal(p));
+        return ty_get_ptr(parse_type_terminal(p, true));
+    case TOK_IDENTIFIER:
+        ;
+        string span = tok_span(p->current);
+        Entity* entity = get_entity(p, span);
+        if (!entity) { // create an incomplete type
+            if (!allow_incomplete) {
+                parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "cannot use incomplete type");
+            }
+            TyIndex incomplete = ty_allocate(TyAlias);
+            entity = new_entity(p, span, ENTKIND_TYPE);
+            entity->ty = incomplete;
+            advance(p);
+            return incomplete;
+        }
+        if (entity->kind != ENTKIND_TYPE) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "symbol is not a type");
+        }
+        advance(p);
+        return entity->ty;
     default:
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "expected type expression");
     }
     return TY_VOID;
 }
 
-TyIndex parse_type(Parser* p) {
-    TyIndex left = parse_type_terminal(p);
+TyIndex parse_type(Parser* p, bool allow_incomplete) {
+    TyIndex left = parse_type_terminal(p, allow_incomplete);
     while (p->current.kind == TOK_OPEN_BRACKET) {
+        if (TY_KIND(left) == TY_ALIAS_INCOMPLETE) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "cannot use incomplete type");
+        }
         advance(p);
         TyIndex arr = ty_allocate(TyArray);
         TY(arr, TyArray)->to = left;
@@ -598,9 +674,24 @@ Expr* parse_atom_terminal(Parser* p) {
     case TOK_KW_SIZEOF:
         Expr* size = new_expr(p, EXPR_LITERAL, target_uword, literal);
         advance(p);
-        TyIndex type = parse_type(p); 
+        TyIndex type = parse_type(p, false); 
         size->literal = ty_size(type);
         return size;
+    case TOK_IDENTIFIER:
+        // find an entity
+        Expr* ident = new_expr(p, EXPR_ENTITY, TY__INVALID, entity);
+        Entity* entity = get_entity(p, span);
+        if (entity == nullptr) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+                "symbol does not exist");
+        }
+        if (entity->kind == ENTKIND_TYPE) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+                "entity is a type");
+        }
+        ident->entity = entity;
+        ident->ty = entity->ty;
+        return ident;
     default:
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
             "expected expression");
@@ -643,16 +734,31 @@ Expr* parse_atom(Parser* p) {
     return atom;
 }
 
-// Expr* parse_unary(Parser* p) {
-    // ArenaState save = arena_save(&p->arena);
+Expr* parse_unary(Parser* p) {
+    ArenaState save = arena_save(&p->arena);
 
-    // switch (p->current) {
-    // case TOK
-    // }
-// }
+    u32 op_position = p->cursor;
+
+    switch (p->current.kind) {
+    case TOK_KW_NOT:
+        advance(p);
+        Expr* inner = parse_unary(p); 
+        if (inner->kind == EXPR_LITERAL) {
+            inner->literal = !inner->literal; // reuse this expr
+            return inner;
+        } else {
+            Expr* not = new_expr(p, EXPR_BOOL_NOT, inner->ty, unary);
+            not->unary = inner;
+            not->token_index = op_position;
+            return not;
+        }
+    default:
+        return parse_atom(p);
+    }
+}
 
 Expr* parse_expr(Parser* p) {
-    return parse_atom(p);
+    return parse_unary(p);
 }
 
 #define new_stmt(p, kind, field) \
@@ -665,54 +771,223 @@ static Stmt* new_stmt_(Parser* p, u8 kind, usize size) {
     return stmt;
 }
 
-Stmt* parse_var_decl(Parser* p, u8 storage_token) {
+static Entity* get_or_create(Parser* p, string ident) {
+    Entity* entity = get_entity(p, ident);
+    if (!entity) {
+        entity = new_entity(p, ident, ENTKIND_VAR);
+    } else if (entity->storage != STORAGE_EXTERN) {
+        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "symbol already exists");
+    }
+    return entity;
+}
+
+Stmt* parse_var_decl(Parser* p, StorageKind storage) {
     Stmt* decl = new_stmt(p, STMT_VAR_DECL, var_decl);
     
     string identifier = tok_span(p->current);
-    if (get_entity(p, identifier)) {
-        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "symbol already exists");
-    }
-    Entity* var = new_entity(p, identifier, ENTKIND_VAR);
+    Entity* var = get_or_create(p, identifier);
+    var->decl = decl;
     decl->var_decl.var = var;
+    if (var->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
+        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "previously EXTERN variable cannot be PRIVATE");
+    }
     advance(p);
     expect_advance(p, TOK_COLON);
 
     if (!match(p, TOK_EQ)) {
-        // no value yet, try to parse a type
         u32 type_start = p->cursor;
-        TyIndex var_ty = parse_type(p);
-        if (ty_size(var_ty) == 0) {
+        TyIndex decl_ty = parse_type(p, false);
+        if (var->storage == STORAGE_EXTERN && !ty_equal(var->ty, decl_ty)) {
+            parse_error(p, type_start, p->cursor - 1, REPORT_ERROR, "type %s differs from previous EXTERN type %s",
+                ty_name(decl_ty), ty_name(var->ty));
+        }
+        if (ty_size(decl_ty) == 0) {
             parse_error(p, type_start, p->cursor - 1, REPORT_ERROR, "variable must have non-zero size");
         }
-        var->ty = var_ty;
+        var->ty = decl_ty;
         if (match(p, TOK_EQ)) {
+            if (storage == STORAGE_EXTERN) {
+                parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "EXTERN variable cannot have a value");
+            }
             advance(p);
             Expr* value = parse_expr(p);
             decl->var_decl.expr = value;
+            if (!ty_compatible(decl_ty, value->ty, value->kind == EXPR_LITERAL)) {
+                error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to %s",
+                    ty_name(value->ty), ty_name(decl_ty));
+            }
         }
     } else {
+        if (storage == STORAGE_EXTERN) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "EXTERN variable must specify a type");
+        }
         advance(p);
         Expr* value = parse_expr(p);
+        if (var->storage == STORAGE_EXTERN && !ty_compatible(var->ty, value->ty, true)) {
+            // parse_error(p, type_start, p->cursor - 1, REPORT_NOTE, "from previous declaration");
+            error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to previous EXTERN type %s",
+                    ty_name(value->ty), ty_name(var->ty));
+        }
         decl->var_decl.expr = value;
-        var->ty = value->ty;
+        if (var->storage != STORAGE_EXTERN) {
+            var->ty = value->ty;
+        }
     }
 
-    printf("(declare "str_fmt" as %s)\n", str_arg(identifier), ty_name(var->ty));
+    // printf("(declare "str_fmt" as %s)\n", str_arg(identifier), ty_name(var->ty));
+    var->storage = storage;
 
     return decl;
+}
+
+static bool is_lvalue(Expr* e) {
+    switch (e->kind) {
+    case EXPR_ENTITY:
+        return e->kind == ENTKIND_VAR;
+    case EXPR_DEREF:
+    case EXPR_DEREF_MEMBER:
+    case EXPR_MEMBER:
+    case EXPR_SUBSCRIPT:
+        return true;
+    default:
+        return false;
+    }
+}
+
+Stmt* parse_stmt_assign(Parser* p, Expr* left_expr) {
+    Stmt* assign = new_stmt(p, STMT_ASSIGN, assign);
+    assign->assign.lhs = left_expr;
+    if (!is_lvalue(left_expr)) {
+        error_at_expr(p, left_expr, REPORT_ERROR, "expression is not an l-value");
+    }
+
+    advance(p);
+    Expr* value = parse_expr(p);
+    if (!ty_compatible(left_expr->ty, value->ty, value->kind == EXPR_LITERAL)) {
+    error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to %s",
+        ty_name(value->ty), ty_name(left_expr->ty));
+    }
+    assign->assign.rhs = value;
+    return assign;
+}
+
+Stmt* parse_stmt_expr(Parser* p) {
+        // expression! who knows what this could be
+    Expr* expr = parse_expr(p);
+    if (TOK_EQ <= p->current.kind && p->current.kind <= TOK_RSHIFT_EQ) {
+        // assignment statement
+        return parse_stmt_assign(p, expr);
+    } else {
+        // expression statement
+        Stmt* stmt_expr = new_stmt(p, STMT_EXPR, expr);
+        stmt_expr->expr = expr;
+        stmt_expr->token_index = expr_leftmost_token(expr);
+        return stmt_expr;
+    }
 }
 
 Stmt* parse_stmt(Parser* p) {
     switch (p->current.kind) {
     case TOK_IDENTIFIER:
         if (peek(p, 1).kind == TOK_COLON) {
-            return parse_var_decl(p, TOK_KW_PUBLIC);
+            return parse_var_decl(p, STORAGE_LOCAL);
         } else {
-            // expression! who knows what this could be
+            return parse_stmt_expr(p);
         }
         break;
+    case TOK_KW_NOTHING:
+        advance(p);
+        return parse_stmt(p);
+    case TOK_KW_PUBLIC:
+    case TOK_KW_PRIVATE:
+    case TOK_KW_EXTERN:
+        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+            "storage class cannot be used locally");
+        break;
+    case TOK_KW_TYPE:
+    case TOK_KW_STRUCT:
+    case TOK_KW_UNION:
+    case TOK_KW_ENUM:
+    case TOK_KW_FNPTR:
+        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+            "cannot locally declare type");
+        break;
+    case TOK_KW_FN:
+        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+            "cannot locally declare function");
+        break;
     default:
-        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "expected statement");
+        return parse_stmt_expr(p);
     }
     return nullptr;
+}
+
+Entity* get_incomplete_type_entity(Parser* p, string identifier) {
+    Entity* entity = get_entity(p, identifier);
+    if (!entity) {
+        entity = new_entity(p, identifier, ENTKIND_TYPE);
+        entity->ty = ty_allocate(TyAlias);
+        TY_KIND(entity->ty) = TY_ALIAS_INCOMPLETE;
+    } else if (entity->kind != ENTKIND_TYPE || TY_KIND(entity->ty) == TY_ALIAS_INCOMPLETE) {
+        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+            "symbol already declared");
+    }
+    return entity;
+}
+
+Stmt* parse_fn_decl(Parser* p, u8 storage) {
+    return nullptr;
+}
+
+Stmt* parse_global_decl(Parser* p) {
+    switch (p->current.kind) {
+    case TOK_KW_NOTHING:
+        advance(p);
+        return parse_global_decl(p);
+    case TOK_KW_TYPE: {
+        advance(p);
+        expect(p, TOK_IDENTIFIER);
+        string identifier = tok_span(p->current);
+        Entity* entity = get_incomplete_type_entity(p, identifier);
+        advance(p);
+        expect_advance(p, TOK_COLON);
+        TY(entity->ty, TyAlias)->aliasing = parse_type(p, false);
+        TY_KIND(entity->ty) = TY_ALIAS;
+    } break;
+    case TOK_KW_PUBLIC:
+    case TOK_KW_PRIVATE:
+    case TOK_KW_EXPORT:
+    case TOK_KW_EXTERN:
+        ;
+        u64 effective_storage = p->current.kind - TOK_KW_PUBLIC + STORAGE_PUBLIC;
+        advance(p);
+        if (p->current.kind == TOK_KW_FN) {
+            return parse_fn_decl(p, effective_storage);
+        }
+        return parse_var_decl(p, effective_storage);
+    case TOK_IDENTIFIER:
+        return parse_var_decl(p, STORAGE_PRIVATE);
+    default:
+        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+            "expected global declaration");
+    }
+    return nullptr;
+}
+
+CompilationUnit parse_unit(Parser* p) {
+    ty_init();
+
+    CompilationUnit cu = {};
+
+    cu.tokens = p->tokens;
+    cu.tokens_len = p->tokens_len;
+    cu.sources = p->sources;
+    cu.top_scope = p->global_scope;
+    cu.arena = p->arena;
+
+    while (p->current.kind != TOK_EOF) {
+        parse_global_decl(p);
+    }
+
+    return cu;
 }

@@ -1,6 +1,7 @@
 #ifndef PARSE_H
 #define PARSE_H
 
+#include "common/vec.h"
 #include "coyote.h"
 #include "lex.h"
 
@@ -82,6 +83,7 @@ typedef struct Expr Expr;
 typedef struct Stmt Stmt;
 
 typedef enum : u8 {
+    STORAGE_LOCAL,
     STORAGE_PUBLIC,
     STORAGE_PRIVATE,
     STORAGE_EXPORT,
@@ -200,6 +202,7 @@ typedef enum : u8 {
     EXPR_NOT,
     EXPR_BOOL_NOT,
     EXPR_SIZEOFVALUE,
+    EXPR_OUT_ARG,
 
     EXPR_CONTAINEROF,
     EXPR_CAST,
@@ -207,13 +210,15 @@ typedef enum : u8 {
     EXPR_ENTITY,
     EXPR_STR_LITERAL,
     EXPR_LITERAL,
+    EXPR_ARRAY_LITERAL,
+    EXPR_STRUCT_LITERAL,
 
     // EXPR_TRUE,
     // EXPR_FALSE,
     // EXPR_NULLPTR,
     // EXPR_OFFSETOF,
     // EXPR_SIZEOF,
-    // ^^^ these just get translated into int literals
+    // ^^^ these just get translated into literals
 
     EXPR_SUBSCRIPT,     // foo[bar]
     EXPR_DEREF,         // foo^
@@ -233,6 +238,18 @@ typedef struct Expr {
         u64 literal;
         CompactString lit_string;
 
+        struct {
+            u64* indices;
+            Expr** values;
+            u32 len;
+        } lit_array;
+
+        struct {
+            u8* field_indices;
+            Expr** values;
+            u32 len;
+        } lit_struct;
+
         Entity* entity;
 
         Expr* unary;
@@ -244,21 +261,29 @@ typedef struct Expr {
 
         struct {
             Expr* callee;
-            Expr* args;
+            Expr** args;
             u32 args_len;
         } call;
+
     };
 } Expr;
 
 Stmt* parse_stmt(Parser* p);
 Expr* parse_expr(Parser* p);
-TyIndex parse_type(Parser* p);
+TyIndex parse_type(Parser* p, bool allow_incomplete);
 
-typedef struct Function {
-    Entity* entity;
-    TyIndex t;
-    Stmt* decl;
-    StmtList stmts;
-} Function;
+VecPtr_typedef(Entity);
+
+typedef struct CompilationUnit {
+    Arena arena;
+    ParseScope* top_scope;
+
+    Token* tokens;
+    u32 tokens_len;
+
+    VecPtr(SrcFile) sources;
+} CompilationUnit;
+
+CompilationUnit parse_unit(Parser* p);
 
 #endif // PARSE_H

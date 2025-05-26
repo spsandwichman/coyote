@@ -1,2 +1,3 @@
 #include <stdint.h>
-uintptr_t foo[1];
+extern uint64_t foo;
+uint64_t foo = 1ULL;

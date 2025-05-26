@@ -46,10 +46,5 @@ int main(int argc, char** argv) {
     }
     printf("\n");
 
-    ty_init();
-
-    // Expr* e = parse_expr(&p);
-    // TyIndex ty = parse_type(&p);
-    Stmt* s = parse_stmt(&p);
+    CompilationUnit cu = parse_unit(&p);
 }
-

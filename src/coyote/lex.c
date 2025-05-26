@@ -492,14 +492,6 @@ static i64 eval_integer(Token t) {
     return is_negative ? -val : val;
 }
 
-// resolve escape sequences, etc.
-static CompactString string_value(CompactString s) {
-    // if the string contains no escape sequences,
-    // we can return a slice of the input without 
-    // the initial and final quotes
-    return s;
-}
-
 static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
     PreprocVal v = {0};
     Token t = lex_next_raw(l);
@@ -955,22 +947,29 @@ static void collect_macro_args_and_emit(Lexer* l, PreprocVal macro, Vec(Token)* 
 
     usize saved_ppv_len = preproc_val_pool.len;
 
-    // consume arg list
-    usize arg_len = 0;
-    while (l->src.raw[l->cursor - 1] != ')') {
-        CompactString arg_span = collect_macro_arg(l, scope);
-        PreprocVal arg = {
-            .kind = PPVAL_COMPLEX_STRING,
-            .is_macro_arg = true,
-            .string = arg_span,
-        };
-
-        if (arg_len >= macro.macro.params_len) {
-            TODO("error: too many parameters, expected %u", macro.macro.params_len);
+    if (macro.macro.params_len == 0) {
+        Token t = lex_next_raw(l);
+        if (t.kind != TOK_CLOSE_PAREN) {
+            TODO("error: too many parameters");
         }
-        string param_name = tok_span(macro_arg_pool.at[macro.macro.params_index + arg_len]);
-        put_replacement_value(param_name, local_scope, arg);
-        ++arg_len;
+    } else {
+        // consume arg list
+        usize arg_len = 0;
+        while (l->src.raw[l->cursor - 1] != ')') {
+            CompactString arg_span = collect_macro_arg(l, scope);
+            PreprocVal arg = {
+                .kind = PPVAL_COMPLEX_STRING,
+                .is_macro_arg = true,
+                .string = arg_span,
+            };
+
+            if (arg_len >= macro.macro.params_len) {
+                TODO("error: too many parameters, expected %u", macro.macro.params_len);
+            }
+            string param_name = tok_span(macro_arg_pool.at[macro.macro.params_index + arg_len]);
+            put_replacement_value(param_name, local_scope, arg);
+            ++arg_len;
+        }
     }
 
     PreprocVal body = preproc_val_pool.at[macro.macro.body_index];
