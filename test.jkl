@@ -1,4 +1,6 @@
 // TYPE Foo : WORD
 // TYPE Bar : Foo[10]
 
-x := 3 + 10 / 3 + 1
+FN foo(IN x: INT, IN y: INT)
+    x := 1
+END

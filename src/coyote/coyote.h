@@ -1,6 +1,7 @@
 #ifndef COYOTE_H
 #define COYOTE_H
 
+#include <stdalign.h>
 #include <assert.h>
 #include "common/orbit.h"
 #include "common/vec.h"

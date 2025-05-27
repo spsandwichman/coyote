@@ -26,24 +26,25 @@ decl =
     | [storageclass] fndecl
     | [storageclass] ident ":" type ["=" (expr | compound)]
     | [storageclass] ident ":" "=" (expr | compound)
-    | EXTERN ident ":" type     (* EXTERN parses differently so it cant go in storageclass *)
-    | EXTERN FN fnproto 
+    | EXTERN ident ":" type (* EXTERN parses differently so it cant go in storageclass *)
+    | EXTERN FN ["(" type ")"] ident fnproto 
     | typedecl
-    ;
-
-fnproto = ["(" type ")"] ident "(" list<param> ")" [":" type];
-fndecl = FN fnproto {stmt} END;
-typedecl = 
-    | STRUCT [PACKED] ident list<field> END
-    | UNION ident list<field> END
-    | ENUM ident ":" type list<variant> END
-    | TYPE ident ":" type
-    | FNPTR fnproto
     ;
 
 param = (IN | OUT) field | "..." ident ident; (* fn and fnptr *)
 field = ident ":" type;                       (* structs and unions *)
 variant = ident | ident "=" expr;             (* enums *)
+
+fnproto = "(" list<param> ")" [":" type];
+
+fndecl = FN ["(" type ")"] ident fnproto {stmt} END;
+typedecl = 
+    | STRUCT [PACKED] ident list<field> END
+    | UNION ident list<field> END
+    | ENUM ident ":" type list<variant> END
+    | TYPE ident ":" type
+    | FNPTR ident fnproto
+    ;
 
 assignop = 
     | "=" 

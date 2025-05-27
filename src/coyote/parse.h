@@ -63,15 +63,37 @@ typedef struct {
     CompactString name;
 } Ty_RecordMember;
 
-#define RECORD_MAX_FIELDS UINT8_MAX
+#define TY_RECORD_MAX_FIELDS UINT8_MAX
 typedef struct {
     u8 kind;
     u8 len; // should never be a limitation O.O
     u16 size;
     u8 align;
     CompactString name;
-    Ty_RecordMember member[];
+    Ty_RecordMember members[];
 } TyRecord;
+
+typedef union {
+    struct {    
+        TyIndex type;
+        bool out;
+        CompactString name;
+    };
+    struct {
+        CompactString argv;
+        CompactString argc;
+    } varargs;
+} Ty_FnParam;
+
+#define TY_FN_MAX_PARAMS 32 // reasonable
+typedef struct {
+    u8 kind;
+    u8 len;
+    bool variadic; // last parameter is a variadic argument
+    TyIndex ret_ty;
+    CompactString name;
+    Ty_FnParam params[];
+} TyFn;
 
 void ty_init();
 

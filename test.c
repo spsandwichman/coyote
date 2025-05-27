@@ -1,3 +1,5 @@
 #include <stdint.h>
-extern uint64_t foo;
-uint64_t foo = 1ULL;
+void foo() {
+    __twr_l1:;
+    _jkl_epilogue:;
+}

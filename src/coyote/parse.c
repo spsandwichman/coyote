@@ -257,6 +257,29 @@ void exit_scope(Parser* p) {
     p->current_scope = p->current_scope->super;
 }
 
+// general dynamic buffer for parsing shit
+
+VecPtr_typedef(void);
+static thread_local VecPtr(void) dynbuf;
+
+static inline usize dynbuf_start() {
+    return dynbuf.len;
+}
+
+static inline void dynbuf_restore(usize start) {
+    dynbuf.len = start;
+}
+
+static inline usize dynbuf_len(usize start) {
+    return dynbuf.len - start;
+}
+
+static inline void** dynbuf_to_arena(Parser* p, usize start) {
+    usize len = dynbuf.len - start;
+    void** items = arena_alloc(&p->arena, len * sizeof(items[0]), alignof(void*));
+    memcpy(items, &dynbuf.at[len], len * sizeof(items[0]));
+    return items;
+}
 
 Entity* new_entity(Parser* p, string ident, EntityKind kind) {
     Entity* entity = arena_alloc(&p->arena, sizeof(Entity), alignof(Entity));
@@ -608,7 +631,11 @@ TyIndex parse_type_terminal(Parser* p, bool allow_incomplete) {
             parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "symbol is not a type");
         }
         advance(p);
-        return entity->ty;
+        TyIndex t = entity->ty;
+        while (TY_KIND(t) == TY_ALIAS) {
+            t = TY(t, TyAlias)->aliasing;
+        }
+        return t;
     default:
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "expected type expression");
     }
@@ -691,6 +718,7 @@ Expr* parse_atom_terminal(Parser* p) {
         }
         ident->entity = entity;
         ident->ty = entity->ty;
+        advance(p);
         return ident;
     default:
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
@@ -889,7 +917,7 @@ Expr* parse_binary(Parser* p, isize precedence) {
             default:
                 UNREACHABLE;
             }
-            printf("consteval %lld\n", lit->literal);
+            // printf("consteval %lld\n", lit->literal);
             lhs = lit;
         } else {
             Expr* op = new_expr(p, op_kind, op_ty, binary); 
@@ -1079,7 +1107,93 @@ Entity* get_incomplete_type_entity(Parser* p, string identifier) {
     return entity;
 }
 
+TyIndex parse_fn_prototype(Parser* p) {
+    ArenaState a_save = arena_save(&p->arena);
+
+    usize params_len = 0;
+    // temporarily allocate a bunch of function params
+    Ty_FnParam* params = arena_alloc(&p->arena, sizeof(Ty_FnParam) * TY_FN_MAX_PARAMS, alignof(Ty_FnParam));
+
+    bool is_variadic = false;
+
+    expect_advance(p,TOK_OPEN_PAREN);
+    while (p->current.kind != TOK_CLOSE_PAREN) {
+        Ty_FnParam* param = &params[params_len];
+
+        if (match(p, TOK_VARARG)) {
+            is_variadic = true;
+            advance(p);
+            expect(p, TOK_IDENTIFIER);
+            string argv = tok_span(p->current);
+            param->varargs.argv = to_compact(argv);
+            advance(p);
+            expect(p, TOK_IDENTIFIER);
+            string argc = tok_span(p->current);
+            param->varargs.argc = to_compact(argc);
+            advance(p);
+            params_len++;
+            break;
+        }
+
+
+        if (match(p, TOK_KW_IN)) {
+            param->out = false;
+        } else if (match(p, TOK_KW_OUT)) {
+            param->out = true;
+        } else {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "expected IN or OUT");
+        }
+        advance(p);
+
+        expect(p, TOK_IDENTIFIER);
+        string ident = tok_span(p->current);
+        for_n(i, 0, params_len) {
+            if (string_eq(from_compact(params[i].name), ident)) {
+                parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "parameter name already used");
+            }
+        }
+
+        param->name = to_compact(ident);
+
+        advance(p);
+        expect_advance(p, TOK_COLON);
+
+        param->type = parse_type(p, false);
+
+        params_len++;
+
+        if (match(p, TOK_COMMA)) {
+            advance(p);
+        } else {
+            break;
+        }
+    }
+    expect_advance(p, TOK_CLOSE_PAREN);
+
+    TyIndex ret_ty = TY_VOID;
+
+    if (match(p, TOK_COLON)) {
+        advance(p);
+        ret_ty = parse_type(p, false);
+    }
+
+    // allocate final type
+    TyIndex proto = ty__allocate(sizeof(TyFn) + sizeof(Ty_FnParam) * params_len, max(alignof(TyFn), alignof(Ty_FnParam)) == 8);
+    TyFn* fn = TY(proto, TyFn);
+    fn->kind = TY_FN;
+    fn->len = params_len;
+    fn->variadic = is_variadic;
+    fn->ret_ty = ret_ty;
+    memcpy(fn->params, params, sizeof(Ty_FnParam) * params_len);
+
+    arena_restore(&p->arena, a_save);
+    return proto;
+}
+
 Stmt* parse_fn_decl(Parser* p, u8 storage) {
+    advance(p);
+    advance(p);
+    parse_fn_prototype(p);
     return nullptr;
 }
 
@@ -1111,6 +1225,8 @@ Stmt* parse_global_decl(Parser* p) {
         return parse_var_decl(p, effective_storage);
     case TOK_IDENTIFIER:
         return parse_var_decl(p, STORAGE_PRIVATE);
+    case TOK_KW_FN:
+        return parse_fn_decl(p, STORAGE_PUBLIC);
     default:
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
             "expected global declaration");
@@ -1121,17 +1237,20 @@ Stmt* parse_global_decl(Parser* p) {
 CompilationUnit parse_unit(Parser* p) {
     ty_init();
 
-    CompilationUnit cu = {};
+    dynbuf = vecptr_new(void, 256);
 
+    while (p->current.kind != TOK_EOF) {
+        parse_global_decl(p);
+    }
+
+    CompilationUnit cu = {};
     cu.tokens = p->tokens;
     cu.tokens_len = p->tokens_len;
     cu.sources = p->sources;
     cu.top_scope = p->global_scope;
     cu.arena = p->arena;
 
-    while (p->current.kind != TOK_EOF) {
-        parse_global_decl(p);
-    }
+    vec_destroy(&dynbuf);
 
     return cu;
 }
