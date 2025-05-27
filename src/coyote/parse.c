@@ -757,8 +757,151 @@ Expr* parse_unary(Parser* p) {
     }
 }
 
+static isize bin_precedence(u8 kind) {
+    switch (kind) {
+        case TOK_MUL:
+        case TOK_DIV:
+        case TOK_MOD:
+            return 10;
+        case TOK_PLUS:
+        case TOK_MINUS:
+            return 9;
+        case TOK_LSHIFT:
+        case TOK_RSHIFT:
+            return 8;
+        case TOK_AND:
+            return 7;
+        case TOK_XOR:
+            return 6;
+        case TOK_OR:
+            return 5;
+        case TOK_LESS:
+        case TOK_LESS_EQ:
+        case TOK_GREATER:
+        case TOK_GREATER_EQ:
+            return 4;
+        case TOK_EQ_EQ:
+        case TOK_NOT_EQ:
+            return 3;
+        case TOK_KW_AND:
+            return 2;
+        case TOK_KW_OR:
+            return 1;
+    }
+    return -1;
+}
+
+static ExprKind binary_expr_kind(u8 tok_kind) {
+    return tok_kind - TOK_PLUS + EXPR_ADD;
+}
+
+Expr* parse_binary(Parser* p, isize precedence) {
+    ArenaState save = arena_save(&p->arena);
+    Expr* lhs = parse_unary(p);
+    
+    while (precedence < bin_precedence(p->current.kind)) {
+        isize n_prec = bin_precedence(p->current.kind);
+        ExprKind op_kind = binary_expr_kind(p->current.kind);
+        u32 op_token = p->cursor;
+        
+        advance(p);
+        Expr* rhs = parse_binary(p, n_prec);
+
+        if (!ty_compatible(lhs->ty, rhs->ty, rhs->kind == EXPR_LITERAL)) {
+            parse_error(p, op_token, op_token, REPORT_ERROR, 
+                "type %u and %u are not compatible", ty_name(lhs->ty), ty_name(rhs->ty));
+        }
+
+        TyIndex op_ty = lhs->ty;
+        if (lhs->kind == EXPR_LITERAL && rhs->ty != EXPR_LITERAL) {
+            op_ty = rhs->ty;
+        }
+        
+        if (lhs->kind == EXPR_LITERAL && rhs->kind == EXPR_LITERAL) {
+            bool signed_op = ty_is_signed(lhs->ty) || ty_is_signed(rhs->ty);
+            u64 lhs_val = lhs->literal;
+            u64 rhs_val = rhs->literal;
+
+            arena_restore(&p->arena, save);
+            Expr* lit = new_expr(p, EXPR_LITERAL, op_ty, literal);
+            lit->token_index = expr_leftmost_token(lhs);
+            switch (op_kind) {
+            case EXPR_ADD: lit->literal = lhs_val + rhs_val; break;
+            case EXPR_SUB: lit->literal = lhs_val - rhs_val; break;
+            case EXPR_MUL: lit->literal = lhs_val * rhs_val; break;
+            case EXPR_DIV: 
+                if (signed_op) {
+                    lit->literal = (isize)lhs_val / (isize)rhs_val;
+                } else {
+                    lit->literal = lhs_val / rhs_val;
+                }
+                break;
+            case EXPR_MOD: 
+                if (signed_op) {
+                    lit->literal = (isize)lhs_val % (isize)rhs_val;
+                } else {
+                    lit->literal = lhs_val % rhs_val;
+                }
+                break;
+            case EXPR_AND: lit->literal = lhs_val & rhs_val; break;
+            case EXPR_OR:  lit->literal = lhs_val | rhs_val; break;
+            case EXPR_XOR: lit->literal = lhs_val ^ rhs_val; break;
+            case EXPR_LSH: lit->literal = lhs_val << rhs_val; break;
+            case EXPR_RSH:
+                if (signed_op) {
+                    lit->literal = (isize)lhs_val >> (isize)rhs_val;
+                } else {
+                    lit->literal = lhs_val >> rhs_val;
+                }
+                break;
+            case EXPR_EQ:  lit->literal = lhs_val == rhs_val; break;
+            case EXPR_NEQ: lit->literal = lhs_val != rhs_val; break;
+            case EXPR_LESS_EQ:
+                if (signed_op) {
+                    lit->literal = (isize)lhs_val <= (isize)rhs_val;
+                } else {
+                    lit->literal = lhs_val <= rhs_val;
+                }
+                break;
+            case EXPR_GREATER_EQ:
+                if (signed_op) {
+                    lit->literal = (isize)lhs_val >= (isize)rhs_val;
+                } else {
+                    lit->literal = lhs_val >= rhs_val;
+                }
+                break;
+            case EXPR_LESS:
+                if (signed_op) {
+                    lit->literal = (isize)lhs_val < (isize)rhs_val;
+                } else {
+                    lit->literal = lhs_val < rhs_val;
+                }
+                break;
+            case EXPR_GREATER:
+                if (signed_op) {
+                    lit->literal = (isize)lhs_val > (isize)rhs_val;
+                } else {
+                    lit->literal = lhs_val > rhs_val;
+                }
+                break;
+            default:
+                UNREACHABLE;
+            }
+            printf("consteval %lld\n", lit->literal);
+            lhs = lit;
+        } else {
+            Expr* op = new_expr(p, op_kind, op_ty, binary); 
+            op->binary.lhs = lhs;
+            op->binary.rhs = rhs;
+            lhs = op;
+        }
+    }
+
+    return lhs;
+}
+
 Expr* parse_expr(Parser* p) {
-    return parse_unary(p);
+    return parse_binary(p, 0);
 }
 
 #define new_stmt(p, kind, field) \
@@ -834,7 +977,6 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
         }
     }
 
-    // printf("(declare "str_fmt" as %s)\n", str_arg(identifier), ty_name(var->ty));
     var->storage = storage;
 
     return decl;

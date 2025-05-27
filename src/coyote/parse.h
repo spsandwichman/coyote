@@ -197,6 +197,13 @@ typedef enum : u8 {
     EXPR_LSH,
     EXPR_RSH,
 
+    EXPR_EQ,
+    EXPR_NEQ,
+    EXPR_LESS_EQ,
+    EXPR_GREATER_EQ,
+    EXPR_LESS,
+    EXPR_GREATER,
+
     EXPR_ADDROF,
     EXPR_NEG,
     EXPR_NOT,

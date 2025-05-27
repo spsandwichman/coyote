@@ -131,10 +131,6 @@ enum {
     TOK_LSHIFT,     // <<
     TOK_RSHIFT,     // >>
 
-    // unary minus. only emitted by the parser
-    // TOK__NEG,       // -
-    // TOK__ADDR,      // &
- 
     TOK_EQ_EQ,      // ==
     TOK_NOT_EQ,     // !=
     TOK_LESS_EQ,    // <=

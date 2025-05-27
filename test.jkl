@@ -1,10 +1,4 @@
 // TYPE Foo : WORD
 // TYPE Bar : Foo[10]
 
-// x := 0
-
-// #MACRO fuuuck() [foo]
-
-EXTERN foo : WORD
-
-EXTERN foo : WORD
+x := 3 + 10 / 3 + 1
