@@ -821,10 +821,12 @@ Expr* parse_binary(Parser* p, isize precedence) {
             bool signed_op = ty_is_signed(lhs->ty) || ty_is_signed(rhs->ty);
             u64 lhs_val = lhs->literal;
             u64 rhs_val = rhs->literal;
+            u32 leftmost = expr_leftmost_token(lhs);
 
             arena_restore(&p->arena, save);
             Expr* lit = new_expr(p, EXPR_LITERAL, op_ty, literal);
-            lit->token_index = expr_leftmost_token(lhs);
+            lit->token_index = leftmost;
+            
             switch (op_kind) {
             case EXPR_ADD: lit->literal = lhs_val + rhs_val; break;
             case EXPR_SUB: lit->literal = lhs_val - rhs_val; break;
