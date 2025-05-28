@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stddef.h>
 
 #include "parse.h"
 #include "common/str.h"
@@ -516,7 +517,7 @@ static void parse_error(Parser* p, u32 start, u32 end, ReportKind kind, const ch
 
     thread_local static char sprintf_buf[512];
 
-    vsprintf_s(sprintf_buf, sizeof(sprintf_buf), fmt, args);
+    vsnprintf(sprintf_buf, sizeof(sprintf_buf), fmt, args);
 
     va_end(args);
 
@@ -672,41 +673,42 @@ TyIndex parse_type(Parser* p, bool allow_incomplete) {
 
 Expr* parse_atom_terminal(Parser* p) {
     string span = tok_span(p->current);
+    Expr* atom = nullptr;
     switch (p->current.kind) {
     case TOK_OPEN_PAREN:
         advance(p);
-        Expr* inner = parse_expr(p);
+        atom = parse_expr(p);
         expect_advance(p, TOK_CLOSE_PAREN);
-        return inner;
+        break;
     case TOK_INTEGER:
-        Expr* int_lit = new_expr(p, EXPR_LITERAL, target_uword, literal);
-        int_lit->literal = eval_integer(p, p->current, p->cursor);
+        atom = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        atom->literal = eval_integer(p, p->current, p->cursor);
         advance(p);
-        return int_lit;
+        break;
     case TOK_KW_TRUE:
-        Expr* true_lit = new_expr(p, EXPR_LITERAL, target_uword, literal);
-        true_lit->literal = 1;
+        atom = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        atom->literal = 1;
         advance(p);
-        return true_lit;
+        break;
     case TOK_KW_FALSE:
-        Expr* false_lit = new_expr(p, EXPR_LITERAL, target_uword, literal);
-        false_lit->literal = 0;
+        atom = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        atom->literal = 0;
         advance(p);
-        return false_lit;
+        break;
     case TOK_KW_NULLPTR:
-        Expr* nullptr_lit = new_expr(p, EXPR_LITERAL, ty_get_ptr(TY_VOID), literal);
-        nullptr_lit->literal = 0;
+        atom = new_expr(p, EXPR_LITERAL, ty_get_ptr(TY_VOID), literal);
+        atom->literal = 0;
         advance(p);
-        return nullptr_lit;
+        break;
     case TOK_KW_SIZEOF:
-        Expr* size = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        atom = new_expr(p, EXPR_LITERAL, target_uword, literal);
         advance(p);
         TyIndex type = parse_type(p, false); 
-        size->literal = ty_size(type);
-        return size;
+        atom->literal = ty_size(type);
+        break;
     case TOK_IDENTIFIER:
         // find an entity
-        Expr* ident = new_expr(p, EXPR_ENTITY, TY__INVALID, entity);
+        atom = new_expr(p, EXPR_ENTITY, TY__INVALID, entity);
         Entity* entity = get_entity(p, span);
         if (entity == nullptr) {
             parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
@@ -716,16 +718,16 @@ Expr* parse_atom_terminal(Parser* p) {
             parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
                 "entity is a type");
         }
-        ident->entity = entity;
-        ident->ty = entity->ty;
+        atom->entity = entity;
+        atom->ty = entity->ty;
         advance(p);
-        return ident;
+        break;
     default:
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
             "expected expression");
     }
 
-    return nullptr;
+    return atom;
 }
 
 Expr* parse_atom(Parser* p) {
@@ -959,7 +961,6 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
     
     string identifier = tok_span(p->current);
     Entity* var = get_or_create(p, identifier);
-    var->decl = decl;
     decl->var_decl.var = var;
     if (var->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "previously EXTERN variable cannot be PRIVATE");
@@ -1008,6 +1009,7 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
     }
 
     var->storage = storage;
+    var->decl = decl;
 
     return decl;
 }
@@ -1069,7 +1071,7 @@ Stmt* parse_stmt(Parser* p) {
         break;
     case TOK_KW_NOTHING:
         advance(p);
-        return parse_stmt(p);
+        return nullptr; // nothing
     case TOK_KW_PUBLIC:
     case TOK_KW_PRIVATE:
     case TOK_KW_EXTERN:
@@ -1191,9 +1193,42 @@ TyIndex parse_fn_prototype(Parser* p) {
 }
 
 Stmt* parse_fn_decl(Parser* p, u8 storage) {
+    // advance(p);
     advance(p);
+    // no fnptr specifier yet
+    expect(p, TOK_IDENTIFIER);
+    u32 ident_pos = p->cursor;
+    string identifier = tok_span(p->current);
+    Entity* fn = get_or_create(p, identifier);
+    if (fn->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
+        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "previously EXTERN function cannot be PRIVATE");
+    }
     advance(p);
-    parse_fn_prototype(p);
+    TyIndex decl_ty = parse_fn_prototype(p);
+    if (fn->storage == STORAGE_EXTERN && !ty_equal(fn->ty, decl_ty)) {
+        parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "type %s differs from previous EXTERN type %s",
+            ty_name(decl_ty), ty_name(fn->ty));
+    }
+    if (storage != STORAGE_EXTERN) {
+        Stmt* fn_decl = new_stmt(p, STMT_FN_DECL, fn_decl);
+        fn_decl->fn_decl.fn = fn;
+
+        u32 stmts_start = dynbuf_start();
+        u32 stmts_len = 0;
+        while (!match(p, TOK_KW_END)) {
+            Stmt* stmt = parse_stmt(p);
+            if (stmt == nullptr) {
+                continue;
+            }
+            vec_append(&dynbuf, stmt);
+            stmts_len++;
+        }
+        Stmt** stmts = (Stmt**)dynbuf_to_arena(p, stmts_start);
+        
+        dynbuf_restore(stmts_start);
+        
+    }
+    fn->storage = storage;
     return nullptr;
 }
 

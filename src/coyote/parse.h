@@ -133,6 +133,7 @@ typedef enum : u8 {
     STMT_EXPR,
 
     STMT_VAR_DECL,
+    STMT_FN_DECL,
 
     STMT_ASSIGN,
     STMT_ASSIGN_ADD,
@@ -178,6 +179,11 @@ typedef struct Stmt {
             Entity* var;
             Expr* expr;
         } var_decl;
+
+        struct {
+            Entity* fn;
+            StmtList body;
+        } fn_decl;
 
         struct {
             Expr* lhs;
