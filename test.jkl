@@ -1,3 +1,11 @@
-FN bruh(IN x: WORD, IN y: WORD)
-    RETURN x + y
-END
+x : ^Foo
+
+TYPE Foo = UWORD
+
+
+// FN bruh()
+//     x : Foo = NULLPTR
+//     y : Bar = NULLPTR
+//     x = y
+//     y = x
+// END

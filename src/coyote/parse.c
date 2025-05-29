@@ -114,6 +114,12 @@ static void _ty_name(Vec(char)* v, TyIndex t) {
         vec_char_append_str(v, "^");
         _ty_name(v, ty_get_ptr_target(t));
         return;
+    case TY_ALIAS:
+    case TY_ALIAS_INCOMPLETE:
+        CompactString compact_name = TY(t, TyAlias)->entity->name;
+        string name = from_compact(compact_name);
+        vec_char_append_many(v, name.raw, name.len);
+        return;
     default: vec_char_append_str(v, "???");
     }
 }
@@ -196,20 +202,73 @@ static bool ty_equal(TyIndex t1, TyIndex t2) {
     while (TY_KIND(t2) == TY_ALIAS) {
         t2 = TY(t2, TyAlias)->aliasing;
     }
+    if (t1 == t2) {
+        return true;
+    }
+
+    if (TY_KIND(t1) == TY_PTR && TY_KIND(t2) == TY_PTR) {
+        return ty_equal(TY(t1, TyPtr)->to, TY(t2, TyPtr)->to);
+    }
+
+    // function type checking
+    if (TY_KIND(t1) == TY_FN && TY_KIND(t2) == TY_FN) {
+        TyFn* fn1 = TY(t1, TyFn);
+        TyFn* fn2 = TY(t2, TyFn);
+
+        if (fn1->len != fn2->len || fn1->variadic != fn2->variadic) {
+            return false;
+        }
+
+        if (!ty_equal(fn1->ret_ty, fn2->ret_ty)) {
+            return false;
+        }
+
+        for_n(i, 0, fn1->len - 1) {
+            Ty_FnParam p1 = fn1->params[i];
+            Ty_FnParam p2 = fn2->params[i];
+            
+            if (p1.out != p2.out) {
+                return false;
+            }
+            if (!ty_equal(p1.ty, p2.ty)) {
+                return false;
+            }
+            if (!string_eq(from_compact(p1.name), from_compact(p2.name))) {
+                return false;
+            }
+        }
+
+        if (fn1->variadic) {
+            Ty_FnParam p1 = fn1->params[fn1->len - 1];
+            Ty_FnParam p2 = fn2->params[fn1->len - 1];
+            if (!string_eq(from_compact(p1.varargs.argv), from_compact(p2.varargs.argv))) {
+                return false;
+            }
+            if (!string_eq(from_compact(p1.varargs.argc), from_compact(p2.varargs.argc))) {
+                return false;
+            }
+        } else if (fn1->len != 0) {
+            Ty_FnParam p1 = fn1->params[fn1->len - 1];
+            Ty_FnParam p2 = fn2->params[fn1->len - 1];
+            
+            if (p1.out != p2.out) {
+                return false;
+            }
+            if (!ty_equal(p1.ty, p2.ty)) {
+                return false;
+            }
+            if (!string_eq(from_compact(p1.name), from_compact(p2.name))) {
+                return false;
+            }
+        }
+        return true; // guess they are equal after all...
+    }
+
     return t1 == t2;
 }
 
 static bool ty_compatible(TyIndex dst, TyIndex src, bool src_is_constant) {
-    if (dst == src) {
-        return true;
-    }
-    while (TY_KIND(dst) == TY_ALIAS) {
-        dst = TY(dst, TyAlias)->aliasing;
-    }
-    while (TY_KIND(src) == TY_ALIAS) {
-        src = TY(src, TyAlias)->aliasing;
-    }
-    if (dst == src) {
+    if (ty_equal(dst, src)) {
         return true;
     }
 
@@ -671,6 +730,9 @@ TyIndex parse_type_terminal(Parser* p, bool allow_incomplete) {
         if (entity->kind != ENTKIND_TYPE) {
             parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "symbol is not a type");
         }
+        // if (TY(entity->ty, TyAlias)->kind == TY_ALIAS_IN_PROGRESS) {
+        //     parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "recursive type aliases are not allowed");
+        // }
         advance(p);
         TyIndex t = entity->ty;
         while (TY_KIND(t) == TY_ALIAS) {
@@ -709,6 +771,21 @@ TyIndex parse_type(Parser* p, bool allow_incomplete) {
         left = arr;
     }
     return left;
+}
+
+
+static bool is_lvalue(Expr* e) {
+    switch (e->kind) {
+    case EXPR_ENTITY:
+        return e->entity->kind == ENTKIND_VAR;
+    case EXPR_DEREF:
+    case EXPR_DEREF_MEMBER:
+    case EXPR_MEMBER:
+    case EXPR_SUBSCRIPT:
+        return true;
+    default:
+        return false;
+    }
 }
 
 Expr* parse_atom_terminal(Parser* p) {
@@ -1054,20 +1131,6 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
     return decl;
 }
 
-static bool is_lvalue(Expr* e) {
-    switch (e->kind) {
-    case EXPR_ENTITY:
-        return e->kind == ENTKIND_VAR;
-    case EXPR_DEREF:
-    case EXPR_DEREF_MEMBER:
-    case EXPR_MEMBER:
-    case EXPR_SUBSCRIPT:
-        return true;
-    default:
-        return false;
-    }
-}
-
 Stmt* parse_stmt_assign(Parser* p, Expr* left_expr) {
     Stmt* assign = new_stmt(p, STMT_ASSIGN, assign);
     assign->assign.lhs = left_expr;
@@ -1178,7 +1241,8 @@ Entity* get_incomplete_type_entity(Parser* p, string identifier) {
         entity = new_entity(p, identifier, ENTKIND_TYPE);
         entity->ty = ty_allocate(TyAlias);
         TY_KIND(entity->ty) = TY_ALIAS_INCOMPLETE;
-    } else if (entity->kind != ENTKIND_TYPE || TY_KIND(entity->ty) == TY_ALIAS_INCOMPLETE) {
+        TY(entity->ty, TyAlias)->entity = entity;
+    } else if (entity->kind != ENTKIND_TYPE) {
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
             "symbol already declared");
     }
@@ -1349,7 +1413,7 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
             vec_append(&dynbuf, stmt);
             stmts_len++;
         }
-        if (!has_returned) {
+        if (!has_returned && fn_type->ret_ty != TY_VOID) {
             parse_error(p, ident_pos, ident_pos, REPORT_NOTE, "in function '"str_fmt"'", str_arg(identifier));
             parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "function may not return with defined value");
         }
@@ -1379,10 +1443,16 @@ Stmt* parse_global_decl(Parser* p) {
         expect(p, TOK_IDENTIFIER);
         string identifier = tok_span(p->current);
         Entity* entity = get_incomplete_type_entity(p, identifier);
+        if (TY_KIND(entity->ty) != TY_ALIAS) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+                "TYPE declaration cannot declare incomplete type");
+        }
         advance(p);
         expect_advance(p, TOK_COLON);
+        // TY_KIND(entity->ty) = TY_ALIAS_IN_PROGRESS;
         TY(entity->ty, TyAlias)->aliasing = parse_type(p, false);
         TY_KIND(entity->ty) = TY_ALIAS;
+        TY(entity->ty, TyAlias)->entity = entity;
     } break;
     case TOK_KW_PUBLIC:
     case TOK_KW_PRIVATE:

@@ -30,6 +30,7 @@ typedef enum : u8 {
     TY_FN,
 
     TY_ALIAS_INCOMPLETE,
+    // TY_ALIAS_IN_PROGRESS,
     TY_ALIAS,
 } TyKind;
 
@@ -54,6 +55,7 @@ typedef struct {
 typedef struct {
     u8 kind;
     TyIndex aliasing;
+    Entity* entity;
 } TyAlias;
 
 typedef struct {
