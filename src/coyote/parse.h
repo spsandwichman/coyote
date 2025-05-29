@@ -27,7 +27,6 @@ typedef enum : u8 {
     TY_STRUCT_PACKED,
     TY_UNION,
     TY_ENUM,
-    TY_FNPTR,
     TY_FN,
 
     TY_ALIAS_INCOMPLETE,
@@ -75,7 +74,7 @@ typedef struct {
 
 typedef union {
     struct {    
-        TyIndex type;
+        TyIndex ty;
         bool out;
         CompactString name;
     };
@@ -106,6 +105,7 @@ typedef struct Stmt Stmt;
 
 typedef enum : u8 {
     STORAGE_LOCAL,
+    STORAGE_OUT_PARAM,
     STORAGE_PUBLIC,
     STORAGE_PRIVATE,
     STORAGE_EXPORT,
@@ -116,9 +116,10 @@ typedef enum : u8 {
     ENTKIND_VAR,
     ENTKIND_FN,
     ENTKIND_TYPE,
+    ENTKIND_LABEL,
 } EntityKind;
 
-typedef struct {
+typedef struct Entity {
     CompactString name;
 
     EntityKind kind;
@@ -163,15 +164,24 @@ typedef enum : u8 {
 
 typedef struct StmtList {
     u32 len; 
-    Stmt* stmts;
+    Stmt** stmts;
 } StmtList;
+
+typedef enum : u8 {
+    RETKIND_NO,     // does not return
+    RETKIND_MAYBE,  // might possibly return
+    RETKIND_YES,    // will return
+} ReturnKind;
 
 typedef struct Stmt {
     StmtKind kind;
+    ReturnKind retkind;
     u32 token_index;
     
     union { // allocated in the arena as-needed
         usize extra[0];
+
+        usize nothing[0];
         
         Expr* expr;
 

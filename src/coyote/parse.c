@@ -133,10 +133,7 @@ static bool ty_is_scalar(TyIndex t) {
         return true;
     }
     u8 ty_kind = TY(t, TyBase)->kind;
-    if (ty_kind == TY_PTR || ty_kind == TY_FNPTR) {
-        return true;
-    }
-    return false;
+    return ty_kind == TY_PTR;
 }
 
 static bool ty_is_integer(TyIndex t) {
@@ -507,6 +504,21 @@ static Token peek(Parser* p, usize n) {
     return p->tokens[cursor];
 }
 
+static bool has_eof_or_nl(Parser* p, u32 pos) {
+    while (p->tokens[pos].kind != TOK_EOF) {
+        if (p->tokens[pos].kind == TOK_NEWLINE) {
+            return true;
+        }
+        if (p->tokens[pos].kind > _TOK_LEX_IGNORE) {
+            pos++;
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
+
 static bool match(Parser* p, u8 kind) {
     return p->current.kind == kind;
 }
@@ -514,6 +526,10 @@ static bool match(Parser* p, u8 kind) {
 static void parse_error(Parser* p, u32 start, u32 end, ReportKind kind, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
+
+    if (p->flags.warn_to_err && kind == REPORT_WARNING) {
+        kind = REPORT_ERROR;
+    }
 
     thread_local static char sprintf_buf[512];
 
@@ -569,11 +585,23 @@ u32 expr_leftmost_token(Expr* expr) {
     case EXPR_LITERAL:
     case EXPR_STR_LITERAL:
     case EXPR_NOT:
+    case EXPR_ENTITY:
         return expr->token_index;
     case EXPR_DEREF:
         return expr_leftmost_token(expr->unary);
+    case EXPR_ADD:
+    case EXPR_SUB:
+    case EXPR_MUL:
+    case EXPR_DIV:
+    case EXPR_MOD:
+    case EXPR_AND:
+    case EXPR_OR:
+    case EXPR_XOR:
+    case EXPR_LSH:
+    case EXPR_RSH:
+        return expr_leftmost_token(expr->binary.lhs);
     default:
-        TODO("unknown expr kind");
+        TODO("unknown expr kind %u", expr->kind);
     }
 }
 
@@ -582,11 +610,23 @@ u32 expr_rightmost_token(Expr* expr) {
     case EXPR_LITERAL:
     case EXPR_STR_LITERAL:
     case EXPR_DEREF:
+    case EXPR_ENTITY:
         return expr->token_index;
     case EXPR_NOT:
         return expr_rightmost_token(expr->unary);
+    case EXPR_ADD:
+    case EXPR_SUB:
+    case EXPR_MUL:
+    case EXPR_DIV:
+    case EXPR_MOD:
+    case EXPR_AND:
+    case EXPR_OR:
+    case EXPR_XOR:
+    case EXPR_LSH:
+    case EXPR_RSH:
+        return expr_rightmost_token(expr->binary.rhs);
     default:
-        TODO("unknown expr kind");
+        TODO("unknown expr kind %u", expr->kind);
     }
 }
 
@@ -839,7 +879,7 @@ Expr* parse_binary(Parser* p, isize precedence) {
 
         if (!ty_compatible(lhs->ty, rhs->ty, rhs->kind == EXPR_LITERAL)) {
             parse_error(p, op_token, op_token, REPORT_ERROR, 
-                "type %u and %u are not compatible", ty_name(lhs->ty), ty_name(rhs->ty));
+                "type %s and %s are not compatible", ty_name(lhs->ty), ty_name(rhs->ty));
         }
 
         TyIndex op_ty = lhs->ty;
@@ -919,7 +959,6 @@ Expr* parse_binary(Parser* p, isize precedence) {
             default:
                 UNREACHABLE;
             }
-            // printf("consteval %lld\n", lit->literal);
             lhs = lit;
         } else {
             Expr* op = new_expr(p, op_kind, op_ty, binary); 
@@ -941,6 +980,7 @@ Expr* parse_expr(Parser* p) {
 
 static Stmt* new_stmt_(Parser* p, u8 kind, usize size) {
     Stmt* stmt = arena_alloc(&p->arena, size, alignof(Stmt));
+    memset(stmt, 0, size);
     stmt->kind = kind;
     stmt->token_index = p->cursor;
     return stmt;
@@ -1046,22 +1086,60 @@ Stmt* parse_stmt_assign(Parser* p, Expr* left_expr) {
 }
 
 Stmt* parse_stmt_expr(Parser* p) {
-        // expression! who knows what this could be
+    // expression! who knows what this could be
+    u32 start = p->cursor;
     Expr* expr = parse_expr(p);
     if (TOK_EQ <= p->current.kind && p->current.kind <= TOK_RSHIFT_EQ) {
         // assignment statement
         return parse_stmt_assign(p, expr);
     } else {
         // expression statement
+        if (expr->kind != TY_VOID) {
+            error_at_expr(p, expr, REPORT_WARNING, "unused expression result");
+        }
         Stmt* stmt_expr = new_stmt(p, STMT_EXPR, expr);
         stmt_expr->expr = expr;
-        stmt_expr->token_index = expr_leftmost_token(expr);
+        stmt_expr->token_index = start;
         return stmt_expr;
     }
 }
 
+#define ALLOW_BARE_RETURN
+
 Stmt* parse_stmt(Parser* p) {
     switch (p->current.kind) {
+    case TOK_KW_LEAVE: {
+        TyIndex ret_ty = TY(p->current_function->ty, TyFn)->ret_ty;
+        if (ret_ty != TY_VOID) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "cannot LEAVE from non-VOID function");
+        }
+        Stmt* leave = new_stmt(p, STMT_LEAVE, nothing);
+        leave->retkind = RETKIND_YES;
+        advance(p);
+        return leave;
+    }
+    case TOK_KW_RETURN: {
+        TyIndex ret_ty = TY(p->current_function->ty, TyFn)->ret_ty;
+        Stmt* return_ = new_stmt(p, STMT_RETURN, expr);
+        if (ret_ty == TY_VOID) {
+            if (p->flags.strict) {
+                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "void RETURN is non-standard");
+            }
+            // if (!has_eof_or_nl(p, p->cursor + 1)) {
+            //     parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "misleading: void RETURN does not return a value");
+            // }
+            advance(p);
+        } else {
+            advance(p);
+            return_->expr = parse_expr(p);
+            if (!ty_compatible(ret_ty, return_->expr->ty, return_->expr->kind == EXPR_LITERAL)) {
+                error_at_expr(p, return_->expr, REPORT_ERROR, "type %s not compatible with return type %s",
+                    ty_name(return_->expr->ty), ty_name(ret_ty));
+            }
+        }
+        return_->retkind = RETKIND_YES;
+        return return_;
+    }
     case TOK_IDENTIFIER:
         if (peek(p, 1).kind == TOK_COLON) {
             return parse_var_decl(p, STORAGE_LOCAL);
@@ -1127,10 +1205,23 @@ TyIndex parse_fn_prototype(Parser* p) {
             advance(p);
             expect(p, TOK_IDENTIFIER);
             string argv = tok_span(p->current);
+            for_n(i, 0, params_len) {
+                if (string_eq(from_compact(params[i].name), argv)) {
+                    parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "parameter name already used");
+                }
+            }
             param->varargs.argv = to_compact(argv);
             advance(p);
             expect(p, TOK_IDENTIFIER);
             string argc = tok_span(p->current);
+            for_n(i, 0, params_len) {
+                if (string_eq(from_compact(params[i].name), argc)) {
+                    parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "parameter name already used");
+                }
+            }
+            if (string_eq(argv, argc)) {
+                parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "parameter name already used");
+            }
             param->varargs.argc = to_compact(argc);
             advance(p);
             params_len++;
@@ -1160,7 +1251,7 @@ TyIndex parse_fn_prototype(Parser* p) {
         advance(p);
         expect_advance(p, TOK_COLON);
 
-        param->type = parse_type(p, false);
+        param->ty = parse_type(p, false);
 
         params_len++;
 
@@ -1209,24 +1300,67 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
         parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "type %s differs from previous EXTERN type %s",
             ty_name(decl_ty), ty_name(fn->ty));
     }
+    fn->ty = decl_ty;
     if (storage != STORAGE_EXTERN) {
         Stmt* fn_decl = new_stmt(p, STMT_FN_DECL, fn_decl);
         fn_decl->fn_decl.fn = fn;
 
+        p->current_function = fn;
+
+        enter_scope(p);
+
+        // define parameters
+        TyFn* fn_type = TY(decl_ty, TyFn);
+        for_n(i, 0, fn_type->len - 1) {
+            Ty_FnParam* param = &fn_type->params[i];
+            Entity* param_entity = new_entity(p, from_compact(param->name), ENTKIND_VAR);
+            param_entity->ty = param->ty;
+            param_entity->storage = param->out ? STORAGE_OUT_PARAM : STORAGE_LOCAL;
+        }
+        if (fn_type->variadic) {
+            Ty_FnParam* param = &fn_type->params[fn_type->len - 1];
+            Entity* argv_entity = new_entity(p, from_compact(param->varargs.argv), ENTKIND_VAR);
+            argv_entity->ty = ty_get_ptr(TY_VOIDPTR);
+            argv_entity->storage = STORAGE_LOCAL;
+            Entity* argc_entity = new_entity(p, from_compact(param->varargs.argc), ENTKIND_VAR);
+            argc_entity->storage = STORAGE_LOCAL;
+            argc_entity->ty = target_uword;
+        } else if (fn_type->len != 0) {
+            Ty_FnParam* param = &fn_type->params[fn_type->len - 1];
+            Entity* param_entity = new_entity(p, from_compact(param->name), ENTKIND_VAR);
+            param_entity->ty = param->ty;
+            param_entity->storage = param->out ? STORAGE_OUT_PARAM : STORAGE_LOCAL;
+        }
+
         u32 stmts_start = dynbuf_start();
         u32 stmts_len = 0;
+        bool has_returned = false;
         while (!match(p, TOK_KW_END)) {
             Stmt* stmt = parse_stmt(p);
             if (stmt == nullptr) {
                 continue;
             }
+            if (stmt->retkind == RETKIND_YES) {
+                has_returned = true;
+            }
             vec_append(&dynbuf, stmt);
             stmts_len++;
         }
+        if (!has_returned) {
+            parse_error(p, ident_pos, ident_pos, REPORT_NOTE, "in function '"str_fmt"'", str_arg(identifier));
+            parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "control flow might reach end of function without returning");
+        }
+        advance(p);
+
         Stmt** stmts = (Stmt**)dynbuf_to_arena(p, stmts_start);
         
+        exit_scope(p);
+
+        p->current_function = nullptr;
+
         dynbuf_restore(stmts_start);
-        
+        fn_decl->fn_decl.body.stmts = stmts;
+        fn_decl->fn_decl.body.len = stmts_len;
     }
     fn->storage = storage;
     return nullptr;

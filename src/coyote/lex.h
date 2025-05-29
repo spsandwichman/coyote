@@ -191,6 +191,13 @@ typedef struct ParseScope {
     ParseScope* sub;
 } ParseScope;
 
+typedef struct Entity Entity;
+
+typedef struct FlagSet {
+    bool strict: 1;
+    bool warn_to_err: 1;
+} FlagSet;
+
 typedef struct {
     Token current;
     Token* tokens;
@@ -202,7 +209,11 @@ typedef struct {
 
     VecPtr(SrcFile) sources;
 
+    Entity* current_function;
+
     Arena arena;
+
+    FlagSet flags;
 } Parser;
 
 Vec_typedef(Token);

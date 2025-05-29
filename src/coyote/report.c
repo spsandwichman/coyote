@@ -54,14 +54,13 @@ static void print_snippet(string line, string snippet, const char* color, usize 
             fprintf(stderr, Bold "%s^", color);
         }
         if (line.raw + i == snippet.raw + snippet.len) {
-            fprintf(stderr, "\n");
             break;
         }
         if (line.raw + i > snippet.raw) {
             fprintf(stderr, "~");
         }
     }
-    fprintf(stderr, Reset);
+    fprintf(stderr, Reset"\n");
 }
 
 bool is_whitespace(char c) {

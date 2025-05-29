@@ -25,26 +25,30 @@ int main(int argc, char** argv) {
     };
 
     Parser p = lex_entrypoint(&f);
-    for_n(i, 0, p.tokens_len) {
-        Token* t = &p.tokens[i];
-        if (_TOK_LEX_IGNORE < t->kind) {
-            if (t->kind == TOK_NEWLINE) {
-                // printf("\n");
-                continue;
-            }
-            printf("%s ", token_kind[t->kind]);
-            continue;
-        }
-        if (t->kind == TOK_STRING) {
-            printf("\"");
-        }
-        printf(str_fmt, str_arg(tok_span(*t)));
-        if (t->kind == TOK_STRING) {
-            printf("\"");
-        }
-        printf(" ");
-    }
-    printf("\n");
+    
+    // p.flags.strict = true;
+    // p.flags.warn_to_err = true;
+
+    // for_n(i, 0, p.tokens_len) {
+    //     Token* t = &p.tokens[i];
+    //     if (_TOK_LEX_IGNORE < t->kind) {
+    //         if (t->kind == TOK_NEWLINE) {
+    //             // printf("\n");
+    //             continue;
+    //         }
+    //         printf("%s ", token_kind[t->kind]);
+    //         continue;
+    //     }
+    //     if (t->kind == TOK_STRING) {
+    //         printf("\"");
+    //     }
+    //     printf(str_fmt, str_arg(tok_span(*t)));
+    //     if (t->kind == TOK_STRING) {
+    //         printf("\"");
+    //     }
+    //     printf(" ");
+    // }
+    // printf("\n");
 
     CompilationUnit cu = parse_unit(&p);
 }

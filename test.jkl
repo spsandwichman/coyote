@@ -1,6 +1,3 @@
-// TYPE Foo : WORD
-// TYPE Bar : Foo[10]
-
-FN foo(IN x: INT, IN y: INT)
-    x := 1
+FN bruh(IN x: WORD, IN y: WORD)
+    RETURN x + y
 END
