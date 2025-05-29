@@ -527,7 +527,7 @@ static void parse_error(Parser* p, u32 start, u32 end, ReportKind kind, const ch
     va_list args;
     va_start(args, fmt);
 
-    if (p->flags.warn_to_err && kind == REPORT_WARNING) {
+    if (p->flags.error_on_warn && kind == REPORT_WARNING) {
         kind = REPORT_ERROR;
     }
 
@@ -1104,8 +1104,6 @@ Stmt* parse_stmt_expr(Parser* p) {
     }
 }
 
-#define ALLOW_BARE_RETURN
-
 Stmt* parse_stmt(Parser* p) {
     switch (p->current.kind) {
     case TOK_KW_LEAVE: {
@@ -1125,9 +1123,9 @@ Stmt* parse_stmt(Parser* p) {
             if (p->flags.strict) {
                 parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "void RETURN is non-standard");
             }
-            // if (!has_eof_or_nl(p, p->cursor + 1)) {
-            //     parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "misleading: void RETURN does not return a value");
-            // }
+            if (!has_eof_or_nl(p, p->cursor + 1)) {
+                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "misleading - void RETURN statement stops here");
+            }
             advance(p);
         } else {
             advance(p);
@@ -1228,15 +1226,20 @@ TyIndex parse_fn_prototype(Parser* p) {
             break;
         }
 
-
-        if (match(p, TOK_KW_IN)) {
+        switch (p->current.kind) {
+        case TOK_KW_IN:
             param->out = false;
-        } else if (match(p, TOK_KW_OUT)) {
+            advance(p);
+            break;
+        case TOK_KW_OUT:
             param->out = true;
-        } else {
-            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "expected IN or OUT");
+            advance(p);
+            break;
+        default:
+            if (p->flags.strict) {
+                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "implicit IN is non-standard");
+            }
         }
-        advance(p);
 
         expect(p, TOK_IDENTIFIER);
         string ident = tok_span(p->current);
@@ -1348,7 +1351,7 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
         }
         if (!has_returned) {
             parse_error(p, ident_pos, ident_pos, REPORT_NOTE, "in function '"str_fmt"'", str_arg(identifier));
-            parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "control flow might reach end of function without returning");
+            parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "function may not return with defined value");
         }
         advance(p);
 

@@ -1,17 +1,34 @@
 #include <stdio.h>
+#include <threads.h>
 
 #include "common/orbit.h"
 
+#include "common/util.h"
 #include "lex.h"
 #include "parse.h"
 
-int main(int argc, char** argv) {
-    if (argc == 1) {
-        printf("no file provided\n");
-        return 1;
-    }
+thread_local const char* filepath = nullptr;
+thread_local FlagSet flags = {};
 
-    char* filepath = argv[1];
+static void parse_args(int argc, char** argv) {
+    for_n(i, 0, argc) {
+        char* arg = argv[i];
+        if (strcmp(arg, "--strict") == 0) {
+            flags.strict = true;
+        } else if (strcmp(arg, "--error-on-warn") == 0) {
+            flags.error_on_warn = true;
+        } else if (arg[0] == '-') {
+            printf("unknown flag '%s'\n", arg);
+            exit(1);
+        } else {
+            filepath = arg;
+        }
+    }
+}
+
+int main(int argc, char** argv) {
+
+    parse_args(argc, argv);
 
     FsFile* file = fs_open(filepath, false, false);
     if (file == nullptr) {
@@ -25,9 +42,10 @@ int main(int argc, char** argv) {
     };
 
     Parser p = lex_entrypoint(&f);
+    p.flags = flags;
     
     // p.flags.strict = true;
-    // p.flags.warn_to_err = true;
+    // p.flags.error_on_warn = true;
 
     // for_n(i, 0, p.tokens_len) {
     //     Token* t = &p.tokens[i];

@@ -195,7 +195,7 @@ typedef struct Entity Entity;
 
 typedef struct FlagSet {
     bool strict: 1;
-    bool warn_to_err: 1;
+    bool error_on_warn: 1;
 } FlagSet;
 
 typedef struct {
