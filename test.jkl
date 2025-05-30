@@ -1,3 +1,6 @@
+TYPE Foo: ^Bar
+TYPE Bar: WORD
+
 FN bruh(): WORD
     x := TRUE
 

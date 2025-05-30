@@ -116,6 +116,7 @@ static void _ty_name(Vec(char)* v, TyIndex t) {
         return;
     case TY_ALIAS:
     case TY_ALIAS_INCOMPLETE:
+        ;
         CompactString compact_name = TY(t, TyAlias)->entity->name;
         string name = from_compact(compact_name);
         vec_char_append_many(v, name.raw, name.len);
@@ -1210,7 +1211,7 @@ StmtList parse_if_block_(Parser* p) {
         stmts_len++;
     }
     end:
-
+    ;
     Stmt** stmts = (Stmt**)dynbuf_to_arena(p, stmts_start);
     dynbuf_restore(stmts_start);
 
@@ -1527,6 +1528,23 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
     return nullptr;
 }
 
+static bool catch_recursive_alias(TyIndex t, TyIndex err_on) {
+    if (t == err_on) {
+        return true;
+    }
+
+    switch (TY_KIND(t)) {
+    case TY_PTR:
+        return catch_recursive_alias(TY(t, TyPtr)->to, err_on);
+    case TY_ARRAY:
+        return catch_recursive_alias(TY(t, TyArray)->to, err_on);
+    case TY_ALIAS:
+        return catch_recursive_alias(TY(t, TyAlias)->aliasing, err_on);
+    default:
+        return false;
+    }
+}
+
 Stmt* parse_global_decl(Parser* p) {
     switch (p->current.kind) {
     case TOK_KW_NOTHING:
@@ -1534,6 +1552,7 @@ Stmt* parse_global_decl(Parser* p) {
         return parse_global_decl(p);
     case TOK_KW_TYPE: {
         advance(p);
+        u32 identifier_pos = p->cursor;
         expect(p, TOK_IDENTIFIER);
         string identifier = tok_span(p->current);
         Entity* entity = get_incomplete_type_entity(p, identifier);
@@ -1546,9 +1565,13 @@ Stmt* parse_global_decl(Parser* p) {
         advance(p);
         expect_advance(p, TOK_COLON);
         // TY_KIND(entity->ty) = TY_ALIAS_IN_PROGRESS;
-        TY(entity->ty, TyAlias)->aliasing = parse_type(p, false);
-        TY_KIND(entity->ty) = TY_ALIAS;
+        TyIndex aliased_ty = parse_type(p, false);
+        if (catch_recursive_alias(aliased_ty, entity->ty)) {
+            parse_error(p, identifier_pos, identifier_pos, REPORT_ERROR, "recursive type aliases are not allowed");
+        }
+        TY(entity->ty, TyAlias)->aliasing = aliased_ty;
         TY(entity->ty, TyAlias)->entity = entity;
+        TY_KIND(entity->ty) = TY_ALIAS;
     } break;
     case TOK_KW_PUBLIC:
     case TOK_KW_PRIVATE:
