@@ -1095,7 +1095,6 @@ Parser lex_entrypoint(SrcFile* f) {
     
     arena_init(&ctx.arena);
 
-
     for_n(i, 0, tokens.len) {
         if (tokens.at[i].kind < _TOK_LEX_IGNORE) {
             ctx.current = tokens.at[i];

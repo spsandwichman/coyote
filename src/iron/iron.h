@@ -231,12 +231,28 @@ typedef struct FeFunc {
     FeStackItem* stack_bottom;
 } FeFunc;
 
+typedef struct FeSymTab {
+    struct {
+        FeCompactStr name;
+        FeSymbol* sym;
+    }* entries;
+    u32 cap;
+} FeSymTab;
+
+void fe_symtab_init(FeSymTab* st);
+void fe_symtab_put(FeSymTab* st, FeSymbol* sym);
+FeSymbol* fe_symtab_get(FeSymTab* st, const char* data, u16 len);
+void fe_symtab_remove(FeSymTab* st, const char* data, u16 len);
+void fe_symtab_destroy(FeSymTab* st);
+
 typedef struct FeModule {
     const FeTarget* target;
     struct {
         FeFunc* first;
         FeFunc* last;
     } funcs;
+
+    FeSymTab symtab;
 } FeModule;
 
 typedef struct FeCFGNode FeCFGNode;

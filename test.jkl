@@ -1,11 +1,9 @@
-x : ^Foo
+FN bruh(): WORD
+    x := TRUE
 
-TYPE Foo = UWORD
-
-
-// FN bruh()
-//     x : Foo = NULLPTR
-//     y : Bar = NULLPTR
-//     x = y
-//     y = x
-// END
+    IF x THEN
+        RETURN 1
+    ELSE
+        RETURN 2
+    END
+END

@@ -157,6 +157,7 @@ typedef enum : u8 {
     STMT_RETURN,
 
     STMT_IF,
+    STMT__BLOCK,
 
     STMT_WHILE,
 
@@ -164,16 +165,17 @@ typedef enum : u8 {
     STMT_GOTO,
 } StmtKind;
 
-typedef struct StmtList {
-    u32 len; 
-    Stmt** stmts;
-} StmtList;
-
 typedef enum : u8 {
     RETKIND_NO,     // does not return
     RETKIND_MAYBE,  // might possibly return
     RETKIND_YES,    // will return
 } ReturnKind;
+
+typedef struct StmtList {
+    u32 len;
+    ReturnKind retkind;
+    Stmt** stmts;
+} StmtList;
 
 typedef struct Stmt {
     StmtKind kind;

@@ -1167,6 +1167,97 @@ Stmt* parse_stmt_expr(Parser* p) {
     }
 }
 
+StmtList parse_stmt_block(Parser* p) {
+    u32 stmts_start = dynbuf_start();
+    u32 stmts_len = 0;
+    ReturnKind retkind = RETKIND_NO;
+    while (!match(p, TOK_KW_END)) {
+        Stmt* stmt = parse_stmt(p);
+        if (stmt == nullptr) {
+            continue;
+        }
+        retkind = max(retkind, stmt->retkind);
+        vec_append(&dynbuf, stmt);
+        stmts_len++;
+    }
+    Stmt** stmts = (Stmt**)dynbuf_to_arena(p, stmts_start);
+    dynbuf_restore(stmts_start);
+
+    return (StmtList){
+        .stmts = stmts,
+        .len = stmts_len,
+        .retkind = retkind,
+    };
+}
+
+StmtList parse_if_block_(Parser* p) {
+    u32 stmts_start = dynbuf_start();
+    u32 stmts_len = 0;
+    ReturnKind retkind = RETKIND_NO;
+    while (true) {
+        switch (p->current.kind) {
+        case TOK_KW_END:
+        case TOK_KW_ELSE:
+        case TOK_KW_ELSEIF:
+            goto end;
+        }
+        Stmt* stmt = parse_stmt(p);
+        if (stmt == nullptr) {
+            continue;
+        }
+        retkind = max(retkind, stmt->retkind);
+        vec_append(&dynbuf, stmt);
+        stmts_len++;
+    }
+    end:
+
+    Stmt** stmts = (Stmt**)dynbuf_to_arena(p, stmts_start);
+    dynbuf_restore(stmts_start);
+
+    return (StmtList){
+        .stmts = stmts,
+        .len = stmts_len,
+        .retkind = retkind,
+    };
+}
+
+Stmt* parse_stmt_if(Parser* p) {
+    Stmt* if_ = new_stmt(p, STMT_IF, if_);
+    advance(p);
+
+    if_->if_.cond = parse_expr(p);
+    expect_advance(p, TOK_KW_THEN);
+    StmtList if_true = parse_if_block_(p);
+    if_->if_.block = if_true;
+    // if_->retkind = if_true.retkind;
+    Stmt* if_false = nullptr;
+    switch (p->current.kind) {
+    case TOK_KW_END:
+        advance(p);
+        break;
+    case TOK_KW_ELSE:
+        if_false = new_stmt(p, STMT__BLOCK, block);
+        advance(p);
+        if_false->block = parse_stmt_block(p);
+        if_false->retkind = if_false->block.retkind;
+        advance(p);
+        break;
+    case TOK_KW_ELSEIF:
+        if_false = parse_stmt_if(p);
+        break;
+    }
+    
+    if (if_true.retkind == RETKIND_YES && if_false && if_false->retkind == RETKIND_YES) {
+        if_->retkind = RETKIND_YES;
+    } else if (if_true.retkind == RETKIND_MAYBE || (if_false && if_false->retkind == RETKIND_MAYBE)) {
+        if_->retkind = RETKIND_MAYBE;
+    } else {
+        if_->retkind = RETKIND_NO;
+    }
+    if_->if_.else_ = if_false;
+    return if_;
+}
+
 Stmt* parse_stmt(Parser* p) {
     switch (p->current.kind) {
     case TOK_KW_LEAVE: {
@@ -1187,7 +1278,7 @@ Stmt* parse_stmt(Parser* p) {
                 parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "void RETURN is non-standard");
             }
             if (!has_eof_or_nl(p, p->cursor + 1)) {
-                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "misleading - void RETURN statement stops here");
+                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "misleading whitespace - void RETURN statement stops here");
             }
             advance(p);
         } else {
@@ -1211,6 +1302,8 @@ Stmt* parse_stmt(Parser* p) {
     case TOK_KW_NOTHING:
         advance(p);
         return nullptr; // nothing
+    case TOK_KW_IF:
+        return parse_stmt_if(p);
     case TOK_KW_PUBLIC:
     case TOK_KW_PRIVATE:
     case TOK_KW_EXTERN:
@@ -1413,19 +1506,20 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
             vec_append(&dynbuf, stmt);
             stmts_len++;
         }
+        Stmt** stmts = (Stmt**)dynbuf_to_arena(p, stmts_start);
+        dynbuf_restore(stmts_start);
+
         if (!has_returned && fn_type->ret_ty != TY_VOID) {
             parse_error(p, ident_pos, ident_pos, REPORT_NOTE, "in function '"str_fmt"'", str_arg(identifier));
             parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "function may not return with defined value");
         }
         advance(p);
 
-        Stmt** stmts = (Stmt**)dynbuf_to_arena(p, stmts_start);
         
         exit_scope(p);
 
         p->current_function = nullptr;
 
-        dynbuf_restore(stmts_start);
         fn_decl->fn_decl.body.stmts = stmts;
         fn_decl->fn_decl.body.len = stmts_len;
     }
@@ -1443,10 +1537,12 @@ Stmt* parse_global_decl(Parser* p) {
         expect(p, TOK_IDENTIFIER);
         string identifier = tok_span(p->current);
         Entity* entity = get_incomplete_type_entity(p, identifier);
-        if (TY_KIND(entity->ty) != TY_ALIAS) {
-            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
-                "TYPE declaration cannot declare incomplete type");
-        }
+        // if (TY_KIND(entity->ty) != TY_ALIAS) {
+            // this is really meant to catch recursive aliases
+            // TODO this might cause problems
+            // parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+            //     "TYPE declaration cannot define incomplete type");
+        // }
         advance(p);
         expect_advance(p, TOK_COLON);
         // TY_KIND(entity->ty) = TY_ALIAS_IN_PROGRESS;

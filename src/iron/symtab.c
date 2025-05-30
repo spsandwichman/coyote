@@ -3,14 +3,6 @@
 #define TOMBSTONE (1)
 #define MAX_SEARCH 16
 
-typedef struct FeSymTab {
-    struct {
-        FeCompactStr name;
-        FeSymbol* sym;
-    }* entries;
-    u32 cap;
-} FeSymTab;
-
 #if FE_HOST_BITS == 64
     #define FNV1A_OFFSET_BASIS 14695981039346656037ull
     #define FNV1A_PRIME 1099511628211ull
@@ -28,7 +20,7 @@ static usize fnv1a(const char* data, u16 len) {
     return hash;
 }
 
-void fe_sym_table_init(FeSymTab* st) {
+void fe_symtab_init(FeSymTab* st) {
     st->cap = 256;
     st->entries = fe_malloc(sizeof(st->entries[0]) * st->cap);
     memset(st->entries, 0, sizeof(st->entries[0]) * st->cap);
