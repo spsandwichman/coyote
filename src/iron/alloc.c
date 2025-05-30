@@ -7,8 +7,8 @@ static u8 extra_size_table[FE__INST_END] = {
     // default error value
     [0 ... FE__INST_END - 1] = 255,
 
-    [FE_BOOKEND] = sizeof(FeInstBookend),
-    [FE_PROJ ... FE_MACH_PROJ] = sizeof(FeInstProj),
+    [FE__BOOKEND] = sizeof(FeInst__Bookend),
+    [FE_PROJ ... FE__MACH_PROJ] = sizeof(FeInstProj),
     [FE_CONST] = sizeof(FeInstConst),
     [FE_SYM_ADDR] = sizeof(FeInstSymAddr),
     [FE_PARAM] = sizeof(FeInstParam),
@@ -17,7 +17,7 @@ static u8 extra_size_table[FE__INST_END] = {
 
     [FE_LOAD ... FE_LOAD_VOLATILE] = sizeof(FeInstLoad),
     [FE_STORE ... FE_STORE_VOLATILE] = sizeof(FeInstStore),
-    [FE_CASCADE_UNIQUE ... FE_MACH_REG] = 0,
+    [FE_CASCADE_UNIQUE ... FE__MACH_REG] = 0,
 
     [FE_BRANCH] = sizeof(FeInstBranch),
     [FE_JUMP] = sizeof(FeInstJump),
@@ -25,8 +25,8 @@ static u8 extra_size_table[FE__INST_END] = {
     
     [FE_CALL] = sizeof(FeInstCall),
 
-    [FE_MACH_STACK_SPILL] = sizeof(FeMachStackSpill),
-    [FE_MACH_STACK_RELOAD] = sizeof(FeMachStackReload),
+    [FE__MACH_STACK_SPILL] = sizeof(FeInst__MachStackSpill),
+    [FE__MACH_STACK_RELOAD] = sizeof(FeInst__MachStackReload),
 };
 
 void fe__load_extra_size_table(usize start_index, u8* table, usize len) {

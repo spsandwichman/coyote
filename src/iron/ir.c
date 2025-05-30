@@ -3,10 +3,10 @@
 
 static const char* inst_name(FeInst* inst) {
     FeInst* bookend = inst;
-    while (bookend->kind != FE_BOOKEND) {
+    while (bookend->kind != FE__BOOKEND) {
         bookend = bookend->next;
     }
-    const FeTarget* t = fe_extra_T(bookend, FeInstBookend)->block->func->mod->target;
+    const FeTarget* t = fe_extra_T(bookend, FeInst__Bookend)->block->func->mod->target;
     return fe_inst_name(t, inst->kind);
 }
 
@@ -92,12 +92,12 @@ FeBlock* fe_block_new(FeFunc* f) {
     block->func = f;
     
     // adds initial bookend instruction to block
-    FeInst* bookend = fe_ipool_alloc(f->ipool, sizeof(FeInstBookend));
-    bookend->kind = FE_BOOKEND;
+    FeInst* bookend = fe_ipool_alloc(f->ipool, sizeof(FeInst__Bookend));
+    bookend->kind = FE__BOOKEND;
     bookend->ty = FE_TY_VOID;
     bookend->next = bookend;
     bookend->prev = bookend;
-    fe_extra_T(bookend, FeInstBookend)->block = block;
+    fe_extra_T(bookend, FeInst__Bookend)->block = block;
     block->bookend = bookend;
 
     // append to block list
@@ -283,7 +283,7 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
 
     switch (inst->kind) {
     case FE_PROJ:
-    case FE_MACH_PROJ:
+    case FE__MACH_PROJ:
         *len_out = 1;
         return &fe_extra_T(inst, FeInstProj)->val;
     case FE_IADD ... FE_FREM:
@@ -322,18 +322,18 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
     case FE_PHI:
         *len_out = fe_extra_T(inst, FeInstPhi)->len;
         return fe_extra_T(inst, FeInstPhi)->vals;
-    case FE_MACH_STACK_SPILL:
+    case FE__MACH_STACK_SPILL:
         *len_out = 1;
-        return &fe_extra_T(inst, FeMachStackSpill)->val;
-    case FE_BOOKEND:
+        return &fe_extra_T(inst, FeInst__MachStackSpill)->val;
+    case FE__BOOKEND:
     case FE_PARAM:
     case FE_CONST:
     case FE_SYM_ADDR:
     case FE_CASCADE_UNIQUE:
     case FE_CASCADE_VOLATILE:
     case FE_JUMP:
-    case FE_MACH_REG:
-    case FE_MACH_STACK_RELOAD:
+    case FE__MACH_REG:
+    case FE__MACH_STACK_RELOAD:
         *len_out = 0;
         return nullptr;
     default:
@@ -754,7 +754,7 @@ FeTy fe_proj_ty(FeInst* tuple, usize index) {
 
 static FeTrait inst_traits[FE__INST_END] = {
     [FE_PROJ] = 0,
-    [FE_MACH_PROJ] = VOL,
+    [FE__MACH_PROJ] = VOL,
     [FE_PARAM] = VOL,
     [FE_CONST] = 0,
     [FE_SYM_ADDR] = 0,
@@ -785,7 +785,7 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_FREM] = BINOP | FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
 
     [FE_MOV]      = UNOP | SAME_IN_OUT,
-    [FE_MACH_MOV] = UNOP | VOL | SAME_IN_OUT | MOV_HINT,
+    [FE__MACH_MOV] = UNOP | VOL | SAME_IN_OUT | MOV_HINT,
     [FE_UPSILON]  = UNOP | VOL | SAME_IN_OUT | MOV_HINT,
     [FE_NOT]   = UNOP | INT_IN | SAME_IN_OUT,
     [FE_NEG]   = UNOP | INT_IN | SAME_IN_OUT,
@@ -795,6 +795,8 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_BITCAST] = UNOP | 0,
     [FE_I2F] = UNOP | INT_IN,
     [FE_F2I] = UNOP | FLT_IN,
+    [FE_U2F] = UNOP | INT_IN,
+    [FE_F2U] = UNOP | FLT_IN,
 
     [FE_LOAD_VOLATILE] = VOL,
 

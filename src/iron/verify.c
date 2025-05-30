@@ -15,10 +15,10 @@ static void inst_local_check(FeFunc* f, FeInst* inst) {
         fe_runtime_crash("inst kind %d is not recognized", inst->kind);
     }
 
-    if ((traits & TERM) && inst->next->kind != FE_BOOKEND) {
+    if ((traits & TERM) && inst->next->kind != FE__BOOKEND) {
         fe_runtime_crash("inst %s is a terminator but is not last in block", inst_name);
     }
-    if (!(traits & TERM) && inst->next->kind == FE_BOOKEND) {
+    if (!(traits & TERM) && inst->next->kind == FE__BOOKEND) {
         fe_runtime_crash("inst %s is not a terminator but is last in block", inst_name);
     }
 

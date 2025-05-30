@@ -289,22 +289,22 @@ typedef struct FeBlock {
     for (FeBlock* block = (funcptr)->entry_block; block != nullptr; block = block->list_next)
 
 #define for_inst(inst, blockptr) \
-    for (FeInst* inst = (blockptr)->bookend->next, *_next_ = inst->next; inst->kind != FE_BOOKEND; inst = _next_, _next_ = _next_->next)
+    for (FeInst* inst = (blockptr)->bookend->next, *_next_ = inst->next; inst->kind != FE__BOOKEND; inst = _next_, _next_ = _next_->next)
 
 #define for_inst_reverse(inst, blockptr) \
-    for (FeInst* inst = (blockptr)->bookend->prev, *_prev_ = inst->prev; inst->kind != FE_BOOKEND; inst = _prev_, _prev_ = _prev_->prev)
+    for (FeInst* inst = (blockptr)->bookend->prev, *_prev_ = inst->prev; inst->kind != FE__BOOKEND; inst = _prev_, _prev_ = _prev_->prev)
 
 typedef u16 FeInstKind;
 typedef enum: FeInstKind {
     // Bookend
-    FE_BOOKEND = 1,
+    FE__BOOKEND = 1,
 
     // Param
     FE_PARAM,
 
     // Proj
     FE_PROJ,
-    FE_MACH_PROJ, // mostly for hardcoding register clobbers
+    FE__MACH_PROJ, // mostly for hardcoding register clobbers
 
     // Const
     FE_CONST,
@@ -333,10 +333,14 @@ typedef enum: FeInstKind {
     FE_FMUL,
     FE_FDIV,
     FE_FREM,
+
+    // FE_INSERT,  // insert a bitfield
+    // FE_EXTRACT, // extract a bitfield
+    // ^^^ TODO
     
     // Unop
     FE_MOV,
-    FE_MACH_MOV, // mostly for hardcoding register clobbers
+    FE__MACH_MOV, // mostly for hardcoding register clobbers
     FE_UPSILON,
     
     FE_NOT,
@@ -348,6 +352,8 @@ typedef enum: FeInstKind {
     FE_BITCAST,
     FE_I2F, // integer to float
     FE_F2I, // float to integer
+    FE_U2F, // unsigned integer to float
+    FE_F2U, // float to unsigned nteger
 
     // Load
     FE_LOAD,
@@ -362,12 +368,12 @@ typedef enum: FeInstKind {
     // (void)
     FE_CASCADE_UNIQUE,
     FE_CASCADE_VOLATILE,
-    FE_MACH_REG,
+    FE__MACH_REG,
 
-    // FeMachStackSpill
-    FE_MACH_STACK_SPILL,
-    // FeMachStackReload
-    FE_MACH_STACK_RELOAD,
+    // FeInst__MachStackSpill
+    FE__MACH_STACK_SPILL,
+    // FeInst__MachStackReload
+    FE__MACH_STACK_RELOAD,
 
     // Branch
     FE_BRANCH,
@@ -412,16 +418,16 @@ typedef struct FeInst {
 
 typedef struct {
     FeBlock* block;
-} FeInstBookend;
+} FeInst__Bookend;
+
+typedef struct {
+    usize index;
+} FeInstParam;
 
 typedef struct {
     FeInst* val;
     usize idx;
 } FeInstProj;
-
-typedef struct {
-    usize index;
-} FeInstParam;
 
 typedef union {
     u64 val;
@@ -442,6 +448,19 @@ typedef struct {
     FeInst* lhs;
     FeInst* rhs;
 } FeInstBinop;
+
+// typedef struct {
+//     FeInst* base;
+//     FeInst* to_insert;
+//     u8 start_bit;
+//     u8 end_bit;
+// } FeInstInsert;
+
+// typedef struct {
+//     FeInst* base;
+//     u8 start_bit;
+//     u8 end_bit;
+// } FeInstExtract;
 
 typedef struct {
     FeInst* ptr;
@@ -498,11 +517,11 @@ typedef struct {
 typedef struct {
     FeInst* val;
     FeStackItem* item;
-} FeMachStackSpill;
+} FeInst__MachStackSpill;
 
 typedef struct {
     FeStackItem* item;
-} FeMachStackReload;
+} FeInst__MachStackReload;
 
 #define FE_STACK_OFFSET_UNDEF UINT32_MAX
 

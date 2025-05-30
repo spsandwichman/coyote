@@ -46,7 +46,7 @@ static const char* ty_name[] = {
 };
 
 static const char* inst_name[FE__BASE_INST_END] = {
-    [FE_BOOKEND] = "<bookend>",
+    [FE__BOOKEND] = "<bookend>",
 
     [FE_CONST] = "const",
 
@@ -55,7 +55,7 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_PARAM] = "param",
 
     [FE_PROJ] = "proj",
-    [FE_MACH_PROJ] = "mach-proj",
+    [FE__MACH_PROJ] = "mach-proj",
 
     [FE_IADD] = "iadd",
     [FE_ISUB] = "isub",
@@ -84,7 +84,7 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_FREM] = "frem",
 
     [FE_MOV] = "mov",
-    [FE_MACH_MOV] = "mach-mov",
+    [FE__MACH_MOV] = "mach-mov",
     [FE_UPSILON] = "upsilon",
     [FE_NOT] = "not",
     [FE_NEG] = "neg",
@@ -93,6 +93,8 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_ZERO_EXT] = "zero-ext",
     [FE_I2F] = "i2f",
     [FE_F2I] = "f2i",
+    [FE_U2F] = "u2f",
+    [FE_F2U] = "f2u",
 
     [FE_LOAD] = "load",
     [FE_LOAD_UNIQUE] = "load-u",
@@ -104,7 +106,7 @@ static const char* inst_name[FE__BASE_INST_END] = {
 
     [FE_CASCADE_UNIQUE] = "cascade-u",
     [FE_CASCADE_VOLATILE] = "cascade-v",
-    [FE_MACH_REG] = "mach-reg",
+    [FE__MACH_REG] = "mach-reg",
 
     [FE_BRANCH] = "branch",
     [FE_JUMP] = "jump",
@@ -206,7 +208,7 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         fe_db_writecstr(db, ", ");
         fe__emit_ir_ref(db, f, fe_extra_T(inst, FeInstBinop)->rhs);
         break;
-    case FE_MOV ... FE_F2I:
+    case FE_MOV ... FE_F2U:
         fe__emit_ir_ref(db, f, fe_extra_T(inst, FeInstUnop)->un);
         break;
     case FE_PARAM:
@@ -296,7 +298,7 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
             break;
         }
         break;
-    case FE_MACH_REG:
+    case FE__MACH_REG:
         ;
         FeVReg vr = inst->vr_out;
         FeVirtualReg* vreg = fe_vreg(f->vregs, vr);
