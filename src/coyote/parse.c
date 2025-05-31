@@ -121,6 +121,43 @@ static void _ty_name(Vec(char)* v, TyIndex t) {
         string name = from_compact(compact_name);
         vec_char_append_many(v, name.raw, name.len);
         return;
+    case TY_FN: {
+        vec_char_append_str(v, "FN(");
+        TyFn* fn = TY(t, TyFn);
+        for_n(i, 0, fn->len - 1) {
+            Ty_FnParam* param = &fn->params[i];
+            vec_char_append_str(v, param->out ? "OUT " : "");
+            string name = from_compact(param->name);
+            vec_char_append_many(v, name.raw, name.len);
+            vec_char_append_str(v, ": ");
+            _ty_name(v, param->ty);
+            vec_char_append_str(v, ", ");
+        }
+        if (fn->variadic) {
+            Ty_FnParam* param = &fn->params[fn->len - 1];
+            vec_char_append_str(v, "... ");
+            string argv = from_compact(param->varargs.argv);
+            string argc = from_compact(param->varargs.argc);
+            vec_char_append_many(v, argv.raw, argv.len);
+            vec_char_append_str(v, " ");
+            vec_char_append_many(v, argc.raw, argc.len);
+        } else {
+            Ty_FnParam* param = &fn->params[fn->len - 1];
+            vec_char_append_str(v, param->out ? "OUT " : "");
+            string name = from_compact(param->name);
+            vec_char_append_many(v, name.raw, name.len);
+            vec_char_append_str(v, ": ");
+            _ty_name(v, param->ty);
+
+        }
+
+        vec_char_append_str(v, ")");
+        if (fn->ret_ty != TY_VOID) {
+            vec_char_append_str(v, ": ");
+            _ty_name(v, fn->ret_ty);
+        }
+
+    } return;
     default: vec_char_append_str(v, "???");
     }
 }
@@ -1081,6 +1118,7 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
     Entity* var = get_or_create(p, identifier);
     decl->var_decl.var = var;
     if (var->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
+            parse_error(p, var->decl->token_index, var->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "previously EXTERN variable cannot be PRIVATE");
     }
     advance(p);
@@ -1090,7 +1128,8 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
         u32 type_start = p->cursor;
         TyIndex decl_ty = parse_type(p, false);
         if (var->storage == STORAGE_EXTERN && !ty_equal(var->ty, decl_ty)) {
-            parse_error(p, type_start, p->cursor - 1, REPORT_ERROR, "type %s differs from previous EXTERN type %s",
+            parse_error(p, var->decl->token_index, var->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
+            parse_error(p, type_start, p->cursor - 1, REPORT_ERROR, "type %s differs from EXTERN type %s",
                 ty_name(decl_ty), ty_name(var->ty));
         }
         if (ty_size(decl_ty) == 0) {
@@ -1117,7 +1156,7 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
         Expr* value = parse_expr(p);
         if (var->storage == STORAGE_EXTERN && !ty_compatible(var->ty, value->ty, true)) {
             // parse_error(p, type_start, p->cursor - 1, REPORT_NOTE, "from previous declaration");
-            error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to previous EXTERN type %s",
+            error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to EXTERN type %s",
                     ty_name(value->ty), ty_name(var->ty));
         }
         decl->var_decl.expr = value;
@@ -1447,24 +1486,43 @@ TyIndex parse_fn_prototype(Parser* p) {
 Stmt* parse_fn_decl(Parser* p, u8 storage) {
     // advance(p);
     advance(p);
+
+    TyIndex fn_ty = TY_VOID;
+    if (match(p, TOK_OPEN_PAREN)) {
+        advance(p);
+        u32 start_index = p->cursor;
+        TyIndex fnptr = parse_type(p, false);
+        u32 end_index = p->cursor - 1;
+        if (TY_KIND(fnptr) != TY_PTR) {
+            parse_error(p, start_index, end_index, REPORT_ERROR, "provided type %s is not an ^FN (declared with FNPTR)", ty_name(fnptr));
+        }
+        fn_ty = TY(fnptr, TyPtr)->to;
+        if (TY_KIND(fn_ty) != TY_FN) {
+            parse_error(p, start_index, end_index, REPORT_ERROR, "provided type %s is not an ^FN (declared with FNPTR)", ty_name(fnptr));
+        }
+        expect_advance(p, TOK_CLOSE_PAREN);
+    }
+
     // no fnptr specifier yet
     expect(p, TOK_IDENTIFIER);
     u32 ident_pos = p->cursor;
     string identifier = tok_span(p->current);
     Entity* fn = get_or_create(p, identifier);
     if (fn->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
-        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "previously EXTERN function cannot be PRIVATE");
+        parse_error(p, fn->decl->token_index, fn->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
+        parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "previously EXTERN function cannot be PRIVATE");
     }
     advance(p);
     TyIndex decl_ty = parse_fn_prototype(p);
     if (fn->storage == STORAGE_EXTERN && !ty_equal(fn->ty, decl_ty)) {
-        parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "type %s differs from previous EXTERN type %s",
-            ty_name(decl_ty), ty_name(fn->ty));
+        parse_error(p, fn->decl->token_index, fn->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
+        parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "type differs from previous EXTERN type");
     }
     fn->ty = decl_ty;
     if (storage != STORAGE_EXTERN) {
         Stmt* fn_decl = new_stmt(p, STMT_FN_DECL, fn_decl);
         fn_decl->fn_decl.fn = fn;
+        fn->decl = fn_decl;
 
         p->current_function = fn;
 
@@ -1523,6 +1581,9 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
 
         fn_decl->fn_decl.body.stmts = stmts;
         fn_decl->fn_decl.body.len = stmts_len;
+    } else {
+        fn->decl = new_stmt(p, STMT_DECL_LOCATION, nothing);
+        fn->decl->token_index = ident_pos;
     }
     fn->storage = storage;
     return nullptr;
@@ -1552,6 +1613,7 @@ Stmt* parse_global_decl(Parser* p) {
         return parse_global_decl(p);
     case TOK_KW_TYPE: {
         advance(p);
+        Stmt* typedecl_loc = new_stmt(p, STMT_DECL_LOCATION, nothing);
         u32 identifier_pos = p->cursor;
         expect(p, TOK_IDENTIFIER);
         string identifier = tok_span(p->current);
@@ -1567,12 +1629,29 @@ Stmt* parse_global_decl(Parser* p) {
         // TY_KIND(entity->ty) = TY_ALIAS_IN_PROGRESS;
         TyIndex aliased_ty = parse_type(p, false);
         if (catch_recursive_alias(aliased_ty, entity->ty)) {
-            parse_error(p, identifier_pos, identifier_pos, REPORT_ERROR, "recursive type aliases are not allowed");
+            parse_error(p, identifier_pos, identifier_pos, REPORT_ERROR, "type aliases cannot be recursive");
         }
         TY(entity->ty, TyAlias)->aliasing = aliased_ty;
         TY(entity->ty, TyAlias)->entity = entity;
         TY_KIND(entity->ty) = TY_ALIAS;
+        entity->decl = typedecl_loc;
     } break;
+    case TOK_KW_FNPTR: {
+        advance(p);
+        Stmt* typedecl_loc = new_stmt(p, STMT_DECL_LOCATION, nothing);
+        u32 identifier_pos = p->cursor;
+        expect(p, TOK_IDENTIFIER);
+        string identifier = tok_span(p->current);
+        Entity* entity = get_incomplete_type_entity(p, identifier);
+        advance(p);
+        TyIndex fn_ty = parse_fn_prototype(p);
+        TyIndex fnptr = ty_get_ptr(fn_ty);
+        TY(entity->ty, TyAlias)->aliasing = fnptr;
+        TY(entity->ty, TyAlias)->entity = entity;
+        TY_KIND(entity->ty) = TY_ALIAS;
+        entity->decl = typedecl_loc;
+        break;
+    }
     case TOK_KW_PUBLIC:
     case TOK_KW_PRIVATE:
     case TOK_KW_EXPORT:

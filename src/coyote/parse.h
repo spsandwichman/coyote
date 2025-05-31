@@ -135,6 +135,8 @@ typedef enum : u8 {
     
     STMT_EXPR,
 
+    STMT_DECL_LOCATION,
+
     STMT_VAR_DECL,
     STMT_FN_DECL,
 

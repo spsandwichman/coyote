@@ -1,12 +1,8 @@
-TYPE Foo: ^Bar
-TYPE Bar: WORD
+// TYPE Foo: ^Bar
+// TYPE Foo: Foo
 
-FN bruh(): WORD
-    x := TRUE
+FNPTR BinaryFunction(IN lhs: WORD, IN rhs: WORD): WORD
 
-    IF x THEN
-        RETURN 1
-    ELSE
-        RETURN 2
-    END
+FN (BinaryFunction) foo(IN x: INT): WORD
+    RETURN 1
 END
