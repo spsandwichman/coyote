@@ -9,18 +9,32 @@
 thread_local const char* filepath = nullptr;
 thread_local FlagSet flags = {};
 
+static void print_help() {
+    puts("coyote path/file.jkl [options]");
+    puts("  -help            Display this info.");
+    puts("  -legacy          Warn on code that would not compile");
+    puts("                   with the original XR/SDK compiler.");
+    puts("  -error-on-warn   Turn warnings into errors.");
+}
+
 static void parse_args(int argc, char** argv) {
-    for_n(i, 0, argc) {
+    if (argc == 1) {
+        print_help();
+        exit(0);
+    }
+    filepath = argv[1];
+    for_n(i, 2, argc) {
         char* arg = argv[i];
-        if (strcmp(arg, "--strict") == 0) {
-            flags.strict = true;
-        } else if (strcmp(arg, "--error-on-warn") == 0) {
+        if (strcmp(arg, "-help") == 0) {
+            print_help();
+            exit(0);
+        } else if (strcmp(arg, "-legacy") == 0) {
+            flags.legacy = true;
+        } else if (strcmp(arg, "-error-on-warn") == 0) {
             flags.error_on_warn = true;
-        } else if (arg[0] == '-') {
+        } else {
             printf("unknown flag '%s'\n", arg);
             exit(1);
-        } else {
-            filepath = arg;
         }
     }
 }
@@ -43,7 +57,7 @@ int main(int argc, char** argv) {
     Parser p = lex_entrypoint(&f);
     p.flags = flags;
     
-    // p.flags.strict = true;
+    // p.flags.legacy = true;
     // p.flags.error_on_warn = true;
 
     // for_n(i, 0, p.tokens_len) {

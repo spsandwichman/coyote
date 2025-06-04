@@ -1345,8 +1345,8 @@ Stmt* parse_stmt(Parser* p) {
         TyIndex ret_ty = TY(p->current_function->ty, TyFn)->ret_ty;
         Stmt* return_ = new_stmt(p, STMT_RETURN, expr);
         if (ret_ty == TY_VOID) {
-            if (p->flags.strict) {
-                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "void RETURN is non-standard");
+            if (p->flags.legacy) {
+                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "void RETURN is non-legacy");
             }
             if (!has_eof_or_nl(p, p->cursor + 1)) {
                 parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "misleading whitespace - void RETURN statement stops here");
@@ -1465,8 +1465,8 @@ TyIndex parse_fn_prototype(Parser* p) {
             advance(p);
             break;
         default:
-            if (p->flags.strict) {
-                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "implicit IN is non-standard");
+            if (p->flags.legacy) {
+                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "implicit IN is non-legacy");
             }
         }
 

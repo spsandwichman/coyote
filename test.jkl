@@ -3,6 +3,6 @@ UNION Foo
     word: ^Foo,
 END
 
-// FN load(IN f: ^Foo): WORD
-//     RETURN f^.word
-// END
+FN load(IN f: ^Foo): WORD
+    RETURN f^.word
+END

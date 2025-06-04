@@ -194,7 +194,7 @@ typedef struct ParseScope {
 typedef struct Entity Entity;
 
 typedef struct FlagSet {
-    bool strict: 1;
+    bool legacy: 1;
     bool error_on_warn: 1;
 } FlagSet;
 
