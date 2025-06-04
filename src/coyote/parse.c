@@ -1789,7 +1789,7 @@ Stmt* parse_global_decl(Parser* p) {
         Entity* entity = get_incomplete_type_entity(p, identifier);
         advance(p);
         TyIndex record = parse_record_decl(p, kind);
-        printf("struct size %llu align %llu", ty_size(record), ty_align(record));
+        // printf("struct size %llu align %llu\n", ty_size(record), ty_align(record));
 
         TY(entity->ty, TyAlias)->aliasing = record;
         TY(entity->ty, TyAlias)->entity = entity;
@@ -1806,7 +1806,7 @@ Stmt* parse_global_decl(Parser* p) {
         Entity* entity = get_incomplete_type_entity(p, identifier);
         advance(p);
         TyIndex record = parse_record_decl(p, TY_UNION);
-        printf("union size %llu align %llu", ty_size(record), ty_align(record));
+        // printf("union size %llu align %llu\n", ty_size(record), ty_align(record));
 
         TY(entity->ty, TyAlias)->aliasing = record;
         TY(entity->ty, TyAlias)->entity = entity;
