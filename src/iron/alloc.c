@@ -17,7 +17,7 @@ static u8 extra_size_table[FE__INST_END] = {
 
     [FE_LOAD ... FE_LOAD_VOLATILE] = sizeof(FeInstLoad),
     [FE_STORE ... FE_STORE_VOLATILE] = sizeof(FeInstStore),
-    [FE_CASCADE_UNIQUE ... FE__MACH_REG] = 0,
+    [FE_CASCADE_VOLATILE ... FE__MACH_REG] = 0,
 
     [FE_BRANCH] = sizeof(FeInstBranch),
     [FE_JUMP] = sizeof(FeInstJump),
