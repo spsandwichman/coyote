@@ -3,6 +3,7 @@
 
 #include <stdalign.h>
 #include <assert.h>
+#include <stddef.h>
 #include "common/orbit.h"
 #include "common/vec.h"
 #include "common/strmap.h"

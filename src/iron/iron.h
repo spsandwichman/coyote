@@ -167,7 +167,7 @@ typedef struct FeStackItem FeStackItem;
 typedef struct FeInstPool FeInstPool;
 typedef struct FeArena FeArena;
 
-typedef u32 FeVReg; // vreg index.
+typedef u32 FeVReg; // vreg index
 typedef struct FeVRegBuffer FeVRegBuffer;
 typedef struct FeBlockLiveness FeBlockLiveness;
 
@@ -464,14 +464,14 @@ typedef struct {
 
 typedef struct {
     FeInst* ptr;
-    // something something alignment something
+    bool unaligned;
 } FeInstLoad;
 
 typedef struct {
     FeInst* ptr;
     FeInst* val;
-    // TODO pack this. doesnt make sense to waste a word's worth of bytes on this.
     FeTy store_ty;
+    bool unaligned;
 } FeInstStore;
 
 typedef struct {

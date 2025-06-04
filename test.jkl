@@ -1,8 +1,8 @@
-// TYPE Foo: ^Bar
-// TYPE Foo: Foo
-
-FNPTR BinaryFunction(IN lhs: WORD, IN rhs: WORD): WORD
-
-FN (BinaryFunction) foo(IN x: INT): WORD
-    RETURN 1
+UNION Foo
+    byte: BYTE[10],
+    word: ^Foo,
 END
+
+// FN load(IN f: ^Foo): WORD
+//     RETURN f^.word
+// END

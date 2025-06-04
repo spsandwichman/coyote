@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <stddef.h>
 
 #include "parse.h"
 #include "common/str.h"
@@ -203,6 +202,7 @@ static bool ty_is_signed(TyIndex t) {
 }
 
 thread_local static usize target_ptr_size = 4;
+thread_local static usize target_ptr_align = 4;
 thread_local static TyIndex target_word  = TY_LONG;
 thread_local static TyIndex target_uword = TY_ULONG;
 #define TY_VOIDPTR (TY_VOID + TY_PTR)
@@ -219,13 +219,44 @@ static usize ty_size(TyIndex t) {
     case TY_QUAD:
     case TY_UQUAD: return 8;
     }
+
     switch (TY_KIND(t)) {
     case TY_PTR:
         return target_ptr_size;
     case TY_ARRAY:
         return TY(t, TyArray)->len * ty_size(TY(t, TyArray)->to);
+    case TY_STRUCT:
+    case TY_STRUCT_PACKED:
+    case TY_UNION:
+        return TY(t, TyRecord)->size;
     default:
-        return 0;
+    }
+    TODO("AAAA");
+}
+
+static usize ty_align(TyIndex t) {
+    switch (t) {
+    case TY_VOID: return 0;
+    case TY_BYTE:
+    case TY_UBYTE: return 1;
+    case TY_INT:
+    case TY_UINT: return 2;
+    case TY_LONG:
+    case TY_ULONG: return 4;
+    case TY_QUAD:
+    case TY_UQUAD: return 8;
+    }
+
+    switch (TY_KIND(t)) {
+    case TY_PTR:
+        return target_ptr_align;
+    case TY_ARRAY:
+        return ty_align(TY(t, TyArray)->to);
+    case TY_STRUCT:
+    case TY_STRUCT_PACKED:
+    case TY_UNION:
+        return TY(t, TyRecord)->align;
+    default:
     }
     TODO("AAAA");
 }
@@ -643,11 +674,6 @@ static void expect(Parser* p, u8 kind) {
     }
 }
 
-static void expect_advance(Parser* p, u8 kind) {
-    expect(p, kind);
-    advance(p);
-}
-
 #define new_expr(p, kind, ty, field) \
     new_expr_(p, kind, ty, offsetof(Expr, extra) + sizeof(((Expr*)nullptr)->field))
 
@@ -746,7 +772,8 @@ TyIndex parse_type_terminal(Parser* p, bool allow_incomplete) {
     case TOK_OPEN_PAREN:
         advance(p);
         TyIndex inner = parse_type(p, allow_incomplete);
-        expect_advance(p, TOK_CLOSE_PAREN);
+        expect(p, TOK_CLOSE_PAREN);
+        advance(p);
         return inner;
     case TOK_CARET:
         advance(p);
@@ -768,9 +795,9 @@ TyIndex parse_type_terminal(Parser* p, bool allow_incomplete) {
         if (entity->kind != ENTKIND_TYPE) {
             parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "symbol is not a type");
         }
-        // if (TY(entity->ty, TyAlias)->kind == TY_ALIAS_IN_PROGRESS) {
-        //     parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "recursive type aliases are not allowed");
-        // }
+        if (!allow_incomplete && TY(entity->ty, TyAlias)->kind == TY_ALIAS_INCOMPLETE) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "cannot use incomplete type");
+        }
         advance(p);
         TyIndex t = entity->ty;
         while (TY_KIND(t) == TY_ALIAS) {
@@ -805,7 +832,8 @@ TyIndex parse_type(Parser* p, bool allow_incomplete) {
             error_at_expr(p, len_expr, REPORT_WARNING, "array length is... excessive");
         }
         TY(arr, TyArray)->len = len_expr->literal;
-        expect_advance(p, TOK_CLOSE_BRACKET);
+        expect(p, TOK_CLOSE_BRACKET);
+        advance(p);
         left = arr;
     }
     return left;
@@ -833,7 +861,8 @@ Expr* parse_atom_terminal(Parser* p) {
     case TOK_OPEN_PAREN:
         advance(p);
         atom = parse_expr(p);
-        expect_advance(p, TOK_CLOSE_PAREN);
+        expect(p, TOK_CLOSE_PAREN);
+        advance(p);
         break;
     case TOK_INTEGER:
         atom = new_expr(p, EXPR_LITERAL, target_uword, literal);
@@ -1122,7 +1151,8 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "previously EXTERN variable cannot be PRIVATE");
     }
     advance(p);
-    expect_advance(p, TOK_COLON);
+    expect(p, TOK_COLON);
+    advance(p);
 
     if (!match(p, TOK_EQ)) {
         u32 type_start = p->cursor;
@@ -1266,7 +1296,8 @@ Stmt* parse_stmt_if(Parser* p) {
     advance(p);
 
     if_->if_.cond = parse_expr(p);
-    expect_advance(p, TOK_KW_THEN);
+    expect(p, TOK_KW_THEN);
+    advance(p);
     StmtList if_true = parse_if_block_(p);
     if_->if_.block = if_true;
     // if_->retkind = if_true.retkind;
@@ -1391,7 +1422,8 @@ TyIndex parse_fn_prototype(Parser* p) {
 
     bool is_variadic = false;
 
-    expect_advance(p,TOK_OPEN_PAREN);
+    expect(p,TOK_OPEN_PAREN);
+    advance(p);
     while (p->current.kind != TOK_CLOSE_PAREN) {
         Ty_FnParam* param = &params[params_len];
 
@@ -1449,7 +1481,8 @@ TyIndex parse_fn_prototype(Parser* p) {
         param->name = to_compact(ident);
 
         advance(p);
-        expect_advance(p, TOK_COLON);
+        expect(p, TOK_COLON);
+        advance(p);
 
         param->ty = parse_type(p, false);
 
@@ -1461,7 +1494,8 @@ TyIndex parse_fn_prototype(Parser* p) {
             break;
         }
     }
-    expect_advance(p, TOK_CLOSE_PAREN);
+    expect(p, TOK_CLOSE_PAREN);
+    advance(p);
 
     TyIndex ret_ty = TY_VOID;
 
@@ -1487,23 +1521,26 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
     // advance(p);
     advance(p);
 
-    TyIndex fn_ty = TY_VOID;
+    TyIndex fnptr_ty = TY__INVALID;
+    u32 fnptr_decl_loc = 0;
     if (match(p, TOK_OPEN_PAREN)) {
         advance(p);
-        u32 start_index = p->cursor;
+        expect(p, TOK_IDENTIFIER);
+        u32 ty_loc = p->cursor;
+        Entity* ty_entity = get_entity(p, tok_span(p->current));
         TyIndex fnptr = parse_type(p, false);
-        u32 end_index = p->cursor - 1;
         if (TY_KIND(fnptr) != TY_PTR) {
-            parse_error(p, start_index, end_index, REPORT_ERROR, "provided type %s is not an ^FN (declared with FNPTR)", ty_name(fnptr));
+            parse_error(p, ty_loc, ty_loc, REPORT_ERROR, "provided type %s is not an FNPTR", ty_name(fnptr));
         }
-        fn_ty = TY(fnptr, TyPtr)->to;
-        if (TY_KIND(fn_ty) != TY_FN) {
-            parse_error(p, start_index, end_index, REPORT_ERROR, "provided type %s is not an ^FN (declared with FNPTR)", ty_name(fnptr));
+        fnptr_ty = TY(fnptr, TyPtr)->to;
+        if (TY_KIND(fnptr_ty) != TY_FN) {
+            parse_error(p, ty_loc, ty_loc, REPORT_ERROR, "provided type %s is not an FNPTR", ty_name(fnptr));
         }
-        expect_advance(p, TOK_CLOSE_PAREN);
+        fnptr_decl_loc = ty_entity->decl->token_index;
+        expect(p, TOK_CLOSE_PAREN);
+        advance(p);
     }
 
-    // no fnptr specifier yet
     expect(p, TOK_IDENTIFIER);
     u32 ident_pos = p->cursor;
     string identifier = tok_span(p->current);
@@ -1518,6 +1555,14 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
         parse_error(p, fn->decl->token_index, fn->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
         parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "type differs from previous EXTERN type");
     }
+    if (fnptr_ty != TY__INVALID && !ty_equal(fnptr_ty, decl_ty)) {
+        parse_error(p, fnptr_decl_loc, fnptr_decl_loc, REPORT_NOTE, "from FNPTR declaration:");
+        parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "type differs from provided FNPTR type");
+    }
+    if (fnptr_ty != TY__INVALID) {
+        decl_ty = fnptr_ty;
+    }
+
     fn->ty = decl_ty;
     if (storage != STORAGE_EXTERN) {
         Stmt* fn_decl = new_stmt(p, STMT_FN_DECL, fn_decl);
@@ -1606,6 +1651,90 @@ static bool catch_recursive_alias(TyIndex t, TyIndex err_on) {
     }
 }
 
+static inline uintptr_t align_forward(uintptr_t ptr, uintptr_t align) {
+    return (ptr + align - 1) & ~(align - 1);
+}
+
+TyIndex parse_record_decl(Parser* p, TyKind kind) {
+    ArenaState a_save = arena_save(&p->arena);
+
+    usize record_align = 1;
+
+    usize params_len = 0;
+    // temporarily allocate a bunch of members
+    Ty_RecordMember* members = arena_alloc(&p->arena, sizeof(Ty_RecordMember) * TY_RECORD_MAX_MEMBERS, alignof(Ty_RecordMember));
+
+    usize max_size = 0;
+    usize offset = 0;
+    usize n = 0;
+    for (; p->current.kind != TOK_KW_END; n++) {
+
+        expect(p, TOK_IDENTIFIER);
+        if (n >= TY_RECORD_MAX_MEMBERS) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "too many fields (max 255)");
+        }
+        Ty_RecordMember* member = &members[n];
+        string member_name = tok_span(p->current);
+
+        for_n(i, 0, n) {
+            CompactString name = members[i].name;
+            if (string_eq(from_compact(name), member_name)) {
+                parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "duplicate member name");
+            }
+        }
+
+        member->name = to_compact(member_name);
+
+        advance(p);
+        expect(p, TOK_COLON);
+        advance(p);
+
+        TyIndex member_ty = parse_type(p, false);
+        usize member_size = ty_size(member_ty);
+        usize member_align = ty_align(member_ty);
+        if (kind != TY_STRUCT_PACKED) {
+            record_align = max(record_align, member_align);
+        }
+
+        if (kind == TY_STRUCT) {
+            offset = align_forward(offset, member_align);
+        }
+        member->offset = offset;
+
+        max_size = max(max_size, member_size);
+        if (kind != TY_UNION) {
+            offset += member_size;
+        }
+
+        if (match(p, TOK_COMMA)) {
+            advance(p);
+            continue;
+        } else {
+            break;
+        }
+    }
+    expect(p, TOK_KW_END);
+    advance(p);
+
+    TyIndex record_index = ty__allocate(sizeof(TyRecord) + sizeof(Ty_RecordMember) * n, max(alignof(TyRecord), alignof(Ty_RecordMember)));
+    TyRecord* record = TY(record_index, TyRecord);
+    record->align = record_align;
+    record->kind = kind;
+    if (kind == TY_UNION) {
+        record->size = max_size;
+    } else {
+        if (kind == TY_STRUCT) {
+            align_forward(offset, record_align);
+        }
+        record->size = offset;
+    }
+    record->len = n;
+    memcpy(record->members, members, sizeof(Ty_RecordMember) * n);
+
+    arena_restore(&p->arena, a_save);
+    return record_index;
+}
+
 Stmt* parse_global_decl(Parser* p) {
     switch (p->current.kind) {
     case TOK_KW_NOTHING:
@@ -1618,14 +1747,9 @@ Stmt* parse_global_decl(Parser* p) {
         expect(p, TOK_IDENTIFIER);
         string identifier = tok_span(p->current);
         Entity* entity = get_incomplete_type_entity(p, identifier);
-        // if (TY_KIND(entity->ty) != TY_ALIAS) {
-            // this is really meant to catch recursive aliases
-            // TODO this might cause problems
-            // parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
-            //     "TYPE declaration cannot define incomplete type");
-        // }
         advance(p);
-        expect_advance(p, TOK_COLON);
+        expect(p, TOK_COLON);
+        advance(p);
         // TY_KIND(entity->ty) = TY_ALIAS_IN_PROGRESS;
         TyIndex aliased_ty = parse_type(p, false);
         if (catch_recursive_alias(aliased_ty, entity->ty)) {
@@ -1639,7 +1763,6 @@ Stmt* parse_global_decl(Parser* p) {
     case TOK_KW_FNPTR: {
         advance(p);
         Stmt* typedecl_loc = new_stmt(p, STMT_DECL_LOCATION, nothing);
-        u32 identifier_pos = p->cursor;
         expect(p, TOK_IDENTIFIER);
         string identifier = tok_span(p->current);
         Entity* entity = get_incomplete_type_entity(p, identifier);
@@ -1647,6 +1770,45 @@ Stmt* parse_global_decl(Parser* p) {
         TyIndex fn_ty = parse_fn_prototype(p);
         TyIndex fnptr = ty_get_ptr(fn_ty);
         TY(entity->ty, TyAlias)->aliasing = fnptr;
+        TY(entity->ty, TyAlias)->entity = entity;
+        TY_KIND(entity->ty) = TY_ALIAS;
+        entity->decl = typedecl_loc;
+        break;
+    }
+    case TOK_KW_STRUCT: {
+        Stmt* typedecl_loc = new_stmt(p, STMT_DECL_LOCATION, nothing);
+        advance(p);
+        TyKind kind = TY_STRUCT;
+        if (match(p, TOK_KW_PACKED)) {
+            kind = TY_STRUCT_PACKED;
+            advance(p);
+        }
+
+        expect(p, TOK_IDENTIFIER);
+        string identifier = tok_span(p->current);
+        Entity* entity = get_incomplete_type_entity(p, identifier);
+        advance(p);
+        TyIndex record = parse_record_decl(p, kind);
+        printf("struct size %llu align %llu", ty_size(record), ty_align(record));
+
+        TY(entity->ty, TyAlias)->aliasing = record;
+        TY(entity->ty, TyAlias)->entity = entity;
+        TY_KIND(entity->ty) = TY_ALIAS;
+        entity->decl = typedecl_loc;
+        break;
+    }
+    case TOK_KW_UNION: {
+        Stmt* typedecl_loc = new_stmt(p, STMT_DECL_LOCATION, nothing);
+        advance(p);
+
+        expect(p, TOK_IDENTIFIER);
+        string identifier = tok_span(p->current);
+        Entity* entity = get_incomplete_type_entity(p, identifier);
+        advance(p);
+        TyIndex record = parse_record_decl(p, TY_UNION);
+        printf("union size %llu align %llu", ty_size(record), ty_align(record));
+
+        TY(entity->ty, TyAlias)->aliasing = record;
         TY(entity->ty, TyAlias)->entity = entity;
         TY_KIND(entity->ty) = TY_ALIAS;
         entity->decl = typedecl_loc;

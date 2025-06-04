@@ -7,11 +7,11 @@ COYOTE_SRC_PATHS = \
 	src/coyote/*.c \
 	src/common/*.c \
 
-COYOTE_SRC = $(wildcard $(COYOTE_SRC_PATHS))
-COYOTE_OBJECTS = $(COYOTE_SRC:src/%.c=build/%.o)
-
 IRON_SRC = $(wildcard $(IRON_SRC_PATHS))
 IRON_OBJECTS = $(IRON_SRC:src/%.c=build/%.o)
+
+COYOTE_SRC = $(wildcard $(COYOTE_SRC_PATHS))
+COYOTE_OBJECTS = $(COYOTE_SRC:src/%.c=build/%.o)
 
 ECHO = echo
 

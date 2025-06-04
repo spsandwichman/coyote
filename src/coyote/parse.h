@@ -64,13 +64,12 @@ typedef struct {
     CompactString name;
 } Ty_RecordMember;
 
-#define TY_RECORD_MAX_FIELDS UINT8_MAX
+#define TY_RECORD_MAX_MEMBERS UINT8_MAX
 typedef struct {
     u8 kind;
     u8 len; // should never be a limitation O.O
     u16 size;
     u8 align;
-    CompactString name;
     Ty_RecordMember members[];
 } TyRecord;
 
