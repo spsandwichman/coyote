@@ -97,15 +97,12 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_F2U] = "f2u",
 
     [FE_LOAD] = "load",
-    [FE_LOAD_UNIQUE] = "load-u",
-    [FE_LOAD_VOLATILE] = "load-v",
+    [FE_LOAD_VOLATILE] = "load-vol",
 
     [FE_STORE] = "store",
-    [FE_STORE_UNIQUE] = "store-u",
-    [FE_STORE_VOLATILE] = "store-v",
+    [FE_STORE_VOLATILE] = "store-vol",
 
-    [FE_CASCADE_UNIQUE] = "cascade-u",
-    [FE_CASCADE_VOLATILE] = "cascade-v",
+    [FE_CASCADE_VOLATILE] = "cascade-vol",
     [FE__MACH_REG] = "mach-reg",
 
     [FE_BRANCH] = "branch",

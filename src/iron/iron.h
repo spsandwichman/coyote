@@ -357,16 +357,13 @@ typedef enum: FeInstKind {
 
     // Load
     FE_LOAD,
-    FE_LOAD_UNIQUE,
     FE_LOAD_VOLATILE,
 
     // Store
     FE_STORE,
-    FE_STORE_UNIQUE,
     FE_STORE_VOLATILE,
 
     // (void)
-    FE_CASCADE_UNIQUE,
     FE_CASCADE_VOLATILE,
     FE__MACH_REG,
 

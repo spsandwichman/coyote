@@ -329,7 +329,6 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
     case FE_PARAM:
     case FE_CONST:
     case FE_SYM_ADDR:
-    case FE_CASCADE_UNIQUE:
     case FE_CASCADE_VOLATILE:
     case FE_JUMP:
     case FE__MACH_REG:
@@ -801,10 +800,8 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_LOAD_VOLATILE] = VOL,
 
     [FE_STORE]          = VOL,
-    [FE_STORE_UNIQUE]   = VOL,
     [FE_STORE_VOLATILE] = VOL,
 
-    [FE_CASCADE_UNIQUE]   = VOL,
     [FE_CASCADE_VOLATILE] = VOL,
 
     [FE_BRANCH] = TERM | VOL,
