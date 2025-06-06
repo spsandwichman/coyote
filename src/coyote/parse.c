@@ -31,16 +31,18 @@ thread_local static struct {
     TyIndex* ptrs;
     u32 len;
     u32 cap;
-} tybuf;
+} tybuf = {nullptr, nullptr, 0, 0};
 
 #define TY(index, T) ((T*)&tybuf.at[index])
 #define TY_KIND(index) ((TyBase*)&tybuf.at[index])->kind
 
 void ty_init() {
     tybuf.len = 0;
-    tybuf.cap = 1024;
-    tybuf.at = malloc(sizeof(tybuf.at[0]) * tybuf.cap);
-    tybuf.ptrs = malloc(sizeof(tybuf.ptrs[0]) * tybuf.cap);
+    if (tybuf.at == nullptr) {
+        tybuf.cap = 1024;
+        tybuf.at = malloc(sizeof(tybuf.at[0]) * tybuf.cap);
+        tybuf.ptrs = malloc(sizeof(tybuf.ptrs[0]) * tybuf.cap);
+    }
     memset(tybuf.ptrs, 0, sizeof(tybuf.ptrs[0]) * tybuf.cap);
     
     for_n_eq(i, TY_VOID, TY_UQUAD) {
@@ -63,7 +65,7 @@ static TyIndex ty__allocate(usize size, bool align64) {
         tybuf.len += 1; // pad to 64
     }
     
-    if (tybuf.len + slots > tybuf.cap) {
+    if_unlikely (tybuf.len + slots > tybuf.cap) {
         tybuf.cap += tybuf.cap << 1;
         tybuf.at = realloc(tybuf.at, sizeof(tybuf.at[0]) * tybuf.cap);
         tybuf.ptrs = realloc(tybuf.ptrs, sizeof(tybuf.ptrs[0]) * tybuf.cap);
@@ -96,6 +98,8 @@ static TyIndex ty_get_ptr(TyIndex t) {
     }
 }
 
+// gross
+thread_local ParseScope* global_scope;
 
 static void _ty_name(Vec(char)* v, TyIndex t) {
     switch (TY_KIND(t)) {
@@ -157,8 +161,32 @@ static void _ty_name(Vec(char)* v, TyIndex t) {
         }
 
     } return;
-    default: vec_char_append_str(v, "???");
+    default: 
+        // attempt to find a matching alias
+        // scuffed af lmao
+        for_n(i, 0, global_scope->map.cap) {
+            Entity* ent = global_scope->map.vals[i];
+            if (ent == nullptr) {
+                continue;
+            }
+            if (ent->kind != ENTKIND_TYPE) {
+                continue;
+            }
+            TyKind ty_kind = TY_KIND(ent->ty);
+            if (ty_kind != TY_ALIAS && ty_kind != TY_ALIAS_INCOMPLETE) {
+                continue;
+            }
+            string name = from_compact(ent->name);
+            TyAlias* alias = TY(ent->ty, TyAlias);
+            if (alias->aliasing != t) {
+                continue;
+            }
+            vec_char_append_many(v, name.raw, name.len);
+            return;
+        }
+        break;
     }
+    vec_char_append_str(v, "???");
 }
 
 const char* ty_name(TyIndex t) {
@@ -919,28 +947,65 @@ Expr* parse_atom(Parser* p) {
     Expr* left;
 
     switch (p->current.kind) {
-    case TOK_CARET:
-        if (peek(p, 1).kind == TOK_DOT) {
-            advance(p);
+    case TOK_CARET: {
+        if_unlikely (peek(p, 1).kind == TOK_DOT) {
             goto member_deref;
         }
         left = atom;
-        if (TY_KIND(left->ty) != TY_PTR) {
+        if_unlikely (TY_KIND(left->ty) != TY_PTR) {
             parse_error(p, expr_leftmost_token(left), p->cursor, REPORT_ERROR, 
                 "cannot dereference type %s", ty_name(left->ty));
         }
         TyIndex ptr_target = ty_get_ptr_target(left->ty);
-        if (!ty_is_scalar(ptr_target)) {
+        if_unlikely (!ty_is_scalar(ptr_target)) {
             parse_error(p, expr_leftmost_token(left), p->cursor, REPORT_ERROR, 
                 "cannot use non-scalar type %s", ty_name(ptr_target));
         }
         atom = new_expr(p, EXPR_DEREF, ptr_target, unary);
         atom->unary = left;
-        break;
-    case TOK_CARET_DOT:
+        advance(p);
+    } break;
+    case TOK_CARET_DOT: {
         member_deref:
+        left = atom;
+
+        if_unlikely (TY_KIND(left->ty) != TY_PTR) {
+            parse_error(p, expr_leftmost_token(left), expr_rightmost_token(left), REPORT_ERROR, 
+                "cannot dereference type %s", ty_name(left->ty));
+        }
+        TyIndex record_ty = ty_get_ptr_target(left->ty);
+        TyKind record_ty_kind = TY_KIND(record_ty);
+        if_unlikely(record_ty_kind != TY_STRUCT && record_ty_kind != TY_STRUCT_PACKED && record_ty_kind != TY_UNION) {
+            parse_error(p, expr_leftmost_token(left), expr_rightmost_token(left), REPORT_ERROR, 
+                "type %s is not a STRUCT or UNION", ty_name(record_ty));
+        }
+        TyRecord* record = TY(record_ty, TyRecord);
+        advance(p);
+
+        expect(p, TOK_IDENTIFIER);
+        string member_span = tok_span(p->current);
+
+        // search for field
+        u32 member_index = 0;
+        TyIndex member_ty = TY_VOID;
+        for_n(i, 0, record->len) {
+            CompactString member_name = record->members[i].name;
+            if (string_eq(from_compact(member_name), member_span)) {
+                member_index = i;
+                member_ty = record->members[i].type;
+                break;
+            }
+        }
+
+        if_unlikely (member_ty == TY_VOID) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+                "type %s has no member "str_fmt, ty_name(record_ty), str_arg(member_span));
+        }
+
+        // atom = new_expr(p, EXPR_DEREF_MEMBER, )
+        // advance(p);
         UNREACHABLE;
-        break;
+    } break;
     default:
         break;
     }
@@ -1345,8 +1410,8 @@ Stmt* parse_stmt(Parser* p) {
         TyIndex ret_ty = TY(p->current_function->ty, TyFn)->ret_ty;
         Stmt* return_ = new_stmt(p, STMT_RETURN, expr);
         if (ret_ty == TY_VOID) {
-            if (p->flags.legacy) {
-                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "void RETURN is non-legacy");
+            if (p->flags.xrsdk) {
+                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "void RETURN is not XR/SDK compatible");
             }
             if (!has_eof_or_nl(p, p->cursor + 1)) {
                 parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "misleading whitespace - void RETURN statement stops here");
@@ -1455,9 +1520,9 @@ TyIndex parse_fn_prototype(Parser* p) {
             break;
         }
 
+        param->out = false;
         switch (p->current.kind) {
         case TOK_KW_IN:
-            param->out = false;
             advance(p);
             break;
         case TOK_KW_OUT:
@@ -1465,8 +1530,8 @@ TyIndex parse_fn_prototype(Parser* p) {
             advance(p);
             break;
         default:
-            if (p->flags.legacy) {
-                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "implicit IN is non-legacy");
+            if (p->flags.xrsdk) {
+                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "implicit IN is not XR/SDK compatible");
             }
         }
 
@@ -1838,6 +1903,8 @@ Stmt* parse_global_decl(Parser* p) {
 
 CompilationUnit parse_unit(Parser* p) {
     ty_init();
+
+    global_scope = p->global_scope;
 
     dynbuf = vecptr_new(void, 256);
 

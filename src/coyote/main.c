@@ -11,10 +11,11 @@ thread_local FlagSet flags = {};
 
 static void print_help() {
     puts("coyote path/file.jkl [options]");
-    puts("  -help            Display this info.");
-    puts("  -legacy          Warn on code that would not compile");
+    puts(" --help            Display this info.");
+    puts(" --version         Display version and copyright information.");
+    puts(" --xrsdk           Warn on code that would not compile");
     puts("                   with the original XR/SDK compiler.");
-    puts("  -error-on-warn   Turn warnings into errors.");
+    puts(" --error-on-warn   Turn warnings into errors.");
 }
 
 static void parse_args(int argc, char** argv) {
@@ -25,12 +26,15 @@ static void parse_args(int argc, char** argv) {
     filepath = argv[1];
     for_n(i, 2, argc) {
         char* arg = argv[i];
-        if (strcmp(arg, "-help") == 0) {
+        if (strcmp(arg, "--help") == 0) {
             print_help();
             exit(0);
-        } else if (strcmp(arg, "-legacy") == 0) {
-            flags.legacy = true;
-        } else if (strcmp(arg, "-error-on-warn") == 0) {
+        } else if (strcmp(arg, "--version") == 0) {
+            print_help();
+            exit(0);
+        } else if (strcmp(arg, "--xrsdk") == 0) {
+            flags.xrsdk = true;
+        } else if (strcmp(arg, "--error-on-warn") == 0) {
             flags.error_on_warn = true;
         } else {
             printf("unknown flag '%s'\n", arg);
@@ -57,7 +61,7 @@ int main(int argc, char** argv) {
     Parser p = lex_entrypoint(&f);
     p.flags = flags;
     
-    // p.flags.legacy = true;
+    // p.flags.xrsdk = true;
     // p.flags.error_on_warn = true;
 
     // for_n(i, 0, p.tokens_len) {

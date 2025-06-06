@@ -5,20 +5,8 @@
     #define OS_WINDOWS
 #elif defined(__linux__)
     #define OS_LINUX
-#endif
-
-#if defined(_MSC_VER)
-#   define forceinline __forceinline
-#elif defined(__GNUC__)
-#   define forceinline inline __attribute__((__always_inline__))
-#elif defined(__clang__)
-#   if __has_attribute(__always_inline__)
-#       define forceinline inline __attribute__((__always_inline__))
-#   else
-#       define forceinline inline
-#   endif
 #else
-#   define forceinline inline
+    #error currently unknown platform! contact sandwich
 #endif
 
 #define TODO(msg, ...) do {\
@@ -39,6 +27,14 @@
 #define for_n_eq(iterator, start, end) for (isize iterator = (start); iterator <= (end); ++iterator)
 #define for_n(iterator, start, end) for (isize iterator = (start); iterator < (end); ++iterator)
 #define for_n_reverse(iterator, start, end) for (isize iterator = (start) - 1; iterator >= (end); --iterator)
+
+#ifdef __GNUC__
+    #define if_likely(x)   if (__builtin_expect((bool)(x), true))
+    #define if_unlikely(x) if (__builtin_expect((bool)(x), false))
+#else
+    #define if_likely(x)   if (x)
+    #define if_unlikely(x) if (x)
+#endif
 
 #define is_pow_2(i) ((i) != 0 && ((i) & ((i)-1)) == 0)
 

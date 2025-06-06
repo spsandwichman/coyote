@@ -1,8 +1,8 @@
-UNION Foo
+STRUCT Foo
     byte: BYTE[10],
     word: ^Foo,
 END
 
 FN load(IN f: ^Foo): WORD
-    RETURN f^.word
+    RETURN f^.bruh
 END

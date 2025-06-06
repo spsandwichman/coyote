@@ -8,7 +8,6 @@
 #include "common/vec.h"
 #include "common/strmap.h"
 
-
 typedef struct Arena__Chunk Arena__Chunk;
 typedef struct Arena {
     Arena__Chunk* top;

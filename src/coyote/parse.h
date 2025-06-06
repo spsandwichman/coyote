@@ -315,6 +315,10 @@ typedef struct Expr {
             u32 args_len;
         } call;
 
+        struct {
+            u32 field_index;
+        } deref;
+
     };
 } Expr;
 
