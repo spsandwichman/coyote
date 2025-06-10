@@ -101,6 +101,13 @@ static TyIndex ty_get_ptr(TyIndex t) {
 // gross
 thread_local ParseScope* global_scope;
 
+static TyIndex ty_unwrap_alias(TyIndex t) {
+    while (TY_KIND(t) == TY_ALIAS) {
+        t = TY(t, TyAlias)->aliasing;
+    }
+    return t;
+}
+
 static void _ty_name(Vec(char)* v, TyIndex t) {
     switch (TY_KIND(t)) {
     case TY__INVALID: vec_char_append_str(v, "INVALID"); return;
@@ -197,14 +204,17 @@ const char* ty_name(TyIndex t) {
 }
 
 static bool ty_is_scalar(TyIndex t) {
-    if (t == TY_VOID) {
+    if_unlikely (t == TY_VOID) {
         return false;
     }
-    if (t < TY_PTR) {
+    if_likely (t < TY_PTR) {
         return true;
     }
+    
+    t = ty_unwrap_alias(t);
+
     u8 ty_kind = TY(t, TyBase)->kind;
-    return ty_kind == TY_PTR;
+    return ty_kind == TY_PTR || ty_kind == TY_ENUM;
 }
 
 static bool ty_is_integer(TyIndex t) {
@@ -257,6 +267,8 @@ static usize ty_size(TyIndex t) {
     case TY_STRUCT_PACKED:
     case TY_UNION:
         return TY(t, TyRecord)->size;
+    case TY_ENUM:
+        return ty_size(TY(t, TyEnum)->backing_ty);
     default:
     }
     TODO("AAAA");
@@ -284,6 +296,8 @@ static usize ty_align(TyIndex t) {
     case TY_STRUCT_PACKED:
     case TY_UNION:
         return TY(t, TyRecord)->align;
+    case TY_ENUM:
+        return ty_align(TY(t, TyEnum)->backing_ty);
     default:
     }
     TODO("AAAA");
@@ -368,6 +382,25 @@ static bool ty_compatible(TyIndex dst, TyIndex src, bool src_is_constant) {
     if (ty_equal(dst, src)) {
         return true;
     }
+
+    while (true) {
+        switch (TY_KIND(dst)) {
+        case TY_ALIAS: dst = TY(dst, TyAlias)->aliasing; break;
+        case TY_ENUM: dst = TY(dst, TyEnum)->backing_ty; break;
+        default:
+            goto dst_done;
+        }
+    }
+    dst_done:
+    while (true) {
+        switch (TY_KIND(src)) {
+        case TY_ALIAS: src = TY(src, TyAlias)->aliasing; break;
+        case TY_ENUM: src = TY(src, TyEnum)->backing_ty; break;
+        default:
+            goto src_done;
+        }
+    }
+    src_done:
 
     if (ty_is_integer(dst) && ty_is_integer(src)) {
         // signedness cannot mix
@@ -675,7 +708,7 @@ static bool has_eof_or_nl(Parser* p, u32 pos) {
 }
 
 
-static bool match(Parser* p, u8 kind) {
+inline static bool match(Parser* p, u8 kind) {
     return p->current.kind == kind;
 }
 
@@ -736,10 +769,14 @@ u32 expr_leftmost_token(Expr* expr) {
     case EXPR_LITERAL:
     case EXPR_STR_LITERAL:
     case EXPR_NOT:
+    case EXPR_ADDROF:
     case EXPR_ENTITY:
         return expr->token_index;
     case EXPR_DEREF:
         return expr_leftmost_token(expr->unary);
+    case EXPR_DEREF_MEMBER:
+    case EXPR_MEMBER:
+        return expr_leftmost_token(expr->member_access.aggregate);
     case EXPR_ADD:
     case EXPR_SUB:
     case EXPR_MUL:
@@ -762,8 +799,11 @@ u32 expr_rightmost_token(Expr* expr) {
     case EXPR_STR_LITERAL:
     case EXPR_DEREF:
     case EXPR_ENTITY:
+    case EXPR_DEREF_MEMBER:
+    case EXPR_MEMBER:
         return expr->token_index;
     case EXPR_NOT:
+    case EXPR_ADDROF:
         return expr_rightmost_token(expr->unary);
     case EXPR_ADD:
     case EXPR_SUB:
@@ -908,7 +948,7 @@ Expr* parse_atom_terminal(Parser* p) {
         advance(p);
         break;
     case TOK_KW_NULLPTR:
-        atom = new_expr(p, EXPR_LITERAL, ty_get_ptr(TY_VOID), literal);
+        atom = new_expr(p, EXPR_LITERAL, TY_VOIDPTR, literal);
         atom->literal = 0;
         advance(p);
         break;
@@ -920,18 +960,24 @@ Expr* parse_atom_terminal(Parser* p) {
         break;
     case TOK_IDENTIFIER:
         // find an entity
-        atom = new_expr(p, EXPR_ENTITY, TY__INVALID, entity);
         Entity* entity = get_entity(p, span);
-        if (entity == nullptr) {
+        if_unlikely (entity == nullptr) {
             parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
                 "symbol does not exist");
         }
-        if (entity->kind == ENTKIND_TYPE) {
+        if_unlikely (entity->kind == ENTKIND_TYPE) {
             parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
                 "entity is a type");
         }
-        atom->entity = entity;
-        atom->ty = entity->ty;
+
+        if (entity->kind == ENTKIND_VARIANT) {
+            atom = new_expr(p, EXPR_LITERAL, entity->ty, literal);
+            atom->literal = entity->variant_value;
+        } else {
+            atom = new_expr(p, EXPR_ENTITY, entity->ty, entity);
+            atom->entity = entity;
+        }
+
         advance(p);
         break;
     default:
@@ -946,68 +992,114 @@ Expr* parse_atom(Parser* p) {
     Expr* atom = parse_atom_terminal(p);
     Expr* left;
 
-    switch (p->current.kind) {
-    case TOK_CARET: {
-        if_unlikely (peek(p, 1).kind == TOK_DOT) {
-            goto member_deref;
-        }
-        left = atom;
-        if_unlikely (TY_KIND(left->ty) != TY_PTR) {
-            parse_error(p, expr_leftmost_token(left), p->cursor, REPORT_ERROR, 
-                "cannot dereference type %s", ty_name(left->ty));
-        }
-        TyIndex ptr_target = ty_get_ptr_target(left->ty);
-        if_unlikely (!ty_is_scalar(ptr_target)) {
-            parse_error(p, expr_leftmost_token(left), p->cursor, REPORT_ERROR, 
-                "cannot use non-scalar type %s", ty_name(ptr_target));
-        }
-        atom = new_expr(p, EXPR_DEREF, ptr_target, unary);
-        atom->unary = left;
-        advance(p);
-    } break;
-    case TOK_CARET_DOT: {
-        member_deref:
-        left = atom;
-
-        if_unlikely (TY_KIND(left->ty) != TY_PTR) {
-            parse_error(p, expr_leftmost_token(left), expr_rightmost_token(left), REPORT_ERROR, 
-                "cannot dereference type %s", ty_name(left->ty));
-        }
-        TyIndex record_ty = ty_get_ptr_target(left->ty);
-        TyKind record_ty_kind = TY_KIND(record_ty);
-        if_unlikely(record_ty_kind != TY_STRUCT && record_ty_kind != TY_STRUCT_PACKED && record_ty_kind != TY_UNION) {
-            parse_error(p, expr_leftmost_token(left), expr_rightmost_token(left), REPORT_ERROR, 
-                "type %s is not a STRUCT or UNION", ty_name(record_ty));
-        }
-        TyRecord* record = TY(record_ty, TyRecord);
-        advance(p);
-
-        expect(p, TOK_IDENTIFIER);
-        string member_span = tok_span(p->current);
-
-        // search for field
-        u32 member_index = 0;
-        TyIndex member_ty = TY_VOID;
-        for_n(i, 0, record->len) {
-            CompactString member_name = record->members[i].name;
-            if (string_eq(from_compact(member_name), member_span)) {
-                member_index = i;
-                member_ty = record->members[i].type;
-                break;
+    while (true) {
+        switch (p->current.kind) {
+        case TOK_CARET: {
+            if_unlikely (peek(p, 1).kind == TOK_DOT) {
+                goto member_deref;
             }
-        }
+            left = atom;
+            if_unlikely (TY_KIND(left->ty) != TY_PTR) {
+                parse_error(p, expr_leftmost_token(left), p->cursor, REPORT_ERROR, 
+                    "cannot dereference non-pointer type %s", ty_name(left->ty));
+            }
+            TyIndex ptr_target = ty_get_ptr_target(left->ty);
+            // if_unlikely (!ty_is_scalar(ptr_target)) {
+            //     parse_error(p, expr_leftmost_token(left), p->cursor, REPORT_ERROR, 
+            //         "cannot use non-scalar type %s", ty_name(ptr_target));
+            // }
+            atom = new_expr(p, EXPR_DEREF, ptr_target, unary);
+            atom->unary = left;
+            advance(p);
+        } break;
+        case TOK_CARET_DOT: {
+            member_deref:
+            left = atom;
 
-        if_unlikely (member_ty == TY_VOID) {
-            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
-                "type %s has no member "str_fmt, ty_name(record_ty), str_arg(member_span));
-        }
+            TyIndex left_ty = ty_unwrap_alias(left->ty);
 
-        // atom = new_expr(p, EXPR_DEREF_MEMBER, )
-        // advance(p);
-        UNREACHABLE;
-    } break;
-    default:
-        break;
+            if_unlikely (TY_KIND(left_ty) != TY_PTR) {
+                parse_error(p, expr_leftmost_token(left), expr_rightmost_token(left), REPORT_ERROR, 
+                    "cannot dereference type %s", ty_name(left->ty));
+            }
+            TyIndex record_ty = ty_unwrap_alias(ty_get_ptr_target(left_ty));
+            TyKind record_ty_kind = TY_KIND(record_ty);
+
+            if_unlikely (record_ty_kind != TY_STRUCT && record_ty_kind != TY_STRUCT_PACKED && record_ty_kind != TY_UNION) {
+                parse_error(p, expr_leftmost_token(left), expr_rightmost_token(left), REPORT_ERROR, 
+                    "type %s is not a STRUCT or UNION", ty_name(record_ty));
+            }
+            TyRecord* record = TY(record_ty, TyRecord);
+            advance(p);
+
+            expect(p, TOK_IDENTIFIER);
+            string member_span = tok_span(p->current);
+
+            // search for field
+            u32 member_index = 0;
+            TyIndex member_ty = TY_VOID;
+            for_n(i, 0, record->len) {
+                CompactString member_name = record->members[i].name;
+                if (string_eq(from_compact(member_name), member_span)) {
+                    member_index = i;
+                    member_ty = record->members[i].type;
+                    break;
+                }
+            }
+
+            if_unlikely (member_ty == TY_VOID) {
+                parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+                    "type %s has no member '"str_fmt"'", ty_name(record_ty), str_arg(member_span));
+            }
+
+            atom = new_expr(p, EXPR_DEREF_MEMBER, member_ty, member_access);
+            atom->member_access.aggregate = left;
+            atom->member_access.member_index = member_index;
+            atom->ty = member_ty;
+            advance(p);
+        } break;
+        case TOK_DOT: {
+            left = atom;
+
+            TyIndex record_ty = ty_unwrap_alias(left->ty);
+            TyKind record_ty_kind = TY_KIND(record_ty);
+
+            if_unlikely (record_ty_kind != TY_STRUCT && record_ty_kind != TY_STRUCT_PACKED && record_ty_kind != TY_UNION) {
+                parse_error(p, expr_leftmost_token(left), expr_rightmost_token(left), REPORT_ERROR, 
+                    "type %s is not a STRUCT or UNION", ty_name(record_ty));
+            }
+            TyRecord* record = TY(record_ty, TyRecord);
+            advance(p);
+
+            expect(p, TOK_IDENTIFIER);
+            string member_span = tok_span(p->current);
+
+            // search for field
+            u32 member_index = 0;
+            TyIndex member_ty = TY_VOID;
+            for_n(i, 0, record->len) {
+                CompactString member_name = record->members[i].name;
+                if (string_eq(from_compact(member_name), member_span)) {
+                    member_index = i;
+                    member_ty = record->members[i].type;
+                    break;
+                }
+            }
+
+            if_unlikely (member_ty == TY_VOID) {
+                parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
+                    "type %s has no member '"str_fmt"'", ty_name(record_ty), str_arg(member_span));
+            }
+
+            atom = new_expr(p, EXPR_MEMBER, member_ty, member_access);
+            atom->member_access.aggregate = left;
+            atom->member_access.member_index = member_index;
+            atom->ty = member_ty;
+            advance(p);
+        } break;
+        default:
+            return atom;
+        }
     }
 
     return atom;
@@ -1019,7 +1111,19 @@ Expr* parse_unary(Parser* p) {
     u32 op_position = p->cursor;
 
     switch (p->current.kind) {
-    case TOK_KW_NOT:
+    case TOK_AND: {
+        advance(p);
+        Expr* inner = parse_unary(p);
+        if_unlikely (!is_lvalue(inner)) {
+            error_at_expr(p, inner, REPORT_ERROR, 
+                "cannot take address of r-value");
+        }
+        Expr* addrof = new_expr(p, EXPR_ADDROF, ty_get_ptr(inner->ty), unary);
+        addrof->unary = inner;
+        addrof->token_index = op_position;
+        return addrof;
+    }
+    case TOK_KW_NOT: {
         advance(p);
         Expr* inner = parse_unary(p); 
         if (inner->kind == EXPR_LITERAL) {
@@ -1031,6 +1135,7 @@ Expr* parse_unary(Parser* p) {
             not->token_index = op_position;
             return not;
         }
+    }
     default:
         return parse_atom(p);
     }
@@ -1205,6 +1310,29 @@ static Entity* get_or_create(Parser* p, string ident) {
     return entity;
 }
 
+static bool is_global_data(Expr* expr) {
+    switch (expr->kind) {
+    case EXPR_ENTITY:
+        // should really just be 'true' but do the extra check, whatever
+        return expr->entity->storage != STORAGE_LOCAL && expr->entity->storage != STORAGE_OUT_PARAM;
+    case EXPR_MEMBER:
+        return is_global_data(expr->member_access.aggregate);
+    default:
+        return false;
+    }
+}
+
+static bool is_linktime_const(Expr* expr) {
+    switch (expr->kind) {
+    case EXPR_LITERAL:
+        return true;
+    case EXPR_ADDROF:
+        return is_global_data(expr->unary);
+    default:
+        return false;
+    }
+}
+
 Stmt* parse_var_decl(Parser* p, StorageKind storage) {
     Stmt* decl = new_stmt(p, STMT_VAR_DECL, var_decl);
     
@@ -1222,12 +1350,12 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
     if (!match(p, TOK_EQ)) {
         u32 type_start = p->cursor;
         TyIndex decl_ty = parse_type(p, false);
-        if (var->storage == STORAGE_EXTERN && !ty_equal(var->ty, decl_ty)) {
+        if_unlikely (var->storage == STORAGE_EXTERN && !ty_equal(var->ty, decl_ty)) {
             parse_error(p, var->decl->token_index, var->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
             parse_error(p, type_start, p->cursor - 1, REPORT_ERROR, "type %s differs from EXTERN type %s",
                 ty_name(decl_ty), ty_name(var->ty));
         }
-        if (ty_size(decl_ty) == 0) {
+        if_unlikely (ty_size(decl_ty) == 0) {
             parse_error(p, type_start, p->cursor - 1, REPORT_ERROR, "variable must have non-zero size");
         }
         var->ty = decl_ty;
@@ -1238,9 +1366,19 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
             advance(p);
             Expr* value = parse_expr(p);
             decl->var_decl.expr = value;
-            if (!ty_compatible(decl_ty, value->ty, value->kind == EXPR_LITERAL)) {
+            if_unlikely (!ty_compatible(decl_ty, value->ty, value->kind == EXPR_LITERAL)) {
                 error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to %s",
                     ty_name(value->ty), ty_name(decl_ty));
+            }
+            if_unlikely (!ty_is_scalar(value->ty)) {
+                error_at_expr(p, value, REPORT_ERROR, "cannot use non-scalar type %s",
+                    ty_name(value->ty));
+            }
+            // this is a global declaration
+            if (storage != STORAGE_LOCAL) {
+                if_unlikely (!is_linktime_const(value)) {
+                    error_at_expr(p, value, REPORT_ERROR, "expression is not link-time constant");
+                }
             }
         }
     } else {
@@ -1249,11 +1387,23 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
         }
         advance(p);
         Expr* value = parse_expr(p);
-        if (var->storage == STORAGE_EXTERN && !ty_compatible(var->ty, value->ty, true)) {
+        if_unlikely (var->storage == STORAGE_EXTERN && !ty_compatible(var->ty, value->ty, true)) {
             // parse_error(p, type_start, p->cursor - 1, REPORT_NOTE, "from previous declaration");
             error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to EXTERN type %s",
                     ty_name(value->ty), ty_name(var->ty));
         }
+        
+        if_unlikely (!ty_is_scalar(value->ty)) {
+            error_at_expr(p, value, REPORT_ERROR, "cannot use non-scalar type %s",
+                ty_name(value->ty));
+        }
+        // this is a global declaration
+        if (storage != STORAGE_LOCAL) {
+            if_unlikely (!is_linktime_const(value)) {
+                error_at_expr(p, value, REPORT_ERROR, "expression is not link-time constant");
+            }
+        }
+
         decl->var_decl.expr = value;
         if (var->storage != STORAGE_EXTERN) {
             var->ty = value->ty;
@@ -1266,18 +1416,22 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
     return decl;
 }
 
-Stmt* parse_stmt_assign(Parser* p, Expr* left_expr) {
-    Stmt* assign = new_stmt(p, STMT_ASSIGN, assign);
+Stmt* parse_stmt_assign(Parser* p, u8 assign_kind, Expr* left_expr) {
+    Stmt* assign = new_stmt(p, assign_kind, assign);
     assign->assign.lhs = left_expr;
-    if (!is_lvalue(left_expr)) {
+    if_unlikely (!is_lvalue(left_expr)) {
         error_at_expr(p, left_expr, REPORT_ERROR, "expression is not an l-value");
     }
 
     advance(p);
     Expr* value = parse_expr(p);
-    if (!ty_compatible(left_expr->ty, value->ty, value->kind == EXPR_LITERAL)) {
-    error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to %s",
-        ty_name(value->ty), ty_name(left_expr->ty));
+    if_unlikely (!ty_compatible(left_expr->ty, value->ty, value->kind == EXPR_LITERAL)) {
+        error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to %s",
+            ty_name(value->ty), ty_name(left_expr->ty));
+    }
+    if_unlikely (!ty_is_scalar(value->ty)) {
+        error_at_expr(p, value, REPORT_ERROR, "cannot use non-scalar type %s",
+            ty_name(value->ty));
     }
     assign->assign.rhs = value;
     return assign;
@@ -1289,7 +1443,7 @@ Stmt* parse_stmt_expr(Parser* p) {
     Expr* expr = parse_expr(p);
     if (TOK_EQ <= p->current.kind && p->current.kind <= TOK_RSHIFT_EQ) {
         // assignment statement
-        return parse_stmt_assign(p, expr);
+        return parse_stmt_assign(p, STMT_ASSIGN + TOK_EQ - p->current.kind, expr);
     } else {
         // expression statement
         if (expr->kind != TY_VOID) {
@@ -1302,7 +1456,7 @@ Stmt* parse_stmt_expr(Parser* p) {
     }
 }
 
-StmtList parse_stmt_block(Parser* p) {
+static StmtList parse_stmt_block(Parser* p) {
     u32 stmts_start = dynbuf_start();
     u32 stmts_len = 0;
     ReturnKind retkind = RETKIND_NO;
@@ -1325,7 +1479,7 @@ StmtList parse_stmt_block(Parser* p) {
     };
 }
 
-StmtList parse_if_block_(Parser* p) {
+static StmtList parse_if_block_(Parser* p) {
     u32 stmts_start = dynbuf_start();
     u32 stmts_len = 0;
     ReturnKind retkind = RETKIND_NO;
@@ -1473,7 +1627,7 @@ Entity* get_incomplete_type_entity(Parser* p, string identifier) {
         TY(entity->ty, TyAlias)->entity = entity;
     } else if (entity->kind != ENTKIND_TYPE) {
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
-            "symbol already declared");
+            "symbol already exists");
     }
     return entity;
 }
@@ -1549,7 +1703,11 @@ TyIndex parse_fn_prototype(Parser* p) {
         expect(p, TOK_COLON);
         advance(p);
 
+        u32 ty_begin = p->cursor;
         param->ty = parse_type(p, false);
+        if_unlikely (!ty_is_scalar(param->ty)) {
+            parse_error(p, ty_begin, p->cursor - 1, REPORT_ERROR, "cannot use non-scalar type %s", ty_name(param->ty));
+        }
 
         params_len++;
 
@@ -1566,7 +1724,11 @@ TyIndex parse_fn_prototype(Parser* p) {
 
     if (match(p, TOK_COLON)) {
         advance(p);
+        u32 ty_begin = p->cursor;
         ret_ty = parse_type(p, false);
+        if_unlikely (!ty_is_scalar(ret_ty)) {
+            parse_error(p, ty_begin, p->cursor - 1, REPORT_ERROR, "cannot use non-scalar type %s", ty_name(ret_ty));
+        }
     }
 
     // allocate final type
@@ -1699,18 +1861,18 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
     return nullptr;
 }
 
-static bool catch_recursive_alias(TyIndex t, TyIndex err_on) {
+static bool nuh_uh_recursive_alias(TyIndex t, TyIndex err_on) {
     if (t == err_on) {
         return true;
     }
 
     switch (TY_KIND(t)) {
     case TY_PTR:
-        return catch_recursive_alias(TY(t, TyPtr)->to, err_on);
+        return nuh_uh_recursive_alias(TY(t, TyPtr)->to, err_on);
     case TY_ARRAY:
-        return catch_recursive_alias(TY(t, TyArray)->to, err_on);
+        return nuh_uh_recursive_alias(TY(t, TyArray)->to, err_on);
     case TY_ALIAS:
-        return catch_recursive_alias(TY(t, TyAlias)->aliasing, err_on);
+        return nuh_uh_recursive_alias(TY(t, TyAlias)->aliasing, err_on);
     default:
         return false;
     }
@@ -1765,6 +1927,7 @@ TyIndex parse_record_decl(Parser* p, TyKind kind) {
             offset = align_forward(offset, member_align);
         }
         member->offset = offset;
+        member->type = member_ty;
 
         max_size = max(max_size, member_size);
         if (kind != TY_UNION) {
@@ -1800,7 +1963,65 @@ TyIndex parse_record_decl(Parser* p, TyKind kind) {
     return record_index;
 }
 
-Stmt* parse_global_decl(Parser* p) {
+TyIndex parse_enum_decl(Parser* p) {
+    expect(p, TOK_COLON);
+    advance(p);
+
+    u32 ty_begin = p->cursor;
+    TyIndex backing_ty = parse_type(p, false);
+    TyIndex real_backing_ty = ty_unwrap_alias(backing_ty);
+    if_unlikely (!ty_is_integer(real_backing_ty)) {
+        parse_error(p, ty_begin, p->cursor - 1, REPORT_ERROR, "ENUM backing type must be an integer");
+    }
+
+
+    TyIndex enum_ty = ty_allocate(TyEnum);
+    TY(enum_ty, TyEnum)->kind = TY_ENUM;
+    TY(enum_ty, TyEnum)->backing_ty = backing_ty;
+    // UNREACHABLE;
+
+    // ArenaState save = arena_save(&p->arena);
+
+    u64 running_value = 0;
+    while (!match(p, TOK_KW_END)) {
+        expect(p, TOK_IDENTIFIER);
+        string span = tok_span(p->current);
+        if_unlikely (get_entity(p, span)) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "symbol '' already exists");
+        }
+
+        advance(p);
+        if (match(p, TOK_EQ)) {
+            advance(p);
+            Expr* value = parse_expr(p);
+            if (value->kind != EXPR_LITERAL) {
+                error_at_expr(p, value, REPORT_ERROR, "expected a constant integer expression");
+            }
+            running_value = value->literal;
+        }
+
+        Entity* entity = new_entity(p, span, ENTKIND_VARIANT);
+        entity->kind = ENTKIND_VARIANT;
+        entity->ty = enum_ty;
+        entity->variant_value = running_value;
+
+        if (match(p, TOK_COMMA)) {
+            advance(p);
+            running_value++;
+            continue;
+        } else {
+            break;
+        }
+    }
+    expect(p, TOK_KW_END);
+    advance(p);
+
+    // arena_restore(&p->arena, save);
+
+    return enum_ty;
+}
+
+void parse_global_decl(Parser* p) {
     switch (p->current.kind) {
     case TOK_KW_NOTHING:
         advance(p);
@@ -1817,8 +2038,8 @@ Stmt* parse_global_decl(Parser* p) {
         advance(p);
         // TY_KIND(entity->ty) = TY_ALIAS_IN_PROGRESS;
         TyIndex aliased_ty = parse_type(p, false);
-        if (catch_recursive_alias(aliased_ty, entity->ty)) {
-            parse_error(p, identifier_pos, identifier_pos, REPORT_ERROR, "type aliases cannot be recursive");
+        if (nuh_uh_recursive_alias(aliased_ty, entity->ty)) {
+            parse_error(p, identifier_pos, identifier_pos, REPORT_ERROR, "TYPE aliases cannot be recursive");
         }
         TY(entity->ty, TyAlias)->aliasing = aliased_ty;
         TY(entity->ty, TyAlias)->entity = entity;
@@ -1840,6 +2061,21 @@ Stmt* parse_global_decl(Parser* p) {
         entity->decl = typedecl_loc;
         break;
     }
+    case TOK_KW_ENUM: {
+        Stmt* typedecl_loc = new_stmt(p, STMT_DECL_LOCATION, nothing);
+        advance(p);
+        expect(p, TOK_IDENTIFIER);
+        string identifier = tok_span(p->current);
+        Entity* entity = get_incomplete_type_entity(p, identifier);
+        advance(p);
+        TyIndex enum_ = parse_enum_decl(p);
+
+        TY(entity->ty, TyAlias)->aliasing = enum_;
+        TY(entity->ty, TyAlias)->entity = entity;
+        TY_KIND(entity->ty) = TY_ALIAS;
+        entity->decl = typedecl_loc;
+        break;
+    }
     case TOK_KW_STRUCT: {
         Stmt* typedecl_loc = new_stmt(p, STMT_DECL_LOCATION, nothing);
         advance(p);
@@ -1854,7 +2090,6 @@ Stmt* parse_global_decl(Parser* p) {
         Entity* entity = get_incomplete_type_entity(p, identifier);
         advance(p);
         TyIndex record = parse_record_decl(p, kind);
-        // printf("struct size %llu align %llu\n", ty_size(record), ty_align(record));
 
         TY(entity->ty, TyAlias)->aliasing = record;
         TY(entity->ty, TyAlias)->entity = entity;
@@ -1887,18 +2122,21 @@ Stmt* parse_global_decl(Parser* p) {
         u64 effective_storage = p->current.kind - TOK_KW_PUBLIC + STORAGE_PUBLIC;
         advance(p);
         if (p->current.kind == TOK_KW_FN) {
-            return parse_fn_decl(p, effective_storage);
+            parse_fn_decl(p, effective_storage);
+            break;
         }
-        return parse_var_decl(p, effective_storage);
+        parse_var_decl(p, effective_storage);
+        break;
     case TOK_IDENTIFIER:
-        return parse_var_decl(p, STORAGE_PRIVATE);
+        parse_var_decl(p, STORAGE_PRIVATE);
+        break;
     case TOK_KW_FN:
-        return parse_fn_decl(p, STORAGE_PUBLIC);
+        parse_fn_decl(p, STORAGE_PUBLIC);
+        break;
     default:
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
             "expected global declaration");
     }
-    return nullptr;
 }
 
 CompilationUnit parse_unit(Parser* p) {

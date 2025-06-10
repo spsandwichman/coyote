@@ -1,8 +1,12 @@
-STRUCT Foo
-    byte: BYTE[10],
-    word: ^Foo,
+// x := 1
+// y := &1
+
+
+ENUM Foo : BYTE
+    FOO_A,
+    FOO_B,
+    FOO_C,
+    FOO_D,
 END
 
-FN load(IN f: ^Foo): WORD
-    RETURN f^.bruh
-END
+x := FOO_D

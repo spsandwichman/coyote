@@ -31,9 +31,13 @@
 #ifdef __GNUC__
     #define if_likely(x)   if (__builtin_expect((bool)(x), true))
     #define if_unlikely(x) if (__builtin_expect((bool)(x), false))
+    #define while_likely(x)   while (__builtin_expect((bool)(x), true))
+    #define while_unlikely(x) while (__builtin_expect((bool)(x), false))
 #else
     #define if_likely(x)   if (x)
     #define if_unlikely(x) if (x)
+    #define while_likely(x)   while (x)
+    #define while_unlikely(x) while (x)
 #endif
 
 #define is_pow_2(i) ((i) != 0 && ((i) & ((i)-1)) == 0)

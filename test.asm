@@ -2,9 +2,8 @@
 
 .section data
 
-.align 4
-TEST_:
-    .dl 1
-
 .section bss
+
+x:
+    .bytes 1, 0
 

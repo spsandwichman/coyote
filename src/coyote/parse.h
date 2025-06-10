@@ -54,6 +54,11 @@ typedef struct {
 
 typedef struct {
     u8 kind;
+    TyIndex backing_ty;
+} TyEnum;
+
+typedef struct {
+    u8 kind;
     TyIndex aliasing;
     Entity* entity;
 } TyAlias;
@@ -114,10 +119,11 @@ typedef enum : u8 {
 } StorageKind;
 
 typedef enum : u8 {
-    ENTKIND_VAR,
+    ENTKIND_VAR = 1,
     ENTKIND_FN,
     ENTKIND_TYPE,
     ENTKIND_LABEL,
+    ENTKIND_VARIANT, // enum variant, treated like a fucked up constant
 } EntityKind;
 
 typedef struct Entity {
@@ -127,7 +133,10 @@ typedef struct Entity {
     StorageKind storage;
     TyIndex ty;
 
-    Stmt* decl;
+    union {
+        Stmt* decl;
+        u64 variant_value;
+    };
 } Entity;
 
 typedef enum : u8 {
@@ -263,13 +272,6 @@ typedef enum : u8 {
     EXPR_ARRAY_LITERAL,
     EXPR_STRUCT_LITERAL,
 
-    // EXPR_TRUE,
-    // EXPR_FALSE,
-    // EXPR_NULLPTR,
-    // EXPR_OFFSETOF,
-    // EXPR_SIZEOF,
-    // ^^^ these just get translated into literals
-
     EXPR_SUBSCRIPT,     // foo[bar]
     EXPR_DEREF,         // foo^
     EXPR_DEREF_MEMBER,  // foo^.bar
@@ -316,9 +318,9 @@ typedef struct Expr {
         } call;
 
         struct {
-            u32 field_index;
-        } deref;
-
+            Expr* aggregate;
+            u32 member_index;
+        } member_access;
     };
 } Expr;
 
