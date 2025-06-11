@@ -1,12 +1,14 @@
-// x := 1
-// y := &1
 
-
-ENUM Foo : BYTE
-    FOO_A,
-    FOO_B,
-    FOO_C,
-    FOO_D,
+STRUCT Bar
+    x0 : INT,
+    x1 : INT,
+    x2 : INT,
+    x3 : INT,
+    x4 : INT,
+    x5 : INT,
+    x6 : INT,
 END
 
-x := FOO_D
+FN bruh(): Bar
+
+END

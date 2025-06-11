@@ -782,6 +782,7 @@ static void preproc_if(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
         case TOK_KW_END:
             return;
         case TOK_KW_ELSE:
+            ;
             // get the rest
             Token last = lex_with_preproc(l, tokens, scope);
 
@@ -1094,6 +1095,7 @@ Parser lex_entrypoint(SrcFile* f) {
     ctx.current_scope = ctx.global_scope;
     
     arena_init(&ctx.arena);
+    arena_init(&ctx.entities);
 
     for_n(i, 0, tokens.len) {
         if (tokens.at[i].kind < _TOK_LEX_IGNORE) {

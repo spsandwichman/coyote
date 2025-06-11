@@ -212,6 +212,7 @@ typedef struct {
     Entity* current_function;
 
     Arena arena;
+    Arena entities;
 
     FlagSet flags;
 } Parser;

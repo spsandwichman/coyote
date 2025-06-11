@@ -10,7 +10,6 @@
 #include "coyote.h"
 #include "lex.h"
 
-
 Vec_typedef(char);
 
 static void vec_char_append_str(Vec(char)* vec, const char* data) {
@@ -104,6 +103,22 @@ thread_local ParseScope* global_scope;
 static TyIndex ty_unwrap_alias(TyIndex t) {
     while (TY_KIND(t) == TY_ALIAS) {
         t = TY(t, TyAlias)->aliasing;
+    }
+    return t;
+}
+
+static TyIndex ty_unwrap_alias_or_enum(TyIndex t) {
+    while (true) {
+        switch (TY_KIND(t)) {
+        case TY_ALIAS:
+            t = TY(t, TyAlias)->aliasing;
+            break;
+        case TY_ENUM:
+            t = TY(t, TyEnum)->backing_ty;
+            break;
+        default:
+            return t;
+        }
     }
     return t;
 }
@@ -221,9 +236,16 @@ static bool ty_is_integer(TyIndex t) {
     if (t == TY_VOID) {
         return false;
     }
-    if (t < TY_PTR) {
+    if_likely (t < TY_PTR) {
         return true;
     }
+
+    t = ty_unwrap_alias_or_enum(t);
+
+    if_likely (t < TY_PTR) {
+        return true;
+    }
+
     return false;
 }
 
@@ -469,7 +491,7 @@ static inline void** dynbuf_to_arena(Parser* p, usize start) {
 }
 
 Entity* new_entity(Parser* p, string ident, EntityKind kind) {
-    Entity* entity = arena_alloc(&p->arena, sizeof(Entity), alignof(Entity));
+    Entity* entity = arena_alloc(&p->entities, sizeof(Entity), alignof(Entity));
     entity->name = to_compact(ident);
     entity->kind = kind;
     entity->ty = TY__INVALID;
@@ -960,6 +982,7 @@ Expr* parse_atom_terminal(Parser* p) {
         break;
     case TOK_IDENTIFIER:
         // find an entity
+        ;
         Entity* entity = get_entity(p, span);
         if_unlikely (entity == nullptr) {
             parse_error(p, p->cursor, p->cursor, REPORT_ERROR, 
@@ -1097,6 +1120,9 @@ Expr* parse_atom(Parser* p) {
             atom->ty = member_ty;
             advance(p);
         } break;
+        case TOK_OPEN_PAREN: {
+            
+        } break;
         default:
             return atom;
         }
@@ -1106,7 +1132,7 @@ Expr* parse_atom(Parser* p) {
 }
 
 Expr* parse_unary(Parser* p) {
-    ArenaState save = arena_save(&p->arena);
+    // ArenaState save = arena_save(&p->arena);
 
     u32 op_position = p->cursor;
 
@@ -1778,6 +1804,9 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
     }
     advance(p);
     TyIndex decl_ty = parse_fn_prototype(p);
+    if (fn->ty == TY__INVALID) {
+        fn->ty = decl_ty;
+    }
     if (fn->storage == STORAGE_EXTERN && !ty_equal(fn->ty, decl_ty)) {
         parse_error(p, fn->decl->token_index, fn->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
         parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "type differs from previous EXTERN type");
@@ -1980,7 +2009,7 @@ TyIndex parse_enum_decl(Parser* p) {
     TY(enum_ty, TyEnum)->backing_ty = backing_ty;
     // UNREACHABLE;
 
-    // ArenaState save = arena_save(&p->arena);
+    ArenaState save = arena_save(&p->arena);
 
     u64 running_value = 0;
     while (!match(p, TOK_KW_END)) {
@@ -2016,7 +2045,7 @@ TyIndex parse_enum_decl(Parser* p) {
     expect(p, TOK_KW_END);
     advance(p);
 
-    // arena_restore(&p->arena, save);
+    arena_restore(&p->arena, save);
 
     return enum_ty;
 }
@@ -2025,7 +2054,8 @@ void parse_global_decl(Parser* p) {
     switch (p->current.kind) {
     case TOK_KW_NOTHING:
         advance(p);
-        return parse_global_decl(p);
+        parse_global_decl(p);
+        return;
     case TOK_KW_TYPE: {
         advance(p);
         Stmt* typedecl_loc = new_stmt(p, STMT_DECL_LOCATION, nothing);
