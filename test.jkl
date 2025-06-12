@@ -1,14 +1,5 @@
+EXTERN FN foo(x: INT, y: WORD): WORD
 
-STRUCT Bar
-    x0 : INT,
-    x1 : INT,
-    x2 : INT,
-    x3 : INT,
-    x4 : INT,
-    x5 : INT,
-    x6 : INT,
-END
-
-FN bruh(): Bar
-
+FN bruh()
+    z := foo(1, 2)
 END

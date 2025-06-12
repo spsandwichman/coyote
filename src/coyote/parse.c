@@ -1013,7 +1013,7 @@ Expr* parse_atom_terminal(Parser* p) {
 
 Expr* parse_atom(Parser* p) {
     Expr* atom = parse_atom_terminal(p);
-    Expr* left;
+    Expr* left = nullptr;
 
     while (true) {
         switch (p->current.kind) {
@@ -1121,7 +1121,24 @@ Expr* parse_atom(Parser* p) {
             advance(p);
         } break;
         case TOK_OPEN_PAREN: {
-            
+            // function call
+            left = atom;
+
+            TyIndex fn_ty = left->ty;
+
+            // make sure we're calling an fn/fnptr lol
+
+            // if not function and not pointer to non-function
+            if_unlikely (!(TY_KIND(fn_ty) == TY_FN || (TY_KIND(fn_ty) == TY_PTR && TY_KIND(TY(fn_ty, TyPtr)->to) == TY_FN))) {
+                error_at_expr(p, left, REPORT_ERROR, "type %s is not an FN or FNPTR", ty_name(fn_ty));
+            }
+
+            // okay, actually check arguments
+            if (TY_KIND(fn_ty) == TY_PTR) {
+                
+            }
+
+            UNREACHABLE;
         } break;
         default:
             return atom;
