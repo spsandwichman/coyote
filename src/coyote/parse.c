@@ -752,7 +752,7 @@ static void parse_error(Parser* p, u32 start, u32 end, ReportKind kind, const ch
 }
 
 static void expect(Parser* p, u8 kind) {
-    if (kind != p->current.kind) {
+    if_unlikely (kind != p->current.kind) {
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "expected '%s', got '%s'", token_kind[kind], token_kind[p->current.kind]);
     }
 }
@@ -793,6 +793,7 @@ u32 expr_leftmost_token(Expr* expr) {
     case EXPR_NOT:
     case EXPR_ADDROF:
     case EXPR_ENTITY:
+    case EXPR_CALL:
         return expr->token_index;
     case EXPR_DEREF:
         return expr_leftmost_token(expr->unary);
@@ -823,6 +824,7 @@ u32 expr_rightmost_token(Expr* expr) {
     case EXPR_ENTITY:
     case EXPR_DEREF_MEMBER:
     case EXPR_MEMBER:
+    case EXPR_CALL:
         return expr->token_index;
     case EXPR_NOT:
     case EXPR_ADDROF:
@@ -980,6 +982,11 @@ Expr* parse_atom_terminal(Parser* p) {
         TyIndex type = parse_type(p, false); 
         atom->literal = ty_size(type);
         break;
+    case TOK_STRING:
+        atom = new_expr(p, EXPR_STR_LITERAL, ty_get_ptr(TY_UBYTE), lit_string);
+        advance(p);
+        // atom->literal = ty_size(type);
+        break;
     case TOK_IDENTIFIER:
         // find an entity
         ;
@@ -1133,12 +1140,54 @@ Expr* parse_atom(Parser* p) {
                 error_at_expr(p, left, REPORT_ERROR, "type %s is not an FN or FNPTR", ty_name(fn_ty));
             }
 
-            // okay, actually check arguments
             if (TY_KIND(fn_ty) == TY_PTR) {
-                
+                fn_ty = TY(fn_ty, TyPtr)->to;
             }
 
-            UNREACHABLE;
+            TyFn* fn = TY(fn_ty, TyFn);
+            if (fn->variadic) {
+                TODO("variadic function calls");
+            }
+
+            atom = new_expr(p, EXPR_CALL, fn->ret_ty, call);
+
+            // okay, actually check arguments
+            advance(p);
+            usize arg_n = 0;
+            while (!match(p, TOK_CLOSE_PAREN)) {
+                Expr* arg = nullptr;
+                Ty_FnParam* param = &fn->params[arg_n];
+                if_unlikely (param->out) {
+                    expect(p, TOK_KW_OUT);
+                    advance(p);
+                    arg = parse_expr(p);
+                    // out_arg must be an lvalue (assignable)
+                    if_unlikely(!is_lvalue(arg)) {
+                        error_at_expr(p, arg, REPORT_ERROR, "OUT argument must be an l-value");
+                    }
+                } else {
+                    arg = parse_expr(p);
+                }
+
+                if_unlikely (!ty_compatible(param->ty, arg->ty, arg->kind == EXPR_LITERAL)) {
+                    error_at_expr(p, arg, REPORT_ERROR, 
+                        "type %s cannot coerce to %s", ty_name(arg->ty), ty_name(param->ty));
+                }
+
+                if_likely (match(p, TOK_COMMA)) {
+                    advance(p);
+                } else {
+                    break;
+                }
+
+                arg_n++;
+            }
+            expect(p, TOK_CLOSE_PAREN);
+            advance(p);
+
+            atom->call.callee = left;
+
+            // UNREACHABLE;
         } break;
         default:
             return atom;
@@ -1236,7 +1285,7 @@ Expr* parse_binary(Parser* p, isize precedence) {
 
         if (!ty_compatible(lhs->ty, rhs->ty, rhs->kind == EXPR_LITERAL)) {
             parse_error(p, op_token, op_token, REPORT_ERROR, 
-                "type %s and %s are not compatible", ty_name(lhs->ty), ty_name(rhs->ty));
+                "types %s and %s are not compatible", ty_name(lhs->ty), ty_name(rhs->ty));
         }
 
         TyIndex op_ty = lhs->ty;
@@ -1489,7 +1538,7 @@ Stmt* parse_stmt_expr(Parser* p) {
         return parse_stmt_assign(p, STMT_ASSIGN + TOK_EQ - p->current.kind, expr);
     } else {
         // expression statement
-        if (expr->kind != TY_VOID) {
+        if (expr->ty != TY_VOID) {
             error_at_expr(p, expr, REPORT_WARNING, "unused expression result");
         }
         Stmt* stmt_expr = new_stmt(p, STMT_EXPR, expr);
@@ -1618,7 +1667,7 @@ Stmt* parse_stmt(Parser* p) {
             advance(p);
             return_->expr = parse_expr(p);
             if (!ty_compatible(ret_ty, return_->expr->ty, return_->expr->kind == EXPR_LITERAL)) {
-                error_at_expr(p, return_->expr, REPORT_ERROR, "type %s not compatible with return type %s",
+                error_at_expr(p, return_->expr, REPORT_ERROR, "type %s cannot coerce to %s",
                     ty_name(return_->expr->ty), ty_name(ret_ty));
             }
         }
@@ -1688,6 +1737,9 @@ TyIndex parse_fn_prototype(Parser* p) {
     advance(p);
     while (p->current.kind != TOK_CLOSE_PAREN) {
         Ty_FnParam* param = &params[params_len];
+        if (params_len > TY_FN_MAX_PARAMS) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "too many parameters (max 32)");
+        }
 
         if (match(p, TOK_VARARG)) {
             is_variadic = true;

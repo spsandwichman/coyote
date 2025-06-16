@@ -56,6 +56,14 @@
     T(QUAD) \
     T(UWORD) \
     T(WORD) \
+    \
+    T(NOALIAS) \
+    T(ALIGNOF) \
+    T(ALIGNOFVALUE) \
+    \
+    T(JKL_FILE_NAME) \
+    T(JKL_FUNC_NAME) \
+    T(JKL_LINE_NUMBER) \
 
 typedef struct {
     string src;
@@ -196,6 +204,7 @@ typedef struct Entity Entity;
 typedef struct FlagSet {
     bool xrsdk: 1;
     bool error_on_warn: 1;
+    bool preproc: 1;
 } FlagSet;
 
 typedef struct {

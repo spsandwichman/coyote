@@ -1,7 +1,5 @@
 #include <stdio.h>
 
-#include "common/orbit.h"
-
 #include "common/util.h"
 #include "lex.h"
 #include "parse.h"
@@ -13,9 +11,12 @@ static void print_help() {
     puts("coyote path/file.jkl [options]");
     puts(" --help            Display this info.");
     puts(" --version         Display version and copyright information.");
-    puts(" --xrsdk           Warn on code that would not compile");
-    puts("                   with the original XR/SDK compiler.");
+    puts(" --xrsdk           Warn on code that would not compile with the");
+    puts("                   original XR/SDK compiler.");
     puts(" --error-on-warn   Turn warnings into errors.");
+    puts(" --preproc         Only perform the preprocessor. This strips");
+    puts("                   all hygenic macro scope information and may");
+    puts("                   not produce re-compilable code.");
 }
 
 static void parse_args(int argc, char** argv) {
@@ -34,6 +35,8 @@ static void parse_args(int argc, char** argv) {
             exit(0);
         } else if (strcmp(arg, "--xrsdk") == 0) {
             flags.xrsdk = true;
+        } else if (strcmp(arg, "--preproc") == 0) {
+            flags.preproc = true;
         } else if (strcmp(arg, "--error-on-warn") == 0) {
             flags.error_on_warn = true;
         } else {
@@ -64,26 +67,29 @@ int main(int argc, char** argv) {
     // p.flags.xrsdk = true;
     // p.flags.error_on_warn = true;
 
-    // for_n(i, 0, p.tokens_len) {
-    //     Token* t = &p.tokens[i];
-    //     if (_TOK_LEX_IGNORE < t->kind) {
-    //         if (t->kind == TOK_NEWLINE) {
-    //             // printf("\n");
-    //             continue;
-    //         }
-    //         printf("%s ", token_kind[t->kind]);
-    //         continue;
-    //     }
-    //     if (t->kind == TOK_STRING) {
-    //         printf("\"");
-    //     }
-    //     printf(str_fmt, str_arg(tok_span(*t)));
-    //     if (t->kind == TOK_STRING) {
-    //         printf("\"");
-    //     }
-    //     printf(" ");
-    // }
-    // printf("\n");
+    if (flags.preproc) {
+        for_n(i, 0, p.tokens_len) {
+            Token* t = &p.tokens[i];
+            if (_TOK_LEX_IGNORE < t->kind) {
+                if (t->kind == TOK_NEWLINE) {
+                    printf("\n");
+                    // continue;
+                }
+                // printf("%s ", token_kind[t->kind]);
+                continue;
+            }
+            if (t->kind == TOK_STRING) {
+                printf("\"");
+            }
+            printf(str_fmt, str_arg(tok_span(*t)));
+            if (t->kind == TOK_STRING) {
+                printf("\"");
+            }
+            printf(" ");
+        }
+        printf("\n");
+        return 0;
+    }
 
     CompilationUnit cu = parse_unit(&p);
 }

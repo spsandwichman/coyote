@@ -133,25 +133,30 @@ string tok_span(Token t) {
 
 // perfect hash function
 // WARNING: THIS HAS TO BE REMADE EVERY TIME A KEYWORD IS ADDED
-static u8 hashfunc(const char* raw, u32 len) {
-    u8 hash = 134;
+// USE SCRIPTS/HASHGEN FOR THIS
+static usize hashfunc(const char* key, usize key_len) {
+    usize hash = 189;
 
-    for (usize i = 0; i < len; ++i) {
-        hash ^= raw[i];
-        hash *= 19;
+    for (usize i = 0; i < key_len; ++i) {
+        hash ^= key[i];
+        hash *= 103;
     }
-    return hash % 126;
+    return hash % 146;
 }
 
-static const char* keyword_table[126];
-static u8 keyword_len_table[126];
-static u8 keyword_code_table[126];
+static const char* keyword_table[146];
+static u8 keyword_len_table[146];
+static u8 keyword_code_table[146];
 
 static u8 lex_categorize_keyword(char* s, size_t len) {
     u8 index = hashfunc(s, len);
 
-    if (keyword_len_table[index] != len) return TOK_IDENTIFIER;
-    if (strncmp(keyword_table[index], s, len) != 0) return TOK_IDENTIFIER;
+    if (keyword_len_table[index] != len) {
+        return TOK_IDENTIFIER;
+    }
+    if (strncmp(keyword_table[index], s, len) != 0) {
+        return TOK_IDENTIFIER;
+    }
 
     return keyword_code_table[index];
 }
@@ -539,6 +544,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
                 if (newstr.len > COMPACT_STR_MAX_LEN) {
                     TODO("error: string too long");
                 }
+
                 memcpy(newstr.raw, (void*)(i64)lhs.string.raw, lhs.string.len);
                 memcpy(newstr.raw + lhs.string.len, (void*)(i64)rhs.string.raw, rhs.string.len);
                 v.kind = PPVAL_STRING;
@@ -609,8 +615,8 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
         break;
     case TOK_STRING:
         v.kind = PPVAL_STRING;
-        v.string.len = t.len - 2;
-        v.string.raw = t.raw + 1;
+        v.len = v.string.len = t.len;
+        v.raw = v.string.raw = t.raw;
         break;
     default:
         TODO("error: expected value, got token '%s'", token_kind[t.kind]);
