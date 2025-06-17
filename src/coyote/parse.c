@@ -492,6 +492,7 @@ static inline void** dynbuf_to_arena(Parser* p, usize start) {
 
 Entity* new_entity(Parser* p, string ident, EntityKind kind) {
     Entity* entity = arena_alloc(&p->entities, sizeof(Entity), alignof(Entity));
+    *entity = (Entity){0};
     entity->name = to_compact(ident);
     entity->kind = kind;
     entity->ty = TY__INVALID;
@@ -628,6 +629,7 @@ void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, c
 
         Vec(char) expanded_snippet = vec_new(char, 256);
 
+        Token last_token;
         for_n_eq(i, expanded_snippet_begin_index, expanded_snippet_end_index) {
             if (i == start_index) {
                 expanded_snippet_highlight_start = expanded_snippet.len;
@@ -636,11 +638,19 @@ void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, c
             if (_TOK_LEX_IGNORE < t.kind) {
                 continue;
             }
+
+            if (i != expanded_snippet_begin_index) {
+                // if there's space between tokens
+                if (last_token.raw + last_token.len != t.raw) {
+                    vec_append(&expanded_snippet, ' ');
+                }
+            }
+            
             vec_char_append_many(&expanded_snippet, tok_raw(t), t.len);
             if (i == end_index) {
                 expanded_snippet_highlight_len = expanded_snippet.len - expanded_snippet_highlight_start;
             }
-            vec_append(&expanded_snippet, ' ');
+            last_token = t;
         }
 
         string src = {
@@ -700,6 +710,7 @@ static void advance(Parser* p) {
         }
     } while (_TOK_LEX_IGNORE < p->tokens[p->cursor].kind);
     p->current = p->tokens[p->cursor];
+    // printf("-> "str_fmt"\n", str_arg(tok_span(p->current)));
 }
 
 static Token peek(Parser* p, usize n) {
@@ -930,7 +941,6 @@ TyIndex parse_type(Parser* p, bool allow_incomplete) {
     }
     return left;
 }
-
 
 static bool is_lvalue(Expr* e) {
     switch (e->kind) {
@@ -2176,6 +2186,7 @@ void parse_global_decl(Parser* p) {
         break;
     }
     case TOK_KW_STRUCT: {
+        // hello there
         Stmt* typedecl_loc = new_stmt(p, STMT_DECL_LOCATION, nothing);
         advance(p);
         TyKind kind = TY_STRUCT;
