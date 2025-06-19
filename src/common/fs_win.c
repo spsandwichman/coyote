@@ -126,6 +126,11 @@ char* fs_get_current_dir() {
     char* current_dir = malloc(required + 1);
     current_dir[required] = 0;
     GetCurrentDirectoryA(required, current_dir);
+    for_n(i, 0, required) {
+        if (current_dir[i] == '\\') {
+            current_dir[i] = '/';
+        }
+    }
     return current_dir;
 }
 

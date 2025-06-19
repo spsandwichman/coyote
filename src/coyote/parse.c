@@ -586,9 +586,9 @@ void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, c
     // find main line snippet
     SrcFile* main_file = ctx->sources.at[0];
     if (inside_preproc) {
-        for_n(i, 0, reports.len) {
-            report_line(&reports.at[i]);
-        }
+        // for_n(i, 0, reports.len) {
+        //     report_line(&reports.at[i]);
+        // }
 
         string main_highlight = {};
         for_n(i, end_index, ctx->tokens_len) {
@@ -643,6 +643,9 @@ void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, c
                 // if there's space between tokens
                 if (last_token.raw + last_token.len != t.raw) {
                     vec_append(&expanded_snippet, ' ');
+                    if (i == start_index) {
+                        expanded_snippet_highlight_start++;
+                    }
                 }
             }
             
@@ -674,6 +677,10 @@ void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, c
         };
 
         report_line(&rep);
+
+        for_n(i, 0, reports.len) {
+            report_line(&reports.at[i]);
+        }
     } else {
         string start_span = tok_span(ctx->tokens[start_index]);
         string end_span = tok_span(ctx->tokens[end_index]);
@@ -690,6 +697,10 @@ void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, c
         };
 
         report_line(&rep);
+    }
+
+    if (kind == REPORT_ERROR) {
+        exit(1);
     }
 }
 
@@ -779,21 +790,80 @@ static Expr* new_expr_(Parser* p, u8 kind, TyIndex ty, usize size) {
     return expr;
 }
 
-static i64 eval_integer(Parser* p, Token t, u32 index) {
+i64 eval_integer_dec(Parser* p, const char* raw, u32 len, u32 index) {
     i64 val = 0;
-    char* raw = tok_raw(t);
-    bool is_negative = raw[0] == '-';
-
-    for (usize i = is_negative; i < t.len; ++i) {
+    for (usize i = 0; i < len; ++i) {
         val *= 10;
         isize char_val = raw[i] - '0';
         if (char_val < 0 || char_val > 9) {
-            // TODO("invalid digit");
-            parse_error(p, index, index, REPORT_ERROR, "invalid digit '%c'", raw[i]);
+            parse_error(p, index, index, REPORT_ERROR, "invalid decimal digit '%c'", raw[i]);
         }
-        val += raw[i] - '0';
+        val += char_val;
+    }
+    return val;
+}
+
+i64 eval_integer_hex(Parser* p, const char* raw, u32 len, u32 index) {
+    i64 val = 0;
+    for (usize i = 0; i < len; ++i) {
+        val *= 16;
+        char c = raw[i];
+        if ('a' <= c && c <= 'f') {
+            val += c - 'a' + 10;
+        } else if ('A' <= c && c <= 'F') {
+            val += c - 'A' + 10;
+        } else if ('0' <= c && c <= '9') {
+            val += c - '0';
+        } else {
+            parse_error(p, index, index, REPORT_ERROR, "invalid hexadecimal digit '%c'", c);
+        }
+    }
+    return val;
+}
+
+i64 eval_integer_oct(Parser* p, const char* raw, u32 len, u32 index) {
+    i64 val = 0;
+    for (usize i = 0; i < len; ++i) {
+        val *= 8;
+        char c = raw[i];
+        if ('0' <= c && c <= '8') {
+            val += c - '0';
+        } else {
+            parse_error(p, index, index, REPORT_ERROR, "invalid hexidecimal digit '%c'", c);
+        }
+    }
+    return val;
+}
+
+i64 eval_integer(Parser* p, Token t, u32 index) {
+    u32 len = t.len;
+    char* raw = tok_raw(t);
+    bool is_negative = false;
+    if (raw[0] == '-') {
+        raw += 1;
+        len -= 1;
+        is_negative = true;
     }
 
+    i64 val;
+    if (raw[0] == '0' && len > 1) {
+        switch (raw[1]) {
+        case 'x':
+        case 'X':
+            val = eval_integer_hex(p, raw + 2, len - 2, index);
+            break;
+        case 'o':
+        case 'O':
+            val = eval_integer_oct(p, raw + 2, len - 2, index);
+            break;
+        default:
+            val = eval_integer_dec(p, raw, len, index);
+            break;
+        }
+    } else {
+        val = eval_integer_dec(p, raw, len, index);
+    }
+    
     return is_negative ? -val : val;
 }
 
@@ -1237,6 +1307,18 @@ Expr* parse_unary(Parser* p) {
             not->token_index = op_position;
             return not;
         }
+    }
+    case TOK_KW_CAST: {
+        advance(p);
+        Expr* inner = parse_expr(p);
+        expect(p, TOK_KW_TO);
+        advance(p);
+        TyIndex to_ty = parse_type(p, false);
+        printf("TODO: fix assumption that this cast is valid\n");
+
+        Expr* cast = new_expr(p, EXPR_CAST, to_ty, unary);
+        cast->unary = inner;
+        return cast;
     }
     default:
         return parse_atom(p);
