@@ -1,5 +1,5 @@
 EXTERN FN foo(x: INT, y: WORD): WORD
 
 FN bruh()
-    z := foo(1, 2)
+    z := foo(0FF, 2)
 END

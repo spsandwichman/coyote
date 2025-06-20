@@ -29,9 +29,9 @@ static u32 col_number(string src, string snippet) {
     return col;
 }
 
-static void print_snippet(string line, string snippet, const char* color, usize pad) {
+static void print_snippet(string line, string snippet, const char* color, usize pad, string msg) {
     
-    fprintf(stderr, "| ");
+    fprintf(stderr, Blue"| "Reset);
 
     for_n(i, 0, line.len) {
         if (line.raw + i == snippet.raw) {
@@ -47,7 +47,7 @@ static void print_snippet(string line, string snippet, const char* color, usize 
     for_n(i, 0, pad) {
         fprintf(stderr, " ");
     }
-    fprintf(stderr, "| ");
+    fprintf(stderr, Blue"| "Reset);
     for_n(i, 0, line.len) {
         if (line.raw + i < snippet.raw) {
             fprintf(stderr, " ");
@@ -63,6 +63,8 @@ static void print_snippet(string line, string snippet, const char* color, usize 
         }
     }
     fprintf(stderr, Reset"\n");
+    // fprintf(stderr, Bold " "str_fmt Reset"\n", str_arg(msg));
+    // fprintf(stderr, Bold " "str_fmt Reset"\n", str_arg(msg));
 }
 
 bool is_whitespace(char c) {
@@ -125,6 +127,15 @@ string try_localize_path(string path) {
     return path;
 }
 
+static usize digits(usize n) {
+    usize d = 1;
+    while (n >= 10) {
+        n /= 10;
+        d++;
+    }
+    return d;
+}
+
 void report_line(ReportLine* report) {
 
     const char* color = White;
@@ -132,27 +143,50 @@ void report_line(ReportLine* report) {
     report->path = try_localize_path(report->path);
 
     switch (report->kind) {
-    case REPORT_ERROR: fprintf(stderr, Bold Red"ERROR"Reset); color = Red; break;
-    case REPORT_WARNING: fprintf(stderr, Bold Yellow"WARN"Reset); color = Yellow; break;
-    case REPORT_NOTE: fprintf(stderr, Bold Cyan"NOTE"Reset); color = Cyan; break;
+    case REPORT_ERROR: fprintf(stderr, Bold Red"error"Reset); color = Red; break;
+    case REPORT_WARNING: fprintf(stderr, Bold Yellow"warning"Reset); color = Yellow; break;
+    case REPORT_NOTE: fprintf(stderr, Bold Cyan"note"Reset); color = Cyan; break;
     }
 
     u32 line_num = line_number(report->src, report->snippet);
     u32 col_num  = col_number(report->src, report->snippet);
 
-    fprintf(stderr, " ["Bold str_fmt Reset":%u:%u] ", str_arg(report->path), line_num, col_num);
-    fprintf(stderr, str_fmt, str_arg(report->msg));
+    // fprintf(stderr, " ["str_fmt":%u:%u] ", str_arg(report->path), line_num, col_num);
+    fprintf(stderr, ": "Bold str_fmt Reset, str_arg(report->msg));
     fprintf(stderr, "\n");
     
-    fprintf(stderr, "%4u ", line_num);
+    usize line_digits = digits(line_num);
+
+    for_n(i, 0, line_digits) {
+        fprintf(stderr, " ");
+    }
+    fprintf(stderr, Blue"--> "Reset str_fmt":%u:%u\n", str_arg(report->path), line_num, col_num);
+    for_n(i, 0, line_digits) {
+        fprintf(stderr, " ");
+    }
+    fprintf(stderr, Blue" |\n"Reset);
+
     string line = snippet_line(report->src, report->snippet);
-    print_snippet(line, report->snippet, color, 5);
+
+    fprintf(stderr, Blue "%u ", line_num);
+    print_snippet(line, report->snippet, color, line_digits + 1, report->msg);
     
     if (report->reconstructed_line.raw != nullptr) {
-        fprintf(stderr, "expands to: "Reset"\n");
-        fprintf(stderr, "%4u ", line_num);
-        // fprintf(stderr, "     ");
         string line = snippet_line(report->reconstructed_line, report->reconstructed_snippet);
-        print_snippet(line, report->reconstructed_snippet, color, 5);
+        
+        for_n(i, 0, line_digits) {
+            fprintf(stderr, " ");
+        }
+        fprintf(stderr, Blue"--> "Reset "expands to: "Reset"\n");
+        for_n(i, 0, line_digits) {
+            fprintf(stderr, " ");
+        }
+        fprintf(stderr, Blue" |\n"Reset);
+        fprintf(stderr, Blue"%u ", line_num);
+        print_snippet(line, report->reconstructed_snippet, color, line_digits + 1, report->msg);
     }
+    for_n(i, 0, line_digits) {
+        fprintf(stderr, " ");
+    }
+    fprintf(stderr, Blue" |\n"Reset);
 }

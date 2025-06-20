@@ -1314,7 +1314,7 @@ Expr* parse_unary(Parser* p) {
         expect(p, TOK_KW_TO);
         advance(p);
         TyIndex to_ty = parse_type(p, false);
-        printf("TODO: fix assumption that this cast is valid\n");
+        // printf("TODO: fix assumption that this cast is valid\n");
 
         Expr* cast = new_expr(p, EXPR_CAST, to_ty, unary);
         cast->unary = inner;
@@ -1524,7 +1524,7 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
     Entity* var = get_or_create(p, identifier);
     decl->var_decl.var = var;
     if (var->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
-            parse_error(p, var->decl->token_index, var->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
+            parse_error(p, var->decl->token_index, var->decl->token_index, REPORT_NOTE, "previous EXTERN declaration");
         parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "previously EXTERN variable cannot be PRIVATE");
     }
     advance(p);
@@ -1535,7 +1535,7 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
         u32 type_start = p->cursor;
         TyIndex decl_ty = parse_type(p, false);
         if_unlikely (var->storage == STORAGE_EXTERN && !ty_equal(var->ty, decl_ty)) {
-            parse_error(p, var->decl->token_index, var->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
+            parse_error(p, var->decl->token_index, var->decl->token_index, REPORT_NOTE, "previous EXTERN declaration");
             parse_error(p, type_start, p->cursor - 1, REPORT_ERROR, "type %s differs from EXTERN type %s",
                 ty_name(decl_ty), ty_name(var->ty));
         }
@@ -1960,7 +1960,7 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
     string identifier = tok_span(p->current);
     Entity* fn = get_or_create(p, identifier);
     if (fn->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
-        parse_error(p, fn->decl->token_index, fn->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
+        parse_error(p, fn->decl->token_index, fn->decl->token_index, REPORT_NOTE, "previous EXTERN declaration");
         parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "previously EXTERN function cannot be PRIVATE");
     }
     advance(p);
@@ -1969,11 +1969,11 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
         fn->ty = decl_ty;
     }
     if (fn->storage == STORAGE_EXTERN && !ty_equal(fn->ty, decl_ty)) {
-        parse_error(p, fn->decl->token_index, fn->decl->token_index, REPORT_NOTE, "previous EXTERN declaration:");
+        parse_error(p, fn->decl->token_index, fn->decl->token_index, REPORT_NOTE, "previous EXTERN declaration");
         parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "type differs from previous EXTERN type");
     }
     if (fnptr_ty != TY__INVALID && !ty_equal(fnptr_ty, decl_ty)) {
-        parse_error(p, fnptr_decl_loc, fnptr_decl_loc, REPORT_NOTE, "from FNPTR declaration:");
+        parse_error(p, fnptr_decl_loc, fnptr_decl_loc, REPORT_NOTE, "from FNPTR declaration");
         parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "type differs from provided FNPTR type");
     }
     if (fnptr_ty != TY__INVALID) {
