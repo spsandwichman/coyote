@@ -7,7 +7,7 @@ This repository is also home to Iron, a lightweight but powerful code optimizati
 
 ## Building
 
-You will need Make, a C compiler, and a linker (`gcc` is the default for both of these).
+You will need Make, a C compiler with support for C23 (with some GNU extensions), and a linker (`gcc` is the default for both of these).
 
 To build from scratch:
 ```sh
