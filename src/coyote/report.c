@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "common/fs.h"
+#include "common/str.h"
 #include "lex.h"
 #include "common/ansi.h"
 
@@ -62,8 +63,8 @@ static void print_snippet(string line, string snippet, const char* color, usize 
             fprintf(stderr, "~");
         }
     }
-    fprintf(stderr, Reset"\n");
-    // fprintf(stderr, Bold " "str_fmt Reset"\n", str_arg(msg));
+    // fprintf(stderr, Reset"\n");
+    fprintf(stderr, Bold " "str_fmt Reset"\n", str_arg(msg));
     // fprintf(stderr, Bold " "str_fmt Reset"\n", str_arg(msg));
 }
 
@@ -151,7 +152,7 @@ void report_line(ReportLine* report) {
     u32 line_num = line_number(report->src, report->snippet);
     u32 col_num  = col_number(report->src, report->snippet);
 
-    // fprintf(stderr, " ["str_fmt":%u:%u] ", str_arg(report->path), line_num, col_num);
+    // fprintf(stderr, " -> "str_fmt":%u:%u ", str_arg(report->path), line_num, col_num);
     fprintf(stderr, ": "Bold str_fmt Reset, str_arg(report->msg));
     fprintf(stderr, "\n");
     
@@ -169,9 +170,16 @@ void report_line(ReportLine* report) {
     string line = snippet_line(report->src, report->snippet);
 
     fprintf(stderr, Blue "%u ", line_num);
-    print_snippet(line, report->snippet, color, line_digits + 1, report->msg);
+
+    if (report->reconstructed_line.raw != nullptr) {
+        print_snippet(line, report->snippet, color, line_digits + 1, constr("in this macro invocation"));
+    } else {
+        print_snippet(line, report->snippet, color, line_digits + 1, report->msg);
+    }
+
     
     if (report->reconstructed_line.raw != nullptr) {
+
         string line = snippet_line(report->reconstructed_line, report->reconstructed_snippet);
         
         for_n(i, 0, line_digits) {

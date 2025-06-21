@@ -215,10 +215,6 @@ typedef struct Stmt {
         } assign;
 
         struct {
-            Stmt* loop;
-        } break_continue;
-
-        struct {
             Expr* cond;
             StmtList block;
             Stmt* else_;
@@ -272,7 +268,8 @@ typedef enum : u8 {
     EXPR_ARRAY_LITERAL,
     EXPR_STRUCT_LITERAL,
 
-    EXPR_SUBSCRIPT,     // foo[bar]
+    EXPR_PTR_INDEX,     // foo[bar]
+    EXPR_ARRAY_INDEX,   // foo[bar]
     EXPR_DEREF,         // foo^
     EXPR_DEREF_MEMBER,  // foo^.bar
     EXPR_MEMBER,        // foo.bar

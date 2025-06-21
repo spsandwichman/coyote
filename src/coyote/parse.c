@@ -326,25 +326,27 @@ static usize ty_align(TyIndex t) {
 }
 
 static bool ty_equal(TyIndex t1, TyIndex t2) {
-    if (t1 == t2) {
+    if_likely (t1 == t2) {
         return true;
     }
-    while (TY_KIND(t1) == TY_ALIAS) {
-        t1 = TY(t1, TyAlias)->aliasing;
-    }
-    while (TY_KIND(t2) == TY_ALIAS) {
-        t2 = TY(t2, TyAlias)->aliasing;
-    }
-    if (t1 == t2) {
+    t1 = ty_unwrap_alias(t1);
+    t2 = ty_unwrap_alias(t2);
+    if_likely (t1 == t2) {
         return true;
     }
 
-    if (TY_KIND(t1) == TY_PTR && TY_KIND(t2) == TY_PTR) {
+    if_unlikely (TY_KIND(t1) == TY_PTR && TY_KIND(t2) == TY_PTR) {
         return ty_equal(TY(t1, TyPtr)->to, TY(t2, TyPtr)->to);
     }
 
+    if_unlikely (TY_KIND(t1) == TY_ARRAY && TY_KIND(t2) == TY_ARRAY) {
+        TyArray* t1_array = TY(t1, TyArray);
+        TyArray* t2_array = TY(t2, TyArray);
+        return t1_array->len == t2_array->len && ty_equal(t1_array->to, t2_array->to);
+    }
+
     // function type checking
-    if (TY_KIND(t1) == TY_FN && TY_KIND(t2) == TY_FN) {
+    if_unlikely (TY_KIND(t1) == TY_FN && TY_KIND(t2) == TY_FN) {
         TyFn* fn1 = TY(t1, TyFn);
         TyFn* fn2 = TY(t2, TyFn);
 
@@ -400,29 +402,30 @@ static bool ty_equal(TyIndex t1, TyIndex t2) {
     return t1 == t2;
 }
 
+
+static bool ty_can_cast(TyIndex dst, TyIndex src, bool src_is_constant) {
+    if (ty_equal(dst, src)) {
+        return true;
+    }
+
+    dst = ty_unwrap_alias_or_enum(dst);
+    src = ty_unwrap_alias_or_enum(src);
+    
+    if (ty_is_scalar(dst) && ty_is_scalar(src)) {
+        // signedness cannot mix
+        return true;
+    }
+
+    return false;
+}
+
 static bool ty_compatible(TyIndex dst, TyIndex src, bool src_is_constant) {
     if (ty_equal(dst, src)) {
         return true;
     }
 
-    while (true) {
-        switch (TY_KIND(dst)) {
-        case TY_ALIAS: dst = TY(dst, TyAlias)->aliasing; break;
-        case TY_ENUM: dst = TY(dst, TyEnum)->backing_ty; break;
-        default:
-            goto dst_done;
-        }
-    }
-    dst_done:
-    while (true) {
-        switch (TY_KIND(src)) {
-        case TY_ALIAS: src = TY(src, TyAlias)->aliasing; break;
-        case TY_ENUM: src = TY(src, TyEnum)->backing_ty; break;
-        default:
-            goto src_done;
-        }
-    }
-    src_done:
+    dst = ty_unwrap_alias_or_enum(dst);
+    src = ty_unwrap_alias_or_enum(src);
 
     if (ty_is_integer(dst) && ty_is_integer(src)) {
         // signedness cannot mix
@@ -845,19 +848,15 @@ i64 eval_integer(Parser* p, Token t, u32 index) {
         is_negative = true;
     }
 
-    i64 val;
+    i64 val = 0;
     if (raw[0] == '0' && len > 1) {
         switch (raw[1]) {
         case 'x':
-        case 'X':
             val = eval_integer_hex(p, raw + 2, len - 2, index);
             break;
-        case 'o':
-        case 'O':
-            val = eval_integer_oct(p, raw + 2, len - 2, index);
-            break;
         default:
-            val = eval_integer_dec(p, raw, len, index);
+            // leading zero octal will be the death of me
+            val = eval_integer_oct(p, raw, len, index);
             break;
         }
     } else {
@@ -1019,7 +1018,8 @@ static bool is_lvalue(Expr* e) {
     case EXPR_DEREF:
     case EXPR_DEREF_MEMBER:
     case EXPR_MEMBER:
-    case EXPR_SUBSCRIPT:
+    case EXPR_PTR_INDEX:
+    case EXPR_ARRAY_INDEX:
         return true;
     default:
         return false;
@@ -1104,6 +1104,39 @@ Expr* parse_atom(Parser* p) {
 
     while (true) {
         switch (p->current.kind) {
+        case TOK_OPEN_BRACKET: {
+            // UNREACHABLE;
+            left = atom;
+            TyKind left_ty_kind = TY_KIND(left->ty);
+            if_likely (left_ty_kind == TY_PTR) {
+                atom = new_expr(p, EXPR_PTR_INDEX, TY(left->ty, TyPtr)->to, binary);
+                atom->binary.lhs = left;
+                advance(p);
+                Expr* index = parse_expr(p);
+                if_unlikely (!ty_is_integer(index->ty)) {
+                    parse_error(p, expr_leftmost_token(left), p->cursor, REPORT_ERROR, 
+                        "index type %s is not an integer", ty_name(left->ty));
+                }
+                atom->binary.rhs = index;
+                expect(p, TOK_CLOSE_BRACKET);
+                advance(p);
+            } else if_likely (left_ty_kind == TY_ARRAY) {
+                atom = new_expr(p, EXPR_ARRAY_INDEX, TY(left->ty, TyPtr)->to, binary);
+                atom->binary.lhs = left;
+                advance(p);
+                Expr* index = parse_expr(p);
+                if_unlikely (!ty_is_integer(index->ty)) {
+                    parse_error(p, expr_leftmost_token(left), p->cursor, REPORT_ERROR, 
+                        "index type %s is not an integer", ty_name(left->ty));
+                }
+                atom->binary.rhs = index;
+                expect(p, TOK_CLOSE_BRACKET);
+                advance(p);
+            } else {
+                parse_error(p, expr_leftmost_token(left), p->cursor, REPORT_ERROR, 
+                    "cannot index type %s", ty_name(left->ty));
+            }
+        } break;
         case TOK_CARET: {
             if_unlikely (peek(p, 1).kind == TOK_DOT) {
                 goto member_deref;
@@ -1111,7 +1144,7 @@ Expr* parse_atom(Parser* p) {
             left = atom;
             if_unlikely (TY_KIND(left->ty) != TY_PTR) {
                 parse_error(p, expr_leftmost_token(left), p->cursor, REPORT_ERROR, 
-                    "cannot dereference non-pointer type %s", ty_name(left->ty));
+                    "cannot dereference type %s", ty_name(left->ty));
             }
             TyIndex ptr_target = ty_get_ptr_target(left->ty);
             // if_unlikely (!ty_is_scalar(ptr_target)) {
@@ -1231,10 +1264,16 @@ Expr* parse_atom(Parser* p) {
 
             atom = new_expr(p, EXPR_CALL, fn->ret_ty, call);
 
+            u32 args_start = dynbuf_start();
+
             // okay, actually check arguments
             advance(p);
             usize arg_n = 0;
             while (!match(p, TOK_CLOSE_PAREN)) {
+                if_unlikely (arg_n >= fn->len) {
+                    parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "too many arguments, expected %u", fn->len);
+                }
+
                 Expr* arg = nullptr;
                 Ty_FnParam* param = &fn->params[arg_n];
                 if_unlikely (param->out) {
@@ -1260,12 +1299,19 @@ Expr* parse_atom(Parser* p) {
                     break;
                 }
 
+                vec_append(&dynbuf, arg);
+
                 arg_n++;
             }
             expect(p, TOK_CLOSE_PAREN);
             advance(p);
+            
+            Expr** args = (Expr**)dynbuf_to_arena(p, args_start);
+            dynbuf_restore(args_start);
 
             atom->call.callee = left;
+            atom->call.args = args;
+            atom->call.args_len = arg_n;
 
             // UNREACHABLE;
         } break;
@@ -1295,9 +1341,47 @@ Expr* parse_unary(Parser* p) {
         addrof->token_index = op_position;
         return addrof;
     }
+    case TOK_TILDE: {
+        advance(p);
+        Expr* inner = parse_unary(p);
+        if_unlikely (!ty_is_integer(inner->ty)) {
+            error_at_expr(p, inner, REPORT_ERROR, 
+                "type %s is not an integer", ty_name(inner->ty));
+        }
+        if (inner->kind == EXPR_LITERAL) {
+            inner->literal = ~inner->literal; // reuse this expr
+            return inner;
+        } else {
+            Expr* not = new_expr(p, EXPR_NOT, inner->ty, unary);
+            not->unary = inner;
+            not->token_index = op_position;
+            return not;
+        }
+    }
+    case TOK_MINUS: {
+        advance(p);
+        Expr* inner = parse_unary(p);
+        if_unlikely (!ty_is_integer(inner->ty)) {
+            error_at_expr(p, inner, REPORT_ERROR, 
+                "type %s is not an integer", ty_name(inner->ty));
+        }
+        if (inner->kind == EXPR_LITERAL) {
+            inner->literal = -inner->literal; // reuse this expr
+            return inner;
+        } else {
+            Expr* not = new_expr(p, EXPR_NEG, inner->ty, unary);
+            not->unary = inner;
+            not->token_index = op_position;
+            return not;
+        }
+    }
     case TOK_KW_NOT: {
         advance(p);
-        Expr* inner = parse_unary(p); 
+        Expr* inner = parse_unary(p);
+        if_unlikely (!ty_is_scalar(inner->ty)) {
+            error_at_expr(p, inner, REPORT_ERROR, 
+                "type %s is not scalar", ty_name(inner->ty));
+        }
         if (inner->kind == EXPR_LITERAL) {
             inner->literal = !inner->literal; // reuse this expr
             return inner;
@@ -1314,7 +1398,16 @@ Expr* parse_unary(Parser* p) {
         expect(p, TOK_KW_TO);
         advance(p);
         TyIndex to_ty = parse_type(p, false);
-        // printf("TODO: fix assumption that this cast is valid\n");
+
+        if_unlikely(!ty_can_cast(to_ty, inner->ty, inner->kind == EXPR_LITERAL)) {
+            error_at_expr(p, inner, REPORT_ERROR, 
+                "type %s cannot cast to %s", ty_name(inner->ty), ty_name(to_ty));
+        }
+
+        if (inner->kind == EXPR_LITERAL) {
+            inner->ty = to_ty;
+            return inner;
+        }
 
         Expr* cast = new_expr(p, EXPR_CAST, to_ty, unary);
         cast->unary = inner;
@@ -1363,6 +1456,10 @@ static ExprKind binary_expr_kind(u8 tok_kind) {
     return tok_kind - TOK_PLUS + EXPR_ADD;
 }
 
+static bool is_bool_op(ExprKind op_kind) {
+    return op_kind == TOK_KW_AND || op_kind == TOK_KW_OR;
+}
+
 Expr* parse_binary(Parser* p, isize precedence) {
     ArenaState save = arena_save(&p->arena);
     Expr* lhs = parse_unary(p);
@@ -1370,17 +1467,19 @@ Expr* parse_binary(Parser* p, isize precedence) {
     while (precedence < bin_precedence(p->current.kind)) {
         isize n_prec = bin_precedence(p->current.kind);
         ExprKind op_kind = binary_expr_kind(p->current.kind);
-        u32 op_token = p->cursor;
+        u32 op_token_index = p->cursor;
         
         advance(p);
         Expr* rhs = parse_binary(p, n_prec);
 
-        if (!ty_compatible(lhs->ty, rhs->ty, rhs->kind == EXPR_LITERAL)) {
-            parse_error(p, op_token, op_token, REPORT_ERROR, 
+        TyIndex op_ty = target_uword;
+        if (!is_bool_op(op_kind)) {
+            op_ty = lhs->ty;
+        } else if_unlikely (!ty_compatible(lhs->ty, rhs->ty, rhs->kind == EXPR_LITERAL)) {
+            parse_error(p, op_token_index, op_token_index, REPORT_ERROR, 
                 "types %s and %s are not compatible", ty_name(lhs->ty), ty_name(rhs->ty));
         }
 
-        TyIndex op_ty = lhs->ty;
         if (lhs->kind == EXPR_LITERAL && rhs->ty != EXPR_LITERAL) {
             op_ty = rhs->ty;
         }
@@ -1523,10 +1622,11 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
     string identifier = tok_span(p->current);
     Entity* var = get_or_create(p, identifier);
     decl->var_decl.var = var;
-    if (var->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
-            parse_error(p, var->decl->token_index, var->decl->token_index, REPORT_NOTE, "previous EXTERN declaration");
-        parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "previously EXTERN variable cannot be PRIVATE");
-    }
+    // if (var->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
+    //         parse_error(p, var->decl->token_index, var->decl->token_index, REPORT_NOTE, "previous EXTERN declaration");
+    //     parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "previously EXTERN variable cannot be PRIVATE");
+    // }
+
     advance(p);
     expect(p, TOK_COLON);
     advance(p);
@@ -1630,7 +1730,7 @@ Stmt* parse_stmt_expr(Parser* p) {
         return parse_stmt_assign(p, STMT_ASSIGN + TOK_EQ - p->current.kind, expr);
     } else {
         // expression statement
-        if (expr->ty != TY_VOID) {
+        if_unlikely (expr->kind != EXPR_CALL && expr->ty != TY_VOID) {
             error_at_expr(p, expr, REPORT_WARNING, "unused expression result");
         }
         Stmt* stmt_expr = new_stmt(p, STMT_EXPR, expr);
@@ -1661,6 +1761,24 @@ static StmtList parse_stmt_block(Parser* p) {
         .len = stmts_len,
         .retkind = retkind,
     };
+}
+
+static Stmt* parse_while(Parser* p) {
+    Stmt* while_ = new_stmt(p, STMT_WHILE, while_);
+    advance(p);
+    Expr* cond = parse_expr(p);
+    if_unlikely (!ty_is_scalar(cond->ty)) {
+        error_at_expr(p, cond, REPORT_ERROR, "condition must be scalar");
+    }
+    expect(p, TOK_KW_DO);
+    advance(p);
+
+    enter_scope(p);
+    while_->while_.block = parse_stmt_block(p);
+    advance(p);
+
+    exit_scope(p);
+    return while_;
 }
 
 static StmtList parse_if_block_(Parser* p) {
@@ -1698,10 +1816,16 @@ Stmt* parse_stmt_if(Parser* p) {
     Stmt* if_ = new_stmt(p, STMT_IF, if_);
     advance(p);
 
-    if_->if_.cond = parse_expr(p);
+    Expr* cond = parse_expr(p);
+    if_unlikely (!ty_is_scalar(cond->ty)) {
+        error_at_expr(p, cond, REPORT_ERROR, "condition must be scalar");
+    }
+    if_->if_.cond = cond;
     expect(p, TOK_KW_THEN);
     advance(p);
+    enter_scope(p);
     StmtList if_true = parse_if_block_(p);
+    exit_scope(p);
     if_->if_.block = if_true;
     // if_->retkind = if_true.retkind;
     Stmt* if_false = nullptr;
@@ -1766,6 +1890,11 @@ Stmt* parse_stmt(Parser* p) {
         return_->retkind = RETKIND_YES;
         return return_;
     }
+    case TOK_KW_BREAK:
+    case TOK_KW_CONTINUE:
+        Stmt* break_ = new_stmt(p, STMT_BREAK, nothing);
+        advance(p);
+        return break_;
     case TOK_IDENTIFIER:
         if (peek(p, 1).kind == TOK_COLON) {
             return parse_var_decl(p, STORAGE_LOCAL);
@@ -1778,6 +1907,8 @@ Stmt* parse_stmt(Parser* p) {
         return nullptr; // nothing
     case TOK_KW_IF:
         return parse_stmt_if(p);
+    case TOK_KW_WHILE:
+        return parse_while(p);
     case TOK_KW_PUBLIC:
     case TOK_KW_PRIVATE:
     case TOK_KW_EXTERN:
@@ -1959,10 +2090,10 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
     u32 ident_pos = p->cursor;
     string identifier = tok_span(p->current);
     Entity* fn = get_or_create(p, identifier);
-    if (fn->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
-        parse_error(p, fn->decl->token_index, fn->decl->token_index, REPORT_NOTE, "previous EXTERN declaration");
-        parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "previously EXTERN function cannot be PRIVATE");
-    }
+    // if (fn->storage == STORAGE_EXTERN && storage == STORAGE_PRIVATE) {
+    //     parse_error(p, fn->decl->token_index, fn->decl->token_index, REPORT_NOTE, "previous EXTERN declaration");
+    //     parse_error(p, ident_pos, ident_pos, REPORT_ERROR, "previously EXTERN function cannot be PRIVATE");
+    // }
     advance(p);
     TyIndex decl_ty = parse_fn_prototype(p);
     if (fn->ty == TY__INVALID) {
@@ -2036,7 +2167,6 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
         }
         advance(p);
 
-        
         exit_scope(p);
 
         p->current_function = nullptr;

@@ -108,4 +108,5 @@ void strmap_remove(StrMap* hm, string key) {
 void strmap_reset(StrMap* hm) {
     memset(hm->vals, 0, sizeof(hm->vals[0]) * hm->cap);
     memset(hm->keys, 0, sizeof(hm->keys[0]) * hm->cap);
+    hm->size = 0;
 }
