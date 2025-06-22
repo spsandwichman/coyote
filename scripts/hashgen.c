@@ -67,8 +67,10 @@ int main(int argc, char** argv) {
         bool* occupied = malloc(sizeof(bool) * table_size);
         memset(occupied, 0, sizeof(bool) * table_size);
 
-        for_n(offset, 0, 256) {
-            for_n(mult, 0, 256) {
+        constexpr usize bits = 10;
+
+        for_n(mult, 1, 1ll << bits) {
+            for_n(offset, 1, 1ll << bits) {
                 // try this table configuration.
                 for_n(i, 0, keywords.len) {
                     string kw = keywords.at[i];
@@ -91,6 +93,7 @@ int main(int argc, char** argv) {
                 memset(occupied, 0, sizeof(bool) * table_size);
             }
         }
+        printf("tried table size %llu\n", table_size);
     }
 
     fs_close(file);

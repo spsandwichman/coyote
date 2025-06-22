@@ -1,0 +1,8 @@
+foo : UWORD[3] = { 1, 2, 3, 4 }
+
+STRUCT Bar
+    a: UWORD,
+    b: ^VOID,
+END
+
+bar: Bar = {}

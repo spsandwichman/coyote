@@ -265,8 +265,10 @@ typedef enum : u8 {
     EXPR_ENTITY,
     EXPR_STR_LITERAL,
     EXPR_LITERAL,
-    EXPR_ARRAY_LITERAL,
-    EXPR_STRUCT_LITERAL,
+    EXPR_COMPOUND_LITERAL,
+    EXPR_EMPTY_COMPOUND_LITERAL,
+
+    EXPR_INDEXED_ITEM,
 
     EXPR_PTR_INDEX,     // foo[bar]
     EXPR_ARRAY_INDEX,   // foo[bar]
@@ -284,20 +286,20 @@ typedef struct Expr {
     union { // allocated in the arena as-needed
         usize extra[0];
 
+        usize nothing[0];
+
         u64 literal;
         CompactString lit_string;
 
         struct {
-            u64* indices;
-            Expr** values;
-            u32 len;
-        } lit_array;
+            Expr* value;
+            u32 index;
+        } indexed_item;
 
         struct {
-            u8* field_indices;
             Expr** values;
             u32 len;
-        } lit_struct;
+        } compound_lit;
 
         Entity* entity;
 

@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
     if (flags.preproc) {
         for_n(i, 0, p.tokens_len) {
             Token* t = &p.tokens[i];
-            if (_TOK_LEX_IGNORE < t->kind) {
+            if (TOK__PARSE_IGNORE < t->kind) {
                 if (t->kind == TOK_NEWLINE) {
                     printf("\n");
                     // continue;

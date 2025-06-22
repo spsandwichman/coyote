@@ -123,6 +123,23 @@ static TyIndex ty_unwrap_alias_or_enum(TyIndex t) {
     return t;
 }
 
+static void vec_char_print_num(Vec(char)* v, u64 val) {
+    if (val < 10) {
+        vec_append(v, '0' + val);
+    } else {
+        vec_char_print_num(v, val / 10);
+        vec_append(v, '0' + val % 10);
+    }
+}
+
+// static void vec_char_print_num(Vec(char)* v, u64 val) {
+//     if (val == 0) {
+//         vec_append(v, '0');
+//     } else {
+
+//     }
+// }
+
 static void _ty_name(Vec(char)* v, TyIndex t) {
     switch (TY_KIND(t)) {
     case TY__INVALID: vec_char_append_str(v, "INVALID"); return;
@@ -138,6 +155,12 @@ static void _ty_name(Vec(char)* v, TyIndex t) {
     case TY_PTR:
         vec_char_append_str(v, "^");
         _ty_name(v, ty_get_ptr_target(t));
+        return;
+    case TY_ARRAY:
+        _ty_name(v, TY(t, TyArray)->to);
+        vec_append(v, '[');
+        vec_char_print_num(v, TY(t, TyArray)->len);
+        vec_append(v, ']');
         return;
     case TY_ALIAS:
     case TY_ALIAS_INCOMPLETE:
@@ -489,7 +512,7 @@ static inline usize dynbuf_len(usize start) {
 static inline void** dynbuf_to_arena(Parser* p, usize start) {
     usize len = dynbuf.len - start;
     void** items = arena_alloc(&p->arena, len * sizeof(items[0]), alignof(void*));
-    memcpy(items, &dynbuf.at[len], len * sizeof(items[0]));
+    memcpy(items, &dynbuf.at[start], len * sizeof(items[0]));
     return items;
 }
 
@@ -632,13 +655,13 @@ void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, c
 
         Vec(char) expanded_snippet = vec_new(char, 256);
 
-        Token last_token;
+        Token last_token = {};
         for_n_eq(i, expanded_snippet_begin_index, expanded_snippet_end_index) {
             if (i == start_index) {
                 expanded_snippet_highlight_start = expanded_snippet.len;
             }
             Token t = ctx->tokens[i];
-            if (_TOK_LEX_IGNORE < t.kind) {
+            if (TOK__PARSE_IGNORE < t.kind) {
                 continue;
             }
 
@@ -722,7 +745,7 @@ static void advance(Parser* p) {
             exit_scope(p);
             break;
         }
-    } while (_TOK_LEX_IGNORE < p->tokens[p->cursor].kind);
+    } while (TOK__PARSE_IGNORE < p->tokens[p->cursor].kind);
     p->current = p->tokens[p->cursor];
     // printf("-> "str_fmt"\n", str_arg(tok_span(p->current)));
 }
@@ -735,7 +758,7 @@ static Token peek(Parser* p, usize n) {
                 return p->tokens[cursor];
             }
             ++cursor;
-        } while (_TOK_LEX_IGNORE < p->tokens[cursor].kind);
+        } while (TOK__PARSE_IGNORE < p->tokens[cursor].kind);
     }
     return p->tokens[cursor];
 }
@@ -745,7 +768,7 @@ static bool has_eof_or_nl(Parser* p, u32 pos) {
         if (p->tokens[pos].kind == TOK_NEWLINE) {
             return true;
         }
-        if (p->tokens[pos].kind > _TOK_LEX_IGNORE) {
+        if (p->tokens[pos].kind > TOK__PARSE_IGNORE) {
             pos++;
             continue;
         }
@@ -874,6 +897,9 @@ u32 expr_leftmost_token(Expr* expr) {
     case EXPR_ADDROF:
     case EXPR_ENTITY:
     case EXPR_CALL:
+    case EXPR_COMPOUND_LITERAL:
+    case EXPR_INDEXED_ITEM:
+    case EXPR_EMPTY_COMPOUND_LITERAL:
         return expr->token_index;
     case EXPR_DEREF:
         return expr_leftmost_token(expr->unary);
@@ -905,7 +931,11 @@ u32 expr_rightmost_token(Expr* expr) {
     case EXPR_DEREF_MEMBER:
     case EXPR_MEMBER:
     case EXPR_CALL:
+    case EXPR_INDEXED_ITEM:
+    case EXPR_COMPOUND_LITERAL:
         return expr->token_index;
+    case EXPR_EMPTY_COMPOUND_LITERAL:
+        return expr->token_index + 1;
     case EXPR_NOT:
     case EXPR_ADDROF:
         return expr_rightmost_token(expr->unary);
@@ -1605,14 +1635,212 @@ static bool is_global_data(Expr* expr) {
     }
 }
 
-static bool is_linktime_const(Expr* expr) {
+static void ensure_linktime_const(Parser* p, Expr* expr) {
     switch (expr->kind) {
     case EXPR_LITERAL:
-        return true;
+        return;
     case EXPR_ADDROF:
-        return is_global_data(expr->unary);
+        if_unlikely (!is_global_data(expr->unary)) {
+            break;
+        }
+        return;
+    case EXPR_COMPOUND_LITERAL:
+        for_n(i, 0, expr->compound_lit.len) {
+            ensure_linktime_const(p, expr->compound_lit.values[i]);
+        }
+        return;
+    case EXPR_INDEXED_ITEM:
+        ensure_linktime_const(p, expr->indexed_item.value);
+        return;
     default:
-        return false;
+        break;
+    }
+    error_at_expr(p, expr, REPORT_ERROR, "expression is not link-time constant");
+}
+
+Expr* parse_initializer(Parser* p, TyIndex ty);
+
+Expr* parse_array_initializer(Parser* p, TyIndex array_ty) {
+    u32 init_start_token = p->cursor;
+
+    expect(p, TOK_OPEN_BRACE);
+    advance(p);
+    if_unlikely (match(p, TOK_CLOSE_BRACE)) {
+        Expr* empty = new_expr(p, EXPR_EMPTY_COMPOUND_LITERAL, array_ty, nothing);
+        empty->token_index = p->cursor;
+        advance(p);
+        return empty;
+    }
+
+    TyIndex elem_ty = TY(array_ty, TyArray)->to;
+    u32 array_len = TY(array_ty, TyArray)->len;
+
+    u32 exprs_start = dynbuf_start();
+    u32 exprs_len = 0;
+
+    // [ expr ] = initializer
+    // expr
+
+    u32 index = 0;
+    while (!match(p, TOK_CLOSE_BRACE)) {
+
+        if (match(p, TOK_OPEN_BRACKET)) {
+            advance(p);
+            Expr* expr = parse_expr(p);
+            expect(p, TOK_CLOSE_BRACKET);
+            advance(p);
+            expect(p, TOK_EQ);
+            advance(p);
+
+            if_unlikely (expr->kind != EXPR_LITERAL || !ty_is_integer(expr->ty)) {
+                error_at_expr(p, expr, REPORT_ERROR, "index must be a compile-time constant integer");
+            }
+            index = expr->literal;
+
+            if_unlikely (index >= array_len) {
+                error_at_expr(p, expr, REPORT_ERROR, "index (%u) must be less than array length (%u)", index, array_len);
+            }
+
+            Expr* value = parse_initializer(p, elem_ty);
+            if_unlikely (!ty_compatible(elem_ty, value->ty, value->kind == EXPR_LITERAL)) {
+                error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to %s",
+                    ty_name(value->ty), ty_name(elem_ty));
+            }
+
+            Expr* item = new_expr(p, EXPR_INDEXED_ITEM, elem_ty, indexed_item);
+            item->indexed_item.index = index;
+            item->indexed_item.value = value;
+            vec_append(&dynbuf, item);
+        } else {
+            Expr* value = parse_initializer(p, elem_ty);
+            if_unlikely (!ty_compatible(elem_ty, value->ty, value->kind == EXPR_LITERAL)) {
+                error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to %s",
+                    ty_name(value->ty), ty_name(elem_ty));
+            }
+
+            if_unlikely (index >= array_len) {
+                error_at_expr(p, value, REPORT_ERROR, "index (%u) must be less than array length (%u)", index, array_len);
+            }
+            vec_append(&dynbuf, value);
+        }
+
+        index++;
+        exprs_len++;
+
+        if_likely (match(p, TOK_COMMA)) {
+            advance(p);
+            continue;
+        } else {
+            break;
+        }
+    }
+    expect(p, TOK_CLOSE_BRACE);
+    advance(p);
+
+
+    Expr** exprs = (Expr**)dynbuf_to_arena(p, exprs_start);
+
+    Expr* array_init = new_expr(p, EXPR_COMPOUND_LITERAL, array_ty, compound_lit);
+    array_init->compound_lit.len = exprs_len;
+    array_init->compound_lit.values = exprs;
+    array_init->token_index = init_start_token;
+
+    dynbuf_restore(exprs_start);
+
+    return array_init;
+}
+
+
+Expr* parse_record_initializer(Parser* p, TyIndex record_ty) {
+    u32 init_start_token = p->cursor;
+
+    expect(p, TOK_OPEN_BRACE);
+    advance(p);
+    if_unlikely (match(p, TOK_CLOSE_BRACE)) {
+        Expr* empty = new_expr(p, EXPR_EMPTY_COMPOUND_LITERAL, record_ty, nothing);
+        empty->token_index = p->cursor;
+        advance(p);
+        return empty;
+    }
+
+    u32 exprs_start = dynbuf_start();
+    u32 exprs_len = 0;
+
+    // [ ident ] = initializer
+
+    while (!match(p, TOK_CLOSE_BRACE)) {
+
+        expect(p, TOK_OPEN_BRACKET);
+        advance(p);
+        expect(p, TOK_IDENTIFIER);
+        string member_name = tok_span(p->current);
+
+        u32 member_index = 0;
+        TyIndex member_ty = TY__INVALID;
+
+        TyRecord* record = TY(record_ty, TyRecord);
+        for_n (i, 0, record->len) {
+            Ty_RecordMember member = record->members[i];
+            if (string_eq(member_name, from_compact(member.name))) {
+                member_index = i;
+                member_ty = member.type;
+            }
+        }
+        if (member_ty == TY__INVALID) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "member '"str_fmt"' does not exist", str_arg(member_name));
+        }
+
+        advance(p);
+        expect(p, TOK_CLOSE_BRACKET);
+        advance(p);
+        expect(p, TOK_EQ);
+        advance(p);
+
+        Expr* value = parse_initializer(p, member_ty);
+        if_unlikely (!ty_compatible(member_ty, value->ty, value->kind == EXPR_LITERAL)) {
+            error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to %s",
+                ty_name(value->ty), ty_name(member_ty));
+        }
+
+        Expr* item = new_expr(p, EXPR_INDEXED_ITEM, member_ty, indexed_item);
+        item->indexed_item.index = member_index;
+        item->indexed_item.value = value;
+        vec_append(&dynbuf, item);
+
+        exprs_len++;
+
+        if_likely (match(p, TOK_COMMA)) {
+            advance(p);
+            continue;
+        } else {
+            break;
+        }
+    }
+    expect(p, TOK_CLOSE_BRACE);
+    advance(p);
+
+
+    Expr** exprs = (Expr**)dynbuf_to_arena(p, exprs_start);
+
+    Expr* array_init = new_expr(p, EXPR_COMPOUND_LITERAL, record_ty, compound_lit);
+    array_init->compound_lit.len = exprs_len;
+    array_init->compound_lit.values = exprs;
+    array_init->token_index = init_start_token;
+
+    dynbuf_restore(exprs_start);
+
+    return array_init;
+}
+
+Expr* parse_initializer(Parser* p, TyIndex ty) {
+    switch (TY_KIND(ty)) {
+    case TY_ARRAY:
+        return parse_array_initializer(p, ty);
+    case TY_STRUCT:
+    case TY_STRUCT_PACKED:
+        return parse_record_initializer(p, ty);
+    default:
+        return parse_expr(p);
     }
 }
 
@@ -1648,21 +1876,19 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
                 parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "EXTERN variable cannot have a value");
             }
             advance(p);
-            Expr* value = parse_expr(p);
+            Expr* value = parse_initializer(p, var->ty);
             decl->var_decl.expr = value;
             if_unlikely (!ty_compatible(decl_ty, value->ty, value->kind == EXPR_LITERAL)) {
                 error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to %s",
                     ty_name(value->ty), ty_name(decl_ty));
             }
-            if_unlikely (!ty_is_scalar(value->ty)) {
-                error_at_expr(p, value, REPORT_ERROR, "cannot use non-scalar type %s",
-                    ty_name(value->ty));
-            }
+            // if_unlikely (!ty_is_scalar(value->ty)) {
+            //     error_at_expr(p, value, REPORT_ERROR, "cannot use non-scalar type %s",
+            //         ty_name(value->ty));
+            // }
             // this is a global declaration
             if (storage != STORAGE_LOCAL) {
-                if_unlikely (!is_linktime_const(value)) {
-                    error_at_expr(p, value, REPORT_ERROR, "expression is not link-time constant");
-                }
+                ensure_linktime_const(p, value);
             }
         }
     } else {
@@ -1670,22 +1896,23 @@ Stmt* parse_var_decl(Parser* p, StorageKind storage) {
             parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "EXTERN variable must specify a type");
         }
         advance(p);
-        Expr* value = parse_expr(p);
+        Expr* value = parse_initializer(p, var->ty);
         if_unlikely (var->storage == STORAGE_EXTERN && !ty_compatible(var->ty, value->ty, true)) {
             // parse_error(p, type_start, p->cursor - 1, REPORT_NOTE, "from previous declaration");
             error_at_expr(p, value, REPORT_ERROR, "type %s cannot coerce to EXTERN type %s",
                     ty_name(value->ty), ty_name(var->ty));
         }
         
-        if_unlikely (!ty_is_scalar(value->ty)) {
-            error_at_expr(p, value, REPORT_ERROR, "cannot use non-scalar type %s",
-                ty_name(value->ty));
-        }
+        // if_unlikely (!ty_is_scalar(value->ty)) {
+        //     error_at_expr(p, value, REPORT_ERROR, "cannot use non-scalar type %s",
+        //         ty_name(value->ty));
+        // }
         // this is a global declaration
         if (storage != STORAGE_LOCAL) {
-            if_unlikely (!is_linktime_const(value)) {
-                error_at_expr(p, value, REPORT_ERROR, "expression is not link-time constant");
-            }
+            // if_unlikely (!is_linktime_const(value)) {
+            //     error_at_expr(p, value, REPORT_ERROR, "expression is not link-time constant");
+            // }
+            ensure_linktime_const(p, value);
         }
 
         decl->var_decl.expr = value;

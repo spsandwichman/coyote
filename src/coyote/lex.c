@@ -3,9 +3,9 @@
 #include "common/util.h"
 #include "common/vec.h"
 
-const char* token_kind[_TOK_COUNT] = {
+const char* token_kind[TOK__COUNT] = {
 
-    [_TOK_INVALID] = "[invalid]",
+    [TOK__INVALID] = "[invalid]",
     [TOK_EOF] = "EOF",
 
     [TOK_NEWLINE] = "newline",
@@ -539,16 +539,20 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
                 if (lhs.kind != PPVAL_STRING && rhs.kind != PPVAL_STRING) {
                     TODO("error: expected string");
                 }
-                // dirty!
-                string newstr = string_alloc(lhs.string.len + rhs.string.len);
+
+                string newstr;
+                newstr.len = lhs.string.len + rhs.string.len;
+                newstr.raw = arena_alloc(l->arena, newstr.len, 1);
                 if (newstr.len > COMPACT_STR_MAX_LEN) {
                     TODO("error: string too long");
                 }
 
                 memcpy(newstr.raw, (void*)(i64)lhs.string.raw, lhs.string.len);
                 memcpy(newstr.raw + lhs.string.len, (void*)(i64)rhs.string.raw, rhs.string.len);
+
                 v.kind = PPVAL_STRING;
                 v.string = to_compact(newstr);
+
             } else if (string_eq(tok_span(op), constr("STRCMP"))) {
                 PreprocVal lhs = preproc_collect_value(l, scope);
                 PreprocVal rhs = preproc_collect_value(l, scope);
@@ -570,24 +574,24 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
             }
             v.kind = PPVAL_INTEGER;
             switch (op.kind) {
-            case TOK_PLUS:   v.integer = lhs.integer + rhs.integer; break;
-            case TOK_MINUS:  v.integer = lhs.integer - rhs.integer; break;
-            case TOK_MUL:    v.integer = lhs.integer * rhs.integer; break;
-            case TOK_DIV:    v.integer = lhs.integer / rhs.integer; break;
-            case TOK_MOD:    v.integer = lhs.integer % rhs.integer; break;
-            case TOK_AND:    v.integer = lhs.integer & rhs.integer; break;
-            case TOK_OR:     v.integer = lhs.integer | rhs.integer; break;
-            case TOK_XOR: v.integer = lhs.integer ^ rhs.integer; break;
-            case TOK_LSHIFT: v.integer = lhs.integer << rhs.integer; break;
-            case TOK_RSHIFT: v.integer = lhs.integer >> rhs.integer; break;
+            case TOK_PLUS:       v.integer = lhs.integer + rhs.integer; break;
+            case TOK_MINUS:      v.integer = lhs.integer - rhs.integer; break;
+            case TOK_MUL:        v.integer = lhs.integer * rhs.integer; break;
+            case TOK_DIV:        v.integer = lhs.integer / rhs.integer; break;
+            case TOK_MOD:        v.integer = lhs.integer % rhs.integer; break;
+            case TOK_AND:        v.integer = lhs.integer & rhs.integer; break;
+            case TOK_OR:         v.integer = lhs.integer | rhs.integer; break;
+            case TOK_XOR:        v.integer = lhs.integer ^ rhs.integer; break;
+            case TOK_LSHIFT:     v.integer = lhs.integer << rhs.integer; break;
+            case TOK_RSHIFT:     v.integer = lhs.integer >> rhs.integer; break;
             case TOK_EQ_EQ:      v.integer = lhs.integer == rhs.integer; break;
             case TOK_NOT_EQ:     v.integer = lhs.integer != rhs.integer; break;
             case TOK_LESS_EQ:    v.integer = lhs.integer <= rhs.integer; break;
             case TOK_GREATER_EQ: v.integer = lhs.integer >= rhs.integer; break;
             case TOK_LESS:       v.integer = lhs.integer < rhs.integer; break;
             case TOK_GREATER:    v.integer = lhs.integer > rhs.integer; break;
-            case TOK_KW_AND: v.integer = lhs.integer && rhs.integer; break;
-            case TOK_KW_OR:  v.integer = lhs.integer || rhs.integer; break;
+            case TOK_KW_AND:     v.integer = lhs.integer && rhs.integer; break;
+            case TOK_KW_OR:      v.integer = lhs.integer || rhs.integer; break;
             default:
                 UNREACHABLE;
             }
@@ -1059,7 +1063,7 @@ static Token lex_with_preproc(Lexer* l, Vec(Token)* tokens, PreprocScope* scope)
 
 Parser lex_entrypoint(SrcFile* f) {
     // init keyword perfect hash table
-    for (usize i = _TOK_KEYWORDS_BEGIN + 1; i < _TOK_KEYWORDS_END; ++i) {
+    for (usize i = TOK__KEYWORDS_BEGIN + 1; i < TOK__KEYWORDS_END; ++i) {
         const char* keyword = token_kind[i];
         u8 hash = hashfunc(keyword, strlen(keyword));
         if (keyword_table[hash]) {
@@ -1070,12 +1074,16 @@ Parser lex_entrypoint(SrcFile* f) {
         keyword_code_table[hash] = i;
     }
 
+    Arena arena;
+    arena_init(&arena);
+
     // init macro info arena
     macro_arg_pool = vec_new(Token, 128);
     preproc_val_pool = vec_new(PreprocVal, 128);
     
     Vec(Token) tokens = vec_new(Token, 512);
     Lexer l = lexer_from_string(f->src);
+    l.arena = &arena;
     strmap_init(&global_scope.map, 64);
 
     lex_with_preproc(&l, &tokens, &global_scope);
@@ -1093,18 +1101,18 @@ Parser lex_entrypoint(SrcFile* f) {
         .tokens_len = tokens.len,
         .sources = vecptr_new(SrcFile, 16),
         .cursor = 0,
+        .arena = arena,
     };
-    ctx.global_scope = malloc(sizeof(ParseScope));
+    ctx.global_scope = arena_alloc(&ctx.arena, sizeof(ParseScope), alignof(ParseScope));
     ctx.global_scope->sub = nullptr;
     ctx.global_scope->super = nullptr;
     strmap_init(&ctx.global_scope->map, 128);
     ctx.current_scope = ctx.global_scope;
     
-    arena_init(&ctx.arena);
     arena_init(&ctx.entities);
 
     for_n(i, 0, tokens.len) {
-        if (tokens.at[i].kind < _TOK_LEX_IGNORE) {
+        if (tokens.at[i].kind < TOK__PARSE_IGNORE) {
             ctx.current = tokens.at[i];
             ctx.cursor = i;
             break;

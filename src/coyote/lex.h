@@ -75,6 +75,7 @@ typedef struct {
     usize cursor;
     char current;
     bool eof;
+    Arena* arena;
 } Lexer;
 
 #define LEX_MAX_TOKEN_LEN 127
@@ -96,7 +97,7 @@ static_assert(sizeof(Token) == 8);
 #define tok_raw(t) ((char*)(i64)((t).raw))
 
 enum {
-    _TOK_INVALID,
+    TOK__INVALID,
     TOK_EOF,
 
     TOK_OPEN_PAREN,    // (
@@ -156,13 +157,13 @@ enum {
     // doesn't appear in final token stream
     TOK_HASH,
 
-    _TOK_KEYWORDS_BEGIN,
+    TOK__KEYWORDS_BEGIN,
 
     #define T(ident) TOK_KW_##ident,
         _LEX_KEYWORDS_
     #undef T
 
-    _TOK_KEYWORDS_END,
+    TOK__KEYWORDS_END,
 
     // these get preserved and passed onto the parser
     TOK_PREPROC_SECTION,
@@ -170,10 +171,11 @@ enum {
     TOK_PREPROC_LEAVESECTION,
     TOK_PREPROC_ASM,
 
-    // for tracking preprocessor replacements
-    // so error messages can trace it, and the parser
-    // can correctly scope things later
-    _TOK_LEX_IGNORE,
+    // 'invisible' tokens, mostly for tracking
+    // preprocessor stuff so error messages can 
+    // trace it, and the parser can correctly 
+    // scope things later
+    TOK__PARSE_IGNORE,
 
         TOK_PREPROC_MACRO_PASTE, // before a macro is invoked in source code
         // TOK_PREPROC_MACRO_ARG_PASTE, // before an argument to a macro gets replaced in the macro's body
@@ -183,13 +185,13 @@ enum {
 
         TOK_NEWLINE, 
 
-    _TOK_PREPROC_TRANSPARENT_END,
+    TOK__PARSE_IGNORE_END,
 
-    _TOK_COUNT
+    TOK__COUNT
 };
-static_assert(_TOK_COUNT < (1 << 7));
+static_assert(TOK__COUNT < (1 << 8));
 
-extern const char* token_kind[_TOK_COUNT];
+extern const char* token_kind[TOK__COUNT];
 
 VecPtr_typedef(SrcFile);
 typedef struct ParseScope ParseScope;

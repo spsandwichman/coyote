@@ -17,10 +17,9 @@ file = {decl};
 
 storageclass = PUBLIC | PRIVATE | EXPORT;
 
-compound = 
-    | "{" list<item> "}"
-    | "{" list<expr> "}"
-    ;
+item = ["[" expr "]" "="] expr;
+
+compound = "{" list<item> "}";
 
 decl =
     | [storageclass] fndecl
@@ -77,8 +76,6 @@ binop =
     | "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "|" | "&" | "$"
     | "!=" | "==" | "<" | ">" | "<=" | ">=" | AND | OR
     ;
-
-item = "[" expr "]" "=" expr;
 
 expr = 
     | expr binop expr         (* no precedence for now its ok *)
