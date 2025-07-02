@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "iron.h"
 #include "iron/iron.h"
 
 static const char* ty_name[] = {
@@ -13,12 +12,13 @@ static const char* ty_name[] = {
     [FE_TY_I16] = "i16",
     [FE_TY_I32] = "i32",
     [FE_TY_I64] = "i64",
-    
+
     [FE_TY_F16] = "f16",
     [FE_TY_F32] = "f32",
     [FE_TY_F64] = "f64",
-    
+
     [FE_TY_TUPLE] = "...",
+    [FE_TY_RECORD] = "{...}",
 
     [FE_TY_I8x16] = "i8x16",
     [FE_TY_I16x8] = "i16x8",
@@ -64,7 +64,7 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_UDIV] = "udiv",
     [FE_IREM] = "irem",
     [FE_UREM] = "urem",
-    
+
     [FE_AND] = "and",
     [FE_OR]  = "or",
     [FE_XOR] = "xor",

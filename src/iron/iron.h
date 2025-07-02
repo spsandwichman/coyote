@@ -98,6 +98,10 @@ typedef enum: u8 {
     // member types dependent on source inst
     FE_TY_TUPLE,
 
+    // there's an FeRecord associated with this somewhere near
+    FE_TY_RECORD,
+    FE_TY_ARRAY,
+
     FE_TY_V128 = 0b010000, // elem type fits in lower 4 bits
     FE_TY_V256 = 0b100000,
     FE_TY_V512 = 0b110000,
@@ -188,10 +192,23 @@ typedef enum: u8 {
     FE_SYMKIND_DATA,
 } FeSymbolKind;
 
+typedef enum: u8 {
+    FE_SECTION_WRITEABLE   = 1 << 0,
+    FE_SECTION_EXECUTABLE  = 1 << 1,
+    FE_SECTION_THREADLOCAL = 1 << 2,
+    FE_SECTION_COMMON      = 1 << 3,
+} FeSectionFlags;
+
+typedef struct FeSection {
+    FeCompactStr name;
+    FeSectionFlags flags;
+} FeSection;
+
 typedef struct FeSymbol {
     FeCompactStr name;
+    FeSection* section;
 
-    FeSymbolKind kind; // what does this symbol refer to?
+    FeSymbolKind kind;    // what does this symbol refer to?
     FeSymbolBinding bind; // where is this symbol visible?
 
     union {
@@ -204,6 +221,7 @@ typedef struct FeFuncParam {
 } FeFuncParam;
 
 // holds type/interface information about a function.
+
 typedef struct FeFuncSig {
     FeCallConv cconv;
     u16 param_len;
@@ -581,7 +599,7 @@ void fe__load_extra_size_table(usize start_index, u8* table, usize len);
 FeModule* fe_module_new(FeArch arch, FeSystem system);
 void fe_module_destroy(FeModule* mod);
 
-FeSymbol* fe_symbol_new(FeModule* mod, const char* name, u16 len, FeSymbolBinding bind);
+FeSymbol* fe_symbol_new(FeModule* m, const char* name, u16 len, FeSection* section, FeSymbolBinding bind);
 void fe_symbol_destroy(FeSymbol* sym);
 
 FeFuncSig* fe_funcsig_new(FeCallConv cconv, u16 param_len, u16 return_len);

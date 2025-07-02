@@ -608,7 +608,6 @@ void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, c
         }
     }
 
-    
     // find main line snippet
     SrcFile* main_file = ctx->sources.at[0];
     if (inside_preproc) {
@@ -626,7 +625,6 @@ void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, c
         }
 
         // vec_append(&reports, main_line_report);
-
 
         // construct the line
         u32 expanded_snippet_begin_index = start_index;    

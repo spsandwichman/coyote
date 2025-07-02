@@ -26,10 +26,6 @@ void fe_symtab_init(FeSymTab* st) {
     memset(st->entries, 0, sizeof(st->entries[0]) * st->cap);
 }
 
-// static bool is_tombstone(FeSymTableEntry* e) {
-//     return e->sym == SYMTAB_TOMBSTONE;
-// }
-
 void fe_symtab_put(FeSymTab* st, FeSymbol* sym) {
     FeCompactStr name = sym->name;
     usize hash = fnv1a(fe_compstr_data(name), name.len);

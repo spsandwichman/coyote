@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
-#include "coyote.h"
+#include "common/util.h"
+#include "common/arena.h"
 
 #define ARENA_CHUNK_DATA_SIZE 32768
 typedef struct Arena__Chunk {
@@ -67,7 +69,7 @@ void* arena_alloc(Arena* arena, usize size, usize align) {
     if (mem) {
         return mem;
     }
-    CRASH("unable to arena-alloc size %zu align %zu", size, align);
+    CRASH("unable to arena alloc size %zu align %zu", size, align);
 }
 
 ArenaState arena_save(Arena* arena) {

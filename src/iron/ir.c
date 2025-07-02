@@ -28,8 +28,12 @@ void fe_module_destroy(FeModule* mod) {
     fe_free(mod);
 }
 
+FeSection* fe_section_new(FeModule* m, const char* name, u16 len) {
+    
+}
+
 // if len == 0, calculate with strlen
-FeSymbol* fe_symbol_new(FeModule* m, const char* name, u16 len, FeSymbolBinding bind) {
+FeSymbol* fe_symbol_new(FeModule* m, const char* name, u16 len, FeSection* section, FeSymbolBinding bind) {
     if (name == nullptr) {
         fe_runtime_crash("symbol cannot be null");
     }
@@ -43,6 +47,7 @@ FeSymbol* fe_symbol_new(FeModule* m, const char* name, u16 len, FeSymbolBinding 
     FeSymbol* sym = fe_malloc(sizeof(FeSymbol));
     sym->kind = FE_SYMKIND_NONE;
     sym->bind = bind;
+    sym->section = section;
     sym->name = fe_compstr(name, len);
 
     if (fe_symtab_get(&m->symtab, name, len)) {

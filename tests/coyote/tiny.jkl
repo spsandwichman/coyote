@@ -1,0 +1,4 @@
+
+FN foo(): UWORD
+    RETURN 1
+END

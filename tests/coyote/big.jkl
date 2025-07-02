@@ -8,17 +8,29 @@
 // order to reuse these things for the other self-hosted tools.
 //
 
-#DEFINE BITS 64
-
 ENUM TlStatus : UWORD
     TL_SUCCESS,
     TL_NO_MEMORY,
     TL_COULDNT_OPEN,
 END
 
+#IF ( == BITS 64 )
+
 #DEFINE TL_MACHINE_WORD_MAX 0xFFFFFFFFFFFFFFFF
 #DEFINE TL_MACHINE_WORD_WIDTH 64
 #DEFINE TL_MACHINE_WORD_SIZE 8
+
+#ELSEIF ( == BITS 32 )
+
+#DEFINE TL_MACHINE_WORD_MAX 0xFFFFFFFF
+#DEFINE TL_MACHINE_WORD_WIDTH 32
+#DEFINE TL_MACHINE_WORD_SIZE 4
+
+#ELSE
+
+#ERROR ( STRCAT "[BLD] Bad bitness: " BITS )
+
+#END
 
 #MACRO TlInitializeList ( head ) [
     listhead := (head)
