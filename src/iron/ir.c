@@ -1,5 +1,6 @@
 #include "iron.h"
 #include "iron/iron.h"
+#include <string.h>
 
 static const char* inst_name(FeInst* inst) {
     FeInst* bookend = inst;
@@ -11,8 +12,9 @@ static const char* inst_name(FeInst* inst) {
 }
 
 FeModule* fe_module_new(FeArch arch, FeSystem system) {
-    FeModule* mod = fe_malloc(sizeof(FeModule));
-    memset(mod, 0, sizeof(FeModule));
+    FeModule* mod = fe_malloc(sizeof(*mod));
+    memset(mod, 0, sizeof(*mod));
+
     mod->target = fe_make_target(arch, system);
     fe_symtab_init(&mod->symtab);
     return mod;
@@ -28,8 +30,23 @@ void fe_module_destroy(FeModule* mod) {
     fe_free(mod);
 }
 
-FeSection* fe_section_new(FeModule* m, const char* name, u16 len) {
-    
+FeSection* fe_section_new(FeModule* m, const char* name, u16 len, FeSectionFlags flags) {
+    FeSection* section = fe_malloc(sizeof(*section));
+    memset(section, 0, sizeof(*section));
+
+    section->name = fe_compstr(name, len);
+    section->flags = flags;
+
+    if (m->sections.first == nullptr) {
+        m->sections.first = section;
+        m->sections.last = section;
+    } else {
+        section->prev = m->sections.last;
+        m->sections.last->next = section;
+        m->sections.last = section;
+    }
+
+    return section;
 }
 
 // if len == 0, calculate with strlen
@@ -65,7 +82,7 @@ void fe_symbol_destroy(FeSymbol* sym) {
 
 FeFuncSig* fe_funcsig_new(FeCallConv cconv, u16 param_len, u16 return_len) {
     FeFuncSig* sig = fe_malloc(
-        sizeof(FeFuncSig) + (param_len + return_len) * sizeof(sig->params[0])
+        sizeof(*sig) + (param_len + return_len) * sizeof(sig->params[0])
     );
     sig->cconv = cconv,
     sig->param_len = param_len;
@@ -92,8 +109,9 @@ void fe_funcsig_destroy(FeFuncSig* sig) {
 }
 
 FeBlock* fe_block_new(FeFunc* f) {
-    FeBlock* block = fe_malloc(sizeof(FeBlock));
+    FeBlock* block = fe_malloc(sizeof(*block));
     memset(block, 0, sizeof(*block));
+
     block->func = f;
     
     // adds initial bookend instruction to block
@@ -112,7 +130,8 @@ FeBlock* fe_block_new(FeFunc* f) {
         last->list_next = block;
         f->last_block = block;
     } else {
-        f->last_block = f->entry_block = block;
+        f->last_block = block;
+        f->entry_block = block;
     }
     return block;
 }
@@ -167,11 +186,11 @@ FeFunc* fe_func_new(FeModule* mod, FeSymbol* sym, FeFuncSig* sig, FeInstPool* ip
 
     // append to function list
     if (mod->funcs.first == nullptr) {
-        mod->funcs.first = mod->funcs.last = f;
+        mod->funcs.first = f;
+        mod->funcs.last = f;
     } else {
         f->list_prev = mod->funcs.last;
         f->list_prev->list_next = f;
-        f->list_next = nullptr;
         mod->funcs.last = f;
     }
     
@@ -226,8 +245,8 @@ void fe_func_destroy(FeFunc *f) {
     } else {
         f->list_prev->list_next = f->list_next;
     }
-    f->list_next = NULL;
-    f->list_prev = NULL;
+    // f->list_next = NULL;
+    // f->list_prev = NULL;
     fe_free(f);
 }
 

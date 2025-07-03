@@ -1354,6 +1354,10 @@ Expr* parse_atom(Parser* p) {
 Expr* parse_unary(Parser* p) {
     // ArenaState save = arena_save(&p->arena);
 
+    while_unlikely (match(p, TOK_KW_NOTHING)) {
+        advance(p);
+    }
+
     u32 op_position = p->cursor;
 
     switch (p->current.kind) {

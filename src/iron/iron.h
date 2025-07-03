@@ -1,6 +1,10 @@
 #ifndef IRON_H
 #define IRON_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -25,6 +29,10 @@
 #else
     #error unrecognized host!
 #endif
+
+// -------------------------------------
+// simple utilities
+// -------------------------------------
 
 typedef uint64_t u64;
 typedef uint32_t u32;
@@ -75,6 +83,10 @@ typedef _Float16 f16;
 #ifndef for_n
     #define for_n(iterator, start, end) for (usize iterator = (start); iterator < (end); ++iterator)
 #endif
+
+// -------------------------------------
+// internal type system
+// -------------------------------------
 
 #define FE_TY_VEC(vecty, elemty) (vecty + elemty)
 #define FE_TY_VEC_ELEM(ty) (ty & 0b1111)
@@ -133,6 +145,37 @@ typedef enum: u8 {
     FE__TY_END,
 } FeTy;
 
+typedef struct FeComplexTy FeComplexTy;
+typedef struct FeRecordField FeRecordField;
+
+// for representing struct (record) and array types
+typedef struct FeComplexTy {
+    union {
+        FeTy ty;
+        struct {
+            FeTy _ty; // mirror of ty for layout
+            FeTy elem_ty;
+            u32 len;
+            FeComplexTy* complex_elem_ty;
+        } array;
+        struct {
+            FeTy _ty; // mirror of ty for layout
+            u32 fields_len;
+            FeRecordField* fields;
+        } record;
+    };
+} FeComplexTy;
+
+typedef struct FeRecordField {
+    FeTy ty;
+    u16 offset;
+    FeComplexTy* complex_ty; // if applicable
+} FeRecordField;
+
+// -------------------------------------
+// architecture/ABI stuff
+// -------------------------------------
+
 typedef enum: u8 {
     FE_ARCH_X86_64 = 1,
 
@@ -146,7 +189,7 @@ typedef enum: u8 {
     FE_SYSTEM_FREESTANDING = 1,
 } FeSystem;
 
-typedef enum: u8 {
+typedef enum : u8 {
     // pass parameters however iron sees fit
     // likely picks based on target
     FE_CCONV_ANY = 0,
@@ -160,11 +203,16 @@ typedef enum: u8 {
     FE_CCONV_JACKAL, // hi will
 } FeCallConv;
 
+// -------------------------------------
+// iron IR
+// -------------------------------------
+
 typedef struct FeInst FeInst;
 typedef struct FeBlock FeBlock;
 typedef struct FeSymbol FeSymbol;
 typedef struct FeFunc FeFunc;
 typedef struct FeFuncSig FeFuncSig;
+typedef struct FeSection FeSection;
 typedef struct FeModule FeModule;
 typedef struct FeTarget FeTarget;
 typedef struct FeStackItem FeStackItem;
@@ -191,18 +239,6 @@ typedef enum: u8 {
     FE_SYMKIND_FUNC,
     FE_SYMKIND_DATA,
 } FeSymbolKind;
-
-typedef enum: u8 {
-    FE_SECTION_WRITEABLE   = 1 << 0,
-    FE_SECTION_EXECUTABLE  = 1 << 1,
-    FE_SECTION_THREADLOCAL = 1 << 2,
-    FE_SECTION_COMMON      = 1 << 3,
-} FeSectionFlags;
-
-typedef struct FeSection {
-    FeCompactStr name;
-    FeSectionFlags flags;
-} FeSection;
 
 typedef struct FeSymbol {
     FeCompactStr name;
@@ -263,12 +299,35 @@ FeSymbol* fe_symtab_get(FeSymTab* st, const char* data, u16 len);
 void fe_symtab_remove(FeSymTab* st, const char* data, u16 len);
 void fe_symtab_destroy(FeSymTab* st);
 
+
+typedef enum: u8 {
+    FE_SECTION_WRITEABLE   = 1 << 0,
+    FE_SECTION_EXECUTABLE  = 1 << 1,
+    FE_SECTION_THREADLOCAL = 1 << 2,
+    FE_SECTION_COMMON      = 1 << 3,
+} FeSectionFlags;
+
+typedef struct FeSection {
+    FeCompactStr name;
+    FeSectionFlags flags;
+
+    FeSection* next;
+    FeSection* prev;
+} FeSection;
+
 typedef struct FeModule {
-    const FeTarget* target;
+
+    struct {
+        FeSection* first;
+        FeSection* last;
+    } sections;
+
     struct {
         FeFunc* first;
         FeFunc* last;
     } funcs;
+
+    const FeTarget* target;
 
     FeSymTab symtab;
 } FeModule;
@@ -562,6 +621,7 @@ typedef enum : u16 {
     // (x op y) op z == x op (y op z)
     FE_TRAIT_ASSOCIATIVE      = 1u << 1,
     // (x op y) op z == x op (y op z) trust me vro 💀🙏🥀
+    // (only associative under imprecise 'fast' circumstances)
     FE_TRAIT_FAST_ASSOCIATIVE = 1u << 2,
     // cannot be simply removed if result is not used
     FE_TRAIT_VOLATILE         = 1u << 3,
@@ -691,22 +751,21 @@ const char* fe_ty_name(FeTy ty);
 // with a runtime init function
 #define FE_INST_EXTRA_MAX_SIZE sizeof(FeInstCall)
 
-
 typedef struct FeWorklist {
     FeInst** at;
     u32 len;
     u32 cap;
 } FeWorklist;
 
-
 void fe_wl_init(FeWorklist* wl);
 void fe_wl_push(FeWorklist* wl, FeInst* inst);
 FeInst* fe_wl_pop(FeWorklist* wl);
 void fe_wl_destroy(FeWorklist* wl);
 
-
-// --------------------------- allocation ----------------------------
-// TODO merge FeInstPool and FeArena into the same thing lol
+// -------------------------------------
+// allocation
+// -------------------------------------
+// TODO merge FeInstPool and FeArena into the same thing? idk
 
 #define FE__IPOOL_FREE_SPACES_LEN (FE_INST_EXTRA_MAX_SIZE / sizeof(usize) + 1)
 typedef struct Fe__InstPoolChunk Fe__InstPoolChunk;
@@ -739,17 +798,19 @@ void* fe_arena_alloc(FeArena* arena, usize size, usize align);
 FeArenaState fe_arena_save(FeArena* arena);
 void fe_arena_restore(FeArena* arena, FeArenaState save);
 
-// ----------------------------- passes ------------------------------
+// -------------------------------------
+// passes/transformations
+// -------------------------------------
 
 typedef struct {
     bool warning;
-
     enum : u8 { // something's wrong with...
         FE_VERIFY_INST,    // an instruction
         FE_VERIFY_BLOCK,   // a block
         FE_VERIFY_FUNC,    // a function
         FE_VERIFY_FUNCSIG, // a function signature
         FE_VERIFY_SYMBOL,  // a symbol
+        FE_VERIFY_SECTION, // a section
     } kind;
     char* message;
     union {
@@ -758,6 +819,7 @@ typedef struct {
         FeFunc*    func;
         FeFuncSig* funcsig;
         FeSymbol*  symbol;
+        FeSection* section;
     };
 } FeVerifyReport;
 
@@ -775,7 +837,9 @@ void fe_cfg_destroy(FeFunc* f);
 void fe_opt_tdce(FeFunc* f);
 void fe_opt_algsimp(FeFunc* f);
 
-// ------------------------------ utils ------------------------------
+// -------------------------------------
+// IO utilities
+// -------------------------------------
 
 // like stringbuilder but epic
 typedef struct FeDataBuffer {
@@ -817,7 +881,9 @@ void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref);
 // in the event of a bad signal
 void fe_init_signal_handler();
 
-// ----------------------------- codegen -----------------------------
+// -------------------------------------
+// code generation
+// -------------------------------------
 
 #define FE_ISEL_GENERATED 0
 #define FE_VREG_REAL_UNASSIGNED UINT16_MAX
@@ -853,8 +919,8 @@ typedef struct FeVRegBuffer {
 } FeVRegBuffer;
 
 typedef enum : u8 {
-    FE_REG_CALL_CLOBBERED,
-    FE_REG_CALL_PRESERVED,
+    FE_REG_CALL_CLOBBERED, // aka "caller-saved"
+    FE_REG_CALL_PRESERVED, // aka "callee-saved"
     FE_REG_UNUSABLE,
 } FeRegStatus;
 
@@ -899,5 +965,9 @@ FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr);
 
 void fe_codegen(FeFunc* f);
 void fe_emit_asm(FeDataBuffer* db, FeModule* m);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
