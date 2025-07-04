@@ -174,6 +174,12 @@ static void print_inst_ty(FeDataBuffer* db, FeInst* inst) {
     }
 }
 
+void fe__emit_ir_stack_label(FeDataBuffer* db, FeStackItem* item) {
+    if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(item->flags));
+    fe_db_writef(db, "s%u", item->flags);
+    if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
+}
+
 void fe__emit_ir_block_label(FeDataBuffer* db, FeFunc* f, FeBlock* ref) {
     if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->flags));
     fe_db_writef(db, "%u:", ref->flags);
@@ -314,6 +320,31 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         fe_db_write(db, fe_compstr_data(sym->name), sym->name.len);
         fe_db_writecstr(db, "\"");
         break;
+    case FE_STACK_ADDR:
+        ;
+        FeStackItem* item = fe_extra_T(inst, FeInstStackAddr)->item;
+        fe__emit_ir_stack_label(db, item);
+        break;
+    case FE_LOAD:
+    case FE_LOAD_VOLATILE:
+        ;
+        FeInstLoad* load = fe_extra(inst);
+        if (load->unaligned) {
+            fe_db_writecstr(db, "unaligned ");
+        }
+        fe__emit_ir_ref(db, f, load->ptr);
+        break;
+    case FE_STORE:
+    case FE_STORE_VOLATILE:
+        ;
+        FeInstStore* store = fe_extra(inst);
+        if (store->unaligned) {
+            fe_db_writecstr(db, "unaligned ");
+        }
+        fe__emit_ir_ref(db, f, store->ptr);
+            fe_db_writecstr(db, ", ");
+        fe__emit_ir_ref(db, f, store->val);
+        break;
     case FE_CONST:
         switch (inst->ty) {
         case FE_TY_BOOL: fe_db_writef(db, "%s", fe_extra_T(inst, FeInstConst)->val ? "true" : "false"); break;
@@ -397,15 +428,12 @@ void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
     u32 stack_counter = 1;
     for (FeStackItem* item = f->stack_top; item != nullptr; item = item->next) {
         item->flags = stack_counter;
-
-        fe_db_writef(db, "    %d: ", stack_counter);
-
+        fe_db_writef(db, "    s%d: ", stack_counter);
         print_ty(db, item->ty, item->complex_ty);
-
+        fe_db_writecstr(db, "\n");
         stack_counter++;
     }
-    
-    
+
     for_blocks(block, f) {
         fe_db_writecstr(db, "  ");
         fe__emit_ir_block_label(db, f, block);

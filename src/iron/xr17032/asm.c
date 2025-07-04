@@ -207,48 +207,63 @@ static void emit_inst(FeFunc* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
     fe_db_writecstr(db, "\n");
 }
 
-void xr_emit_assembly(FeDataBuffer* db, FeModule* m) {
-
-    fe_db_writecstr(db, ".section text\n\n");
-    for_funcs(f, m) {
-        // number all instructions and blocks
-        u32 block_counter = 1;
-        for_blocks(block, f) {
-            block->flags = block_counter++;
-            for_inst(inst, block) {
-                inst->flags = 0;
-            }
+static void emit_func(FeDataBuffer* db, FeModule* m, FeFunc* f) {
+    // number all instructions and blocks
+    u32 block_counter = 1;
+    for_blocks(block, f) {
+        block->flags = block_counter++;
+        for_inst(inst, block) {
+            inst->flags = 0;
         }
+    }
 
-        // function label
+    // function label
+    fe_db_write(db, fe_compstr_data(f->sym->name), f->sym->name.len);
+    fe_db_writecstr(db, ":\n");
+
+    // visibility 
+    switch (f->sym->bind) {
+    case FE_BIND_EXTERN:
+    case FE_BIND_SHARED_IMPORT:
+    case FE_BIND_LOCAL:
+        break;
+    case FE_BIND_GLOBAL:
+        fe_db_writecstr(db, ".global ");
         fe_db_write(db, fe_compstr_data(f->sym->name), f->sym->name.len);
+        fe_db_writecstr(db, "\n");
+        break;
+    case FE_BIND_SHARED_EXPORT:
+        fe_db_writecstr(db, ".export ");
+        fe_db_write(db, fe_compstr_data(f->sym->name), f->sym->name.len);
+        fe_db_writecstr(db, "\n");
+        break;
+    }
+
+    for_blocks(block, f) {
+        emit_block_name(db, block);
         fe_db_writecstr(db, ":\n");
 
-        // visibility 
-        switch (f->sym->bind) {
-        case FE_BIND_EXTERN:
-        case FE_BIND_SHARED_IMPORT:
-        case FE_BIND_LOCAL:
-            break;
-        case FE_BIND_GLOBAL:
-            fe_db_writecstr(db, ".global ");
-            fe_db_write(db, fe_compstr_data(f->sym->name), f->sym->name.len);
-            fe_db_writecstr(db, "\n");
-            break;
-        case FE_BIND_SHARED_EXPORT:
-            fe_db_writecstr(db, ".export ");
-            fe_db_write(db, fe_compstr_data(f->sym->name), f->sym->name.len);
-            fe_db_writecstr(db, "\n");
-            break;
+        for_inst(inst, block) {
+            emit_inst(f, block, db, inst);
         }
+    }
+}
 
-        for_blocks(block, f) {
-            emit_block_name(db, block);
-            fe_db_writecstr(db, ":\n");
+void xr_emit_assembly(FeDataBuffer* db, FeModule* m) {
 
-            for_inst(inst, block) {
-                emit_inst(f, block, db, inst);
+    // fe_db_writecstr(db, ".section text\n\n");
+    
+    for(FeSection* section = m->sections.first; section != nullptr; section = section->next) {
+        fe_db_writecstr(db, ".section ");
+        fe_db_write(db, fe_compstr_data(section->name), section->name.len);
+        fe_db_writecstr(db, "\n\n");
+
+        for_funcs(f, m) {
+            if (f->sym->section != section) {
+                continue;
             }
+
+            emit_func(db, m, f);
         }
     }
 }

@@ -1,5 +1,6 @@
 #include "iron.h"
 #include "iron/iron.h"
+#include <corecrt.h>
 #include <string.h>
 
 static const char* inst_name(FeInst* inst) {
@@ -651,6 +652,25 @@ FeInst* fe_inst_const_f16(FeFunc* f, f16 val) {
     return inst;
 }
 
+FeInst* fe_inst_load(FeFunc* f, FeTy ty, FeInst* ptr, bool is_volatile, bool unaligned) {
+    FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstLoad));
+    inst->kind = is_volatile ? FE_LOAD_VOLATILE : FE_LOAD;
+    inst->ty = ty;
+    fe_extra_T(inst, FeInstLoad)->ptr = ptr;
+    fe_extra_T(inst, FeInstLoad)->unaligned = unaligned;
+    return inst;
+}
+
+FeInst* fe_inst_store(FeFunc* f, FeInst* ptr, FeInst* val, bool is_volatile, bool unaligned) {
+    FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstStore));
+    inst->kind = is_volatile ? FE_STORE_VOLATILE : FE_STORE;
+    inst->ty = FE_TY_VOID;
+    fe_extra_T(inst, FeInstStore)->ptr = ptr;
+    fe_extra_T(inst, FeInstStore)->val = val;
+    fe_extra_T(inst, FeInstStore)->unaligned = unaligned;
+    return inst;
+}
+
 FeInst* fe_inst_stack_addr(FeFunc* f, FeTy ty, FeStackItem* item) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstStackAddr));
     inst->kind = FE_STACK_ADDR;
@@ -919,6 +939,7 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE__MACH_PROJ] = VOL,
     [FE_PARAM] = VOL,
     [FE_CONST] = 0,
+    [FE_STACK_ADDR] = 0,
     [FE_SYM_ADDR] = 0,
 
     [FE_IADD] = BINOP | INT_IN | VEC_IN | SAME_IN_OUT | SAME_INS | COMMU | ASSOC | FAST_ASSOC,

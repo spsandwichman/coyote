@@ -25,10 +25,10 @@ LD = gcc
 
 INCLUDEPATHS = -Isrc/
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
-CFLAGS = -std=gnu2x -g0 -fwrapv -fno-strict-aliasing
+CFLAGS = -std=gnu2x -g -fwrapv -fno-strict-aliasing
 WARNINGS = -Wall -Wimplicit-fallthrough -Wno-deprecated-declarations -Wno-enum-compare -Wno-unused -Wno-format -Wno-enum-conversion -Wincompatible-pointer-types -Wno-discarded-qualifiers -Wno-strict-aliasing
 ALLFLAGS = $(CFLAGS) $(WARNINGS)
-OPT = -O3
+OPT = -Og
 
 ifneq ($(OS),Windows_NT)
 	CFLAGS += -rdynamic

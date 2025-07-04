@@ -254,6 +254,9 @@ FeInst** xr_list_inputs(FeInst* inst, usize* len_out) {
     case XR_ADDI ... XR_LOAD32_IMM:
         *len_out = 1;
         return &fe_extra_T(inst, XrRegImm16)->reg;
+    case XR_STORE8_IMM ... XR_STORE32_IMM:
+        *len_out = 2;
+        return &fe_extra_T(inst, XrRegRegImm16)->r1;
     case XR_SHIFT ... XR_LOAD32_REG:
         *len_out = 2;
         return &fe_extra_T(inst, XrRegReg)->r1;

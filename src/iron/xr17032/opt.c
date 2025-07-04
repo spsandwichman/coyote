@@ -1,6 +1,8 @@
 #include "iron/iron.h"
 #include "xr.h"
 
+#include <stdio.h>
+
 static FeInst* peephole(FeInst* inst) {
     XrRegImm16* reg_imm16 = fe_extra(inst);
     switch (inst->kind) {

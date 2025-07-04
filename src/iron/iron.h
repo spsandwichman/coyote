@@ -309,7 +309,6 @@ FeSymbol* fe_symtab_get(FeSymTab* st, const char* data, u16 len);
 void fe_symtab_remove(FeSymTab* st, const char* data, u16 len);
 void fe_symtab_destroy(FeSymTab* st);
 
-
 typedef enum: u8 {
     FE_SECTION_WRITEABLE   = 1 << 0,
     FE_SECTION_EXECUTABLE  = 1 << 1,
@@ -741,6 +740,9 @@ FeInst* fe_inst_unop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* val);
 FeInst* fe_inst_binop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs);
 FeInst* fe_inst_bare(FeFunc* f, FeTy ty, FeInstKind kind);
 
+FeInst* fe_inst_load(FeFunc* f, FeTy ty, FeInst* ptr, bool is_volatile, bool unaligned);
+FeInst* fe_inst_store(FeFunc* f, FeInst* ptr, FeInst* val, bool is_volatile, bool unaligned);
+
 FeInst* fe_inst_call(FeFunc* f, FeInst* callee, FeFuncSig* sig);
 FeInst* fe_call_arg(FeInst* call, u16 index);
 void fe_call_set_arg(FeInst* call, u16 index, FeInst* arg);
@@ -892,6 +894,7 @@ usize fe_db_write64(FeDataBuffer* buf, u64 data);
 usize fe_db_writef(FeDataBuffer* buf, const char* fmt, ...);
 
 void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy);
+void fe__emit_ir_stack_label(FeDataBuffer* db, FeStackItem* item);
 void fe__emit_ir_block_label(FeDataBuffer* db, FeFunc* f, FeBlock* ref);
 void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref);
 
@@ -906,7 +909,6 @@ void fe_init_signal_handler();
 // code generation
 // -------------------------------------
 
-#define FE_ISEL_GENERATED 0
 #define FE_VREG_REAL_UNASSIGNED UINT16_MAX
 #define FE_VREG_NONE UINT32_MAX
 

@@ -48,7 +48,6 @@ static FeInst* create_mach(FeFunc* f, FeInstKind kind, FeTy ty, usize size) {
     memset(fe_extra(i), 0, size);
     i->kind = kind; 
     i->ty = ty;
-    i->flags = FE_ISEL_GENERATED;
     // i->vr_out = (ty == FE_TY_TUPLE || ty == FE_TY_VOID) ? FE_VREG_NONE : fe_vreg_new(f->vregs, i, XR_REGCLASS_REG);
     i->vr_out = FE_VREG_NONE;
     return i;
@@ -56,7 +55,6 @@ static FeInst* create_mach(FeFunc* f, FeInstKind kind, FeTy ty, usize size) {
 
 static FeInst* mach_mov(FeFunc* f, FeInst* source) {
     FeInst* i = fe_inst_unop(f, FE_TY_I32, FE__MACH_MOV, source);
-    i->flags = FE_ISEL_GENERATED;
     // i->vr_out = fe_vreg_new(f->vregs, i, XR_REGCLASS_REG);
     i->vr_out = FE_VREG_NONE;
     return i;
@@ -219,6 +217,59 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
         chain = fe_chain_append_end(chain, slti);
         return chain;
     }
+    case FE_STACK_ADDR: {
+
+
+        FeInst* sp = mach_reg(f, block, XR_REG_SP);
+        FeInst* subi = create_mach(f, XR_SUBI, FE_TY_I32, sizeof(XrRegImm16));
+        fe_extra_T(subi, XrRegImm16)->reg = sp;
+        fe_extra_T(subi, XrRegImm16)->imm16 = fe_extra_T(inst, FeInstStackAddr)->item->_offset;
+        
+        FeInstChain chain = fe_chain_new(sp);
+        chain = fe_chain_append_end(chain, subi);
+        return chain;
+    }
+    case FE_LOAD:
+    case FE_LOAD_VOLATILE: {
+        FeInstKind kind;
+        switch (inst->ty) {
+        case FE_TY_I32: kind = XR_LOAD32_IMM; break;
+        case FE_TY_I16: kind = XR_LOAD16_IMM; break;
+        case FE_TY_I8:  kind = XR_LOAD8_IMM; break;
+        default:
+            FE_CRASH("cannot load ty %u", inst->ty);
+        }
+        FeInst* ptr = fe_extra_T(inst, FeInstLoad)->ptr;
+
+        // very simple load for now, just use the imm pattern for now
+        FeInst* load = create_mach(f, kind, inst->ty, sizeof(XrRegImm16));
+        fe_extra_T(load, XrRegImm16)->reg = ptr;
+        fe_extra_T(load, XrRegImm16)->imm16 = 0;
+
+        return fe_chain_new(load);
+    }
+    case FE_STORE:
+    case FE_STORE_VOLATILE: {
+        FeInst* ptr = fe_extra_T(inst, FeInstStore)->ptr;
+        FeInst* val = fe_extra_T(inst, FeInstStore)->val;
+
+        FeInstKind kind = 0;
+        switch (val->ty) {
+        case FE_TY_I32: kind = XR_STORE32_IMM; break;
+        case FE_TY_I16: kind = XR_STORE16_IMM; break;
+        case FE_TY_I8:  kind = XR_STORE8_IMM; break;
+        default:
+            FE_CRASH("cannot store ty %u", val->ty);
+        }
+
+        // very simple load for now, just use the imm pattern for now
+        FeInst* store = create_mach(f, kind, inst->ty, sizeof(XrRegRegImm16));
+        fe_extra_T(store, XrRegRegImm16)->r1 = ptr;
+        fe_extra_T(store, XrRegRegImm16)->r2 = val;
+        fe_extra_T(store, XrRegRegImm16)->imm16 = 0;
+
+        return fe_chain_new(store);
+    }
     case FE_BRANCH: {
         FeInst* condition = fe_extra_T(inst, FeInstBranch)->cond;
         FeBlock* if_true = fe_extra_T(inst, FeInstBranch)->if_true;
@@ -303,7 +354,7 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
     case FE_UPSILON:
         return fe_chain_new(inst);
     }
-    FE_CRASH("xr_isel: unable to select inst kind %s (%u)", fe_inst_name(target, inst->kind), inst->kind);
+    FE_CRASH("unable to select inst kind '%s' (%u)", fe_inst_name(target, inst->kind), inst->kind);
     return fe_chain_new(inst);
 }
 

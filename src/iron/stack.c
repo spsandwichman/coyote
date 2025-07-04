@@ -20,13 +20,13 @@ FeStackItem* fe_stack_item_new(FeTy ty, FeComplexTy* cty) {
 
 FeStackItem* fe_stack_remove(FeFunc* f, FeStackItem* item) {
     if (item->next) {
-        item->prev->next = item->next;
+        item->next->prev = item->prev;
     } else {
         f->stack_top = item->prev;
     }
 
     if (item->prev) {
-        item->next->prev = item->prev;
+        item->prev->next = item->next;
     } else {
         f->stack_bottom = item->next;
     }

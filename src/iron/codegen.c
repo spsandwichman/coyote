@@ -69,6 +69,8 @@ void fe_codegen(FeFunc* f) {
     const FeTarget* target = f->mod->target;
 
     fe_inst_calculate_uses(f);
+    fe_stack_calculate_size(f);
+
 
     usize START = 1;
     // assign each instruction an index starting from 1.
@@ -101,9 +103,10 @@ void fe_codegen(FeFunc* f) {
             usize inputs_len = 0;
             FeInst** inputs = fe_inst_list_inputs(target, inst, &inputs_len);
             for_n(i, 0, inputs_len) {
-                if (inputs[i]->flags == FE_ISEL_GENERATED) continue;
-
-                inputs[i] = isel_map[inputs[i]->flags].to.end;
+                FeInst* new_input = isel_map[inputs[i]->flags].to.end;
+                if (new_input != nullptr) {
+                    inputs[i] = new_input;
+                }
             }
         }
     }

@@ -11,7 +11,7 @@ static void quick_print(FeFunc* f) {
 
 FeFunc* make_phi_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
-    FeSection* text = fe_section_new(mod, ".text", 0, FE_SECTION_EXECUTABLE);
+    FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
     FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 1, 1);
     fe_funcsig_param(f_sig, 0)->ty = FE_TY_BOOL;
@@ -50,7 +50,7 @@ FeFunc* make_phi_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 }
 
 FeFunc* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
-    FeSection* text = fe_section_new(mod, ".text", 0, FE_SECTION_EXECUTABLE);
+    FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
     // set up function to call
     FeFuncSig* fact_sig = fe_funcsig_new(FE_CCONV_JACKAL, 1, 1);
@@ -104,7 +104,7 @@ FeFunc* make_factorial(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 }
 
 FeFunc* make_factorial2(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
-    FeSection* text = fe_section_new(mod, ".text", 0, FE_SECTION_EXECUTABLE);
+    FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
     // set up function to call
     FeFuncSig* fact_sig = fe_funcsig_new(FE_CCONV_JACKAL, 1, 1);
@@ -160,7 +160,7 @@ FeFunc* make_factorial2(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 }
 
 FeFunc* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
-    FeSection* text = fe_section_new(mod, ".text", 0, FE_SECTION_EXECUTABLE);
+    FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
     // set up function to call
     FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 1, 1);
@@ -204,7 +204,7 @@ FeFunc* make_branch_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) 
 }
 
 FeFunc* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
-    FeSection* text = fe_section_new(mod, ".text", 0, FE_SECTION_EXECUTABLE);
+    FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
     // set up function to call
     FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 4, 4);
@@ -239,7 +239,7 @@ FeFunc* make_regalloc_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs
 }
 
 FeFunc* make_symaddr_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
-    FeSection* text = fe_section_new(mod, ".text", 0, FE_SECTION_EXECUTABLE);
+    FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
     FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 0, 1);
     fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
@@ -257,7 +257,7 @@ FeFunc* make_symaddr_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs)
 }
 
 FeFunc* make_algsimp_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
-    FeSection* text = fe_section_new(mod, ".text", 0, FE_SECTION_EXECUTABLE);
+    FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
     FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 0, 1);
     fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
@@ -284,32 +284,28 @@ FeFunc* make_algsimp_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs)
     return f;
 }
 
+FeFunc* make_stack_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
+    FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
-FeFunc* make_mem_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
-    FeSection* text = fe_section_new(mod, ".text", 0, FE_SECTION_EXECUTABLE);
-
-    FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 1, 1);
-    fe_funcsig_param(f_sig, 0)->ty = FE_TY_I32;
-    fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
+    FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_JACKAL, 0, 0);
+    // fe_funcsig_param(f_sig, 0)->ty = FE_TY_I32;
+    // fe_funcsig_return(f_sig, 0)->ty = FE_TY_I32;
 
     // make the function and its symbol
-    FeSymbol* f_sym = fe_symbol_new(mod, "mem_test", 0, text, FE_BIND_GLOBAL);
+    FeSymbol* f_sym = fe_symbol_new(mod, "stack_test", 0, text, FE_BIND_GLOBAL);
     FeFunc* f = fe_func_new(mod, f_sym, f_sig, ipool, vregs);
     FeBlock* entry = f->entry_block;
 
+    FeStackItem* var = fe_stack_append_top(f, fe_stack_item_new(FE_TY_I32, nullptr));
+    
+    FeInst* var_addr = fe_append_end(entry, fe_inst_stack_addr(f, FE_TY_I32, var));
+
     FeInst* const1 = fe_append_end(entry, fe_inst_const(f, FE_TY_I32, 10));
-    FeInst* const2 = fe_append_end(entry, fe_inst_const(f, FE_TY_I32, 20));
-    FeInst* const3 = fe_append_end(entry, fe_inst_const(f, FE_TY_I32, 30));
-    FeInst* add = fe_append_end(entry, fe_inst_binop(f, FE_TY_I32, 
-        FE_IADD,
-        const1, const2
-    ));
-    FeInst* mul = fe_append_end(entry, fe_inst_binop(f, FE_TY_I32, 
-        FE_IDIV,
-        add, const3
-    ));
+    FeInst* store = fe_append_end(entry, fe_inst_store(f, var_addr, const1, false, false));
+    FeInst* load = fe_append_end(entry, fe_inst_load(f, FE_TY_I32, var_addr, false, false));
+
     FeInst* ret = fe_append_end(entry, fe_inst_return(f));
-    fe_return_set_arg(ret, 0, mul);
+    // fe_return_set_arg(ret, 0, load);
     
     return f;
 }
@@ -323,11 +319,11 @@ int main() {
 
     FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
-    FeFunc* func = make_algsimp_test(mod, &ipool, &vregs);
+    FeFunc* func = make_stack_test(mod, &ipool, &vregs);
 
     quick_print(func);
-    fe_opt_algsimp(func);
-    quick_print(func);
+    // fe_opt_algsimp(func);
+    // quick_print(func);
     fe_codegen(func);
     quick_print(func);
 
