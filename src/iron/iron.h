@@ -84,6 +84,28 @@ typedef _Float16 f16;
     #define for_n(iterator, start, end) for (usize iterator = (start); iterator < (end); ++iterator)
 #endif
 
+#define FE_CRASH(fmt, ...) fe_runtime_crash("iron crash in %s() at %s:%zu -> " fmt, __func__, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
+
+// -------------------------------------
+// predefs!
+// -------------------------------------
+
+typedef struct FeInst FeInst;
+typedef struct FeBlock FeBlock;
+typedef struct FeSymbol FeSymbol;
+typedef struct FeFunc FeFunc;
+typedef struct FeFuncSig FeFuncSig;
+typedef struct FeSection FeSection;
+typedef struct FeModule FeModule;
+typedef struct FeTarget FeTarget;
+typedef struct FeStackItem FeStackItem;
+typedef struct FeInstPool FeInstPool;
+typedef struct FeArena FeArena;
+
+typedef u32 FeVReg; // vreg index
+typedef struct FeVRegBuffer FeVRegBuffer;
+typedef struct FeBlockLiveness FeBlockLiveness;
+
 // -------------------------------------
 // internal type system
 // -------------------------------------
@@ -91,7 +113,7 @@ typedef _Float16 f16;
 #define FE_TY_VEC(vecty, elemty) (vecty + elemty)
 #define FE_TY_VEC_ELEM(ty) (ty & 0b1111)
 #define FE_TY_VEC_SIZETY(ty) (ty & 0b110000)
-#define FE_TY_IS_VEC(ty) (ty > FE_TY_V128)
+#define FE_TY_IS_VEC(ty) (ty >= FE_TY_V128)
 
 typedef enum: u8 {
     FE_TY_VOID,
@@ -172,6 +194,10 @@ typedef struct FeRecordField {
     FeComplexTy* complex_ty; // if applicable
 } FeRecordField;
 
+// if ty is not a complex type, cty should be nullptr
+usize fe_ty_get_size(FeTy ty, FeComplexTy* cty);
+usize fe_ty_get_align(FeTy ty, FeComplexTy* cty);
+
 // -------------------------------------
 // architecture/ABI stuff
 // -------------------------------------
@@ -206,22 +232,6 @@ typedef enum : u8 {
 // -------------------------------------
 // iron IR
 // -------------------------------------
-
-typedef struct FeInst FeInst;
-typedef struct FeBlock FeBlock;
-typedef struct FeSymbol FeSymbol;
-typedef struct FeFunc FeFunc;
-typedef struct FeFuncSig FeFuncSig;
-typedef struct FeSection FeSection;
-typedef struct FeModule FeModule;
-typedef struct FeTarget FeTarget;
-typedef struct FeStackItem FeStackItem;
-typedef struct FeInstPool FeInstPool;
-typedef struct FeArena FeArena;
-
-typedef u32 FeVReg; // vreg index
-typedef struct FeVRegBuffer FeVRegBuffer;
-typedef struct FeBlockLiveness FeBlockLiveness;
 
 typedef enum: u8 {
     FE_BIND_LOCAL = 1,
@@ -315,6 +325,8 @@ typedef struct FeSection {
     FeSection* prev;
 } FeSection;
 
+FeSection* fe_section_new(FeModule* m, const char* name, u16 len, FeSectionFlags flags);
+
 typedef struct FeModule {
 
     struct {
@@ -388,6 +400,8 @@ typedef enum: FeInstKind {
 
     // SymAddr
     FE_SYM_ADDR,
+    // StackAddr
+    FE_STACK_ADDR,
 
     // Binop
     FE_IADD,
@@ -511,6 +525,10 @@ typedef union {
 } FeInstConst;
 
 typedef struct {
+    FeStackItem* item;
+} FeInstStackAddr;
+
+typedef struct {
     FeSymbol* sym;
 } FeInstSymAddr;
 
@@ -603,13 +621,15 @@ typedef struct FeStackItem {
     FeStackItem* next; // points to top
     FeStackItem* prev; // points to bottom
 
-    u16 size;
-    u16 align;
+    FeComplexTy* complex_ty;
+    FeTy ty;
+
+    u16 flags;
 
     u32 _offset;
 } FeStackItem;
 
-FeStackItem* fe_stack_item_new(u16 size, u16 align);
+FeStackItem* fe_stack_item_new(FeTy ty, FeComplexTy* cty);
 FeStackItem* fe_stack_append_bottom(FeFunc* f, FeStackItem* item);
 FeStackItem* fe_stack_append_top(FeFunc* f, FeStackItem* item);
 FeStackItem* fe_stack_remove(FeFunc* f, FeStackItem* item);
@@ -715,6 +735,7 @@ FeInst* fe_inst_const(FeFunc* f, FeTy ty, u64 val);
 FeInst* fe_inst_const_f64(FeFunc* f, f64 val);
 FeInst* fe_inst_const_f32(FeFunc* f, f32 val);
 FeInst* fe_inst_const_f16(FeFunc* f, f16 val);
+FeInst* fe_inst_stack_addr(FeFunc* f, FeTy ty, FeStackItem* item);
 FeInst* fe_inst_sym_addr(FeFunc* f, FeTy ty, FeSymbol* sym);
 FeInst* fe_inst_unop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* val);
 FeInst* fe_inst_binop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* lhs, FeInst* rhs);
@@ -877,7 +898,7 @@ void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref);
 // crash at runtime with a stack trace (if available)
 [[noreturn]] void fe_runtime_crash(const char* error, ...);
 
-// initialize signal handler that calls fe_runtime_crash
+// initialize signal handler that calls FE_CRASH
 // in the event of a bad signal
 void fe_init_signal_handler();
 

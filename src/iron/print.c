@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "iron.h"
 #include "iron/iron.h"
 
 static const char* ty_name[] = {
@@ -17,8 +18,9 @@ static const char* ty_name[] = {
     [FE_TY_F32] = "f32",
     [FE_TY_F64] = "f64",
 
-    [FE_TY_TUPLE] = "...",
+    [FE_TY_TUPLE]  = "...",
     [FE_TY_RECORD] = "{...}",
+    [FE_TY_ARRAY]  = "[...]",
 
     [FE_TY_I8x16] = "i8x16",
     [FE_TY_I16x8] = "i16x8",
@@ -50,6 +52,7 @@ static const char* inst_name[FE__BASE_INST_END] = {
 
     [FE_CONST] = "const",
 
+    [FE_STACK_ADDR] = "stack-addr",
     [FE_SYM_ADDR] = "sym-addr",
 
     [FE_PARAM] = "param",
@@ -125,6 +128,37 @@ static int ansi(usize x) {
 }
 
 thread_local static bool should_ansi = true;
+
+static void print_ty(FeDataBuffer* db, FeTy ty, FeComplexTy* cty) {
+    if (ty == FE_TY_RECORD) {
+        if (cty != nullptr) {
+            FE_CRASH("ty is record but no FeComplexTy was provided");
+        }
+        fe_db_writecstr(db, "{ ");
+
+        for_n (i, 0, cty->record.fields_len) {
+            FeRecordField* field = &cty->record.fields[i];
+            if (i != 0) {
+                fe_db_writecstr(db, ", ");
+            }
+            fe_db_writef(db, "%u: ", field->offset);
+            print_ty(db, field->ty, field->complex_ty);
+        }
+
+        fe_db_writecstr(db, " }");
+    } else if (ty == FE_TY_ARRAY) {
+        if (cty != nullptr) {
+            FE_CRASH("ty is array but no FeComplexTy was provided");
+        }
+
+        fe_db_writecstr(db, "[");
+        fe_db_writef(db, "%u * ", cty->array.len);
+        print_ty(db, cty->array.elem_ty, cty->array.complex_elem_ty);
+        fe_db_writecstr(db, "]");
+    } else {
+        fe_db_writecstr(db, ty_name[ty]);
+    }
+}
 
 static void print_inst_ty(FeDataBuffer* db, FeInst* inst) {
     if (inst->ty == FE_TY_TUPLE) {
@@ -330,7 +364,7 @@ void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
     case FE_BIND_GLOBAL: fe_db_writecstr(db, "global "); break;
     case FE_BIND_LOCAL:  fe_db_writecstr(db, "local "); break;
     case FE_BIND_SHARED_EXPORT: fe_db_writecstr(db, "shared_export "); break;
-    case FE_BIND_SHARED_IMPORT: fe_runtime_crash("function cannot have shared_import binding"); break;
+    case FE_BIND_SHARED_IMPORT: fe_db_writecstr(db, "shared_import "); break;
     }
 
     // write function signature
@@ -358,6 +392,20 @@ void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
 
     // write function body
     fe_db_writecstr(db, " {\n");
+    
+    // write stack frame
+    u32 stack_counter = 1;
+    for (FeStackItem* item = f->stack_top; item != nullptr; item = item->next) {
+        item->flags = stack_counter;
+
+        fe_db_writef(db, "    %d: ", stack_counter);
+
+        print_ty(db, item->ty, item->complex_ty);
+
+        stack_counter++;
+    }
+    
+    
     for_blocks(block, f) {
         fe_db_writecstr(db, "  ");
         fe__emit_ir_block_label(db, f, block);

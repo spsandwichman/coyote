@@ -122,7 +122,7 @@ static void emit_mem_operand(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         shamt = fe_extra_T(inst, XrRegRegReg)->imm5;
         break;
     default:
-        fe_runtime_crash("incorrect inst type for emit_mem_operand");
+        FE_CRASH("incorrect inst type for emit_mem_operand");
     }
     FeVirtualReg* base_vr = fe_vreg(f->vregs, base->vr_out);
     FeVirtualReg* shifted_vr = fe_vreg(f->vregs, shifted->vr_out);

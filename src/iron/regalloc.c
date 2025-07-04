@@ -212,7 +212,7 @@ void fe_regalloc_linear_scan(FeFunc* f) {
                     break;
                 }
                 if (real >= target->regclass_lens[input_vr->class]) {
-                    fe_runtime_crash("unable to allocate");
+                    FE_CRASH("unable to allocate");
                 }
 
                 // assign real register to virtual register

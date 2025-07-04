@@ -14,9 +14,6 @@
 [[noreturn]] void fe_runtime_crash(const char* error, ...) {
     fflush(stdout);
 
-    printf("\niron runtime crash: ");
-    fflush(stdout);
-
     va_list args;
     va_start(args, error);
     vfprintf(stderr, error, args);
@@ -58,19 +55,19 @@
 static void signal_handler(int sig) {
     switch (sig) {
     case SIGSEGV:
-        fe_runtime_crash("segfault");
+        FE_CRASH("segfault");
         break;
     case SIGINT:
-        fe_runtime_crash("debug interrupt");
+        FE_CRASH("debug interrupt");
         break;
     case SIGFPE:
-        fe_runtime_crash("fatal arithmetic exception");
+        FE_CRASH("fatal arithmetic exception");
         break;
     case SIGTERM:
         exit(0);
         break;
     default:
-        fe_runtime_crash("unhandled signal %d", sig);
+        FE_CRASH("unhandled signal %d", sig);
         break;
     }
 }
@@ -85,19 +82,19 @@ static void signal_handler(int sig, siginfo_t* info, void* ucontext) {
     // ucontext = ucontext;
     switch (sig) {
     case SIGSEGV:
-        fe_runtime_crash("segfault at addr 0x%lx", (long)info->si_addr);
+        FE_CRASH("segfault at addr 0x%lx", (long)info->si_addr);
         break;
     case SIGINT:
         printf("debug interrupt caught");
         break;
     case SIGFPE:
-        fe_runtime_crash("fatal arithmetic exception");
+        FE_CRASH("fatal arithmetic exception");
         break;
     case SIGABRT:
-        fe_runtime_crash("sigabrt lmao");
+        FE_CRASH("sigabrt lmao");
         break;
     default:
-        fe_runtime_crash("unhandled signal %s caught", strsignal(sig));
+        FE_CRASH("unhandled signal %s caught", strsignal(sig));
         break;
     }
 }

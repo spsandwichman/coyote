@@ -92,7 +92,7 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
         case 2: real_param_reg = XR_REG_A2; break;
         case 3: real_param_reg = XR_REG_A3; break;
         default:
-            fe_runtime_crash("pass on stack later LOL");
+            FE_CRASH("pass on stack later LOL");
         }
 
         FeInst* param_reg = mach_reg(f, block, real_param_reg);
@@ -289,7 +289,7 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
             case 2: real_return_reg = XR_REG_A1; break;
             case 3: real_return_reg = XR_REG_A0; break;
             default:
-                fe_runtime_crash("pass on stack later LOL");
+                FE_CRASH("pass on stack later LOL");
             }
 
             preassign(f, mov, block, real_return_reg);
@@ -303,7 +303,7 @@ FeInstChain xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
     case FE_UPSILON:
         return fe_chain_new(inst);
     }
-    fe_runtime_crash("xr_isel: unable to select inst kind %s (%u)", fe_inst_name(target, inst->kind), inst->kind);
+    FE_CRASH("xr_isel: unable to select inst kind %s (%u)", fe_inst_name(target, inst->kind), inst->kind);
     return fe_chain_new(inst);
 }
 
@@ -336,7 +336,7 @@ void xr_final_touchups(FeFunc* f) {
     // if this function contains a call, push the link register to the top of the stack frame.
     FeStackItem* lr_slot = nullptr;
     if (should_push_lr) {
-        lr_slot = fe_stack_item_new(4, 4);
+        lr_slot = fe_stack_item_new(FE_TY_I32, nullptr);
         fe_stack_append_top(f, lr_slot);
     }
 

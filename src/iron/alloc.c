@@ -11,6 +11,7 @@ static u8 extra_size_table[FE__INST_END] = {
     [FE_PROJ ... FE__MACH_PROJ] = sizeof(FeInstProj),
     [FE_CONST] = sizeof(FeInstConst),
     [FE_SYM_ADDR] = sizeof(FeInstSymAddr),
+    [FE_STACK_ADDR] = sizeof(FeInstStackAddr),
     [FE_PARAM] = sizeof(FeInstParam),
     [FE_IADD ... FE_FREM] = sizeof(FeInstBinop),
     [FE_MOV ... FE_F2I] = sizeof(FeInstUnop),
@@ -45,7 +46,7 @@ usize fe_inst_extra_size_unsafe(FeInstKind kind) {
 usize fe_inst_extra_size(FeInstKind kind) {
     u8 size = fe_inst_extra_size_unsafe(kind);
     if (size == 255) {
-        fe_runtime_crash("invalid inst kind %u", kind);
+        FE_CRASH("invalid inst kind %u", kind);
     }
     return (usize) size;
 }
@@ -91,7 +92,7 @@ static FeInst* init_inst(FeInst* inst) {
 
 FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
     if (extra_size > FE_INST_EXTRA_MAX_SIZE)  {
-        fe_runtime_crash("extra size > max size");
+        FE_CRASH("extra size > max size");
     }
 
     usize extra_slots = extra_size / sizeof(usize);
@@ -237,7 +238,7 @@ void* fe_arena_alloc(FeArena* arena, usize size, usize align) {
     if (mem) {
         return mem;
     }
-    fe_runtime_crash("unable to arena-alloc size %zu align %zu", size, align);
+    FE_CRASH("unable to arena-alloc size %zu align %zu", size, align);
 }
 
 FeArenaState fe_arena_save(FeArena* arena) {

@@ -29,14 +29,14 @@ const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
         fe__load_trait_table(FE__XR_INST_BEGIN, xr_trait_table, FE__XR_INST_END - FE__XR_INST_BEGIN);
         break;
     default:
-        fe_runtime_crash("arch unsupported");
+        FE_CRASH("arch unsupported");
     }
 
     switch (system) {
     case FE_SYSTEM_FREESTANDING:
         break;
     default:
-        fe_runtime_crash("system unsupported");
+        FE_CRASH("system unsupported");
     }
 
     return t;

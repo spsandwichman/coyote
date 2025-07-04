@@ -30,9 +30,17 @@ void fe_module_destroy(FeModule* mod) {
     fe_free(mod);
 }
 
+// void fe_section_destroy(FeSection* section) {
+
+// }
+
 FeSection* fe_section_new(FeModule* m, const char* name, u16 len, FeSectionFlags flags) {
     FeSection* section = fe_malloc(sizeof(*section));
     memset(section, 0, sizeof(*section));
+
+    if (len == 0) {
+        len = strlen(name);
+    }
 
     section->name = fe_compstr(name, len);
     section->flags = flags;
@@ -49,16 +57,139 @@ FeSection* fe_section_new(FeModule* m, const char* name, u16 len, FeSectionFlags
     return section;
 }
 
+FeComplexTy* fe_ty_record_new(u32 fields_len) {
+    FeComplexTy* record = fe_malloc(sizeof(*record));
+    record->ty = FE_TY_RECORD;
+    record->record.fields_len = fields_len;
+    record->record.fields = fe_malloc(sizeof(FeRecordField) * fields_len);
+
+    return record;
+}
+
+// if elem_ty is not a complex type, elem_cty should be nullptr
+FeComplexTy* fe_ty_array_new(u32 array_len, FeTy elem_ty, FeComplexTy* elem_cty) {
+    FeComplexTy* array = fe_malloc(sizeof(*array));
+    array->ty = FE_TY_ARRAY;
+    array->array.elem_ty = elem_ty;
+    array->array.complex_elem_ty = elem_cty;
+    array->array.len = array_len;
+    return array;
+}
+
+usize fe_ty_get_align(FeTy ty, FeComplexTy *cty) {
+    switch (ty) {
+    case FE_TY_VOID:
+        FE_CRASH("cant get align of void");
+    case FE_TY_TUPLE:
+        FE_CRASH("cant get align of tuple");
+    case FE_TY_ARRAY:
+        if (cty != nullptr) {
+            FE_CRASH("ty is array but no FeComplexTy was provided");
+        }
+        return fe_ty_get_align(cty->array.elem_ty, cty->array.complex_elem_ty);
+    case FE_TY_RECORD: {
+        if (cty != nullptr) {
+            FE_CRASH("ty is record but no FeComplexTy was provided");
+        }
+        usize align = 1;
+        FeRecordField* fields = cty->record.fields;
+        for_n(i, 0, cty->record.fields_len) {
+            usize field_align = fe_ty_get_align(fields[i].ty, fields[i].complex_ty);
+            if (align < field_align) {
+                align = field_align;
+            }
+        }
+        return align;
+    }
+    case FE_TY_BOOL:
+    case FE_TY_I8:
+        return 1;
+    case FE_TY_I16:
+    case FE_TY_F16:
+        return 2;
+    case FE_TY_I32:
+    case FE_TY_F32:
+        return 4;
+    case FE_TY_I64:
+    case FE_TY_F64:
+        return 8;
+    default:
+        if (FE_TY_IS_VEC(ty)) {
+            switch (FE_TY_VEC_SIZETY(ty)) {
+            case FE_TY_V128:
+                return 16;
+            case FE_TY_V256:
+                return 32;
+            case FE_TY_V512:
+                return 64;
+            default:
+                FE_CRASH("insane vector type");
+            }
+        }
+        FE_CRASH("unknown ty %u", ty);
+    }
+}
+
+usize fe_ty_get_size(FeTy ty, FeComplexTy *cty) {
+    switch (ty) {
+    case FE_TY_VOID:
+        FE_CRASH("cant get size of void");
+    case FE_TY_TUPLE:
+        FE_CRASH("cant get size of tuple");
+    case FE_TY_ARRAY:
+        if (cty == nullptr) {
+            FE_CRASH("ty is array but no FeComplexTy was provided");
+        }
+        return cty->array.len * fe_ty_get_size(cty->array.elem_ty, cty->array.complex_elem_ty);
+    case FE_TY_RECORD: {
+        if (cty == nullptr) {
+            FE_CRASH("ty is record but no FeComplexTy was provided");
+        }
+
+        usize align = fe_ty_get_align(ty, cty);
+
+        FeRecordField* last_field = &cty->record.fields[cty->record.fields_len];
+        return last_field->offset + last_field->offset;
+    }
+    case FE_TY_BOOL:
+    case FE_TY_I8:
+        return 1;
+    case FE_TY_I16:
+    case FE_TY_F16:
+        return 2;
+    case FE_TY_I32:
+    case FE_TY_F32:
+        return 4;
+    case FE_TY_I64:
+    case FE_TY_F64:
+        return 8;
+    default:
+        if (FE_TY_IS_VEC(ty)) {
+            switch (FE_TY_VEC_SIZETY(ty)) {
+            case FE_TY_V128:
+                return 16;
+            case FE_TY_V256:
+                return 32;
+            case FE_TY_V512:
+                return 64;
+            default:
+                FE_CRASH("insane vector type");
+            }
+        }
+        FE_CRASH("unknown ty %u", ty);
+    }
+}
+
 // if len == 0, calculate with strlen
 FeSymbol* fe_symbol_new(FeModule* m, const char* name, u16 len, FeSection* section, FeSymbolBinding bind) {
     if (name == nullptr) {
-        fe_runtime_crash("symbol cannot be null");
+        FE_CRASH("symbol cannot be null");
     }
     if (len == 0) {
         len = strlen(name);
     }
     if (len == 0) {
-        fe_runtime_crash("symbol cannot have zero length");
+        FE_CRASH("symbol cannot have zero length");
     }
     // put this in an arena of some sort later
     FeSymbol* sym = fe_malloc(sizeof(FeSymbol));
@@ -68,7 +199,7 @@ FeSymbol* fe_symbol_new(FeModule* m, const char* name, u16 len, FeSection* secti
     sym->name = fe_compstr(name, len);
 
     if (fe_symtab_get(&m->symtab, name, len)) {
-        fe_runtime_crash("symbol with name '%.*s' already exists", len, name);
+        FE_CRASH("symbol with name '%.*s' already exists", len, name);
     }
     fe_symtab_put(&m->symtab, sym);
 
@@ -92,14 +223,14 @@ FeFuncSig* fe_funcsig_new(FeCallConv cconv, u16 param_len, u16 return_len) {
 
 FeFuncParam* fe_funcsig_param(FeFuncSig* sig, u16 index) {
     if (index >= sig->param_len) {
-        fe_runtime_crash("index > param_len");
+        FE_CRASH("index > param_len");
     }
     return &sig->params[index];
 }
 
 FeFuncParam* fe_funcsig_return(FeFuncSig* sig, u16 index) {
     if (index >= sig->return_len) {
-        fe_runtime_crash("index > return_len");
+        FE_CRASH("index > return_len");
     }
     return &sig->params[sig->param_len + index];
 }
@@ -217,7 +348,6 @@ FeFunc* fe_func_new(FeModule* mod, FeSymbol* sym, FeFuncSig* sig, FeInstPool* ip
 
     return f;
 }
-
 
 void fe_func_destroy(FeFunc *f) {
     if (f->params) {
@@ -353,6 +483,7 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
     case FE_PARAM:
     case FE_CONST:
     case FE_SYM_ADDR:
+    case FE_STACK_ADDR:
     case FE_CASCADE_VOLATILE:
     case FE_JUMP:
     case FE__MACH_REG:
@@ -360,14 +491,14 @@ FeInst** fe_inst_list_inputs(const FeTarget* t, FeInst* inst, usize* len_out) {
         *len_out = 0;
         return nullptr;
     default:
-        fe_runtime_crash("list_inputs: unknown kind %d", inst->kind);
+        FE_CRASH("unknown kind %d", inst->kind);
         break;
     }
 }
 
 FeBlock** fe_inst_list_terminator_successors(const FeTarget* t, FeInst* term, usize* len_out) {
     if (!fe_inst_has_trait(term->kind, FE_TRAIT_TERMINATOR)) {
-        fe_runtime_crash("list_targets: inst %s is not a terminator", inst_name(term));
+        FE_CRASH("list_targets: inst %s is not a terminator", inst_name(term));
     }
     if (term->kind > FE__BASE_INST_END) {
         return t->list_targets(term, len_out);
@@ -520,6 +651,14 @@ FeInst* fe_inst_const_f16(FeFunc* f, f16 val) {
     return inst;
 }
 
+FeInst* fe_inst_stack_addr(FeFunc* f, FeTy ty, FeStackItem* item) {
+    FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstStackAddr));
+    inst->kind = FE_STACK_ADDR;
+    inst->ty = ty;
+    fe_extra_T(inst, FeInstStackAddr)->item = item;
+    return inst;
+}
+
 FeInst* fe_inst_sym_addr(FeFunc* f, FeTy ty, FeSymbol* sym) {
     FeInst* inst = fe_ipool_alloc(f->ipool, sizeof(FeInstSymAddr));
     inst->kind = FE_SYM_ADDR;
@@ -582,7 +721,7 @@ FeInst* fe_inst_return(FeFunc* f) {
 FeInst* fe_return_arg(FeInst* ret, u16 index) {
     FeInstReturn* r = fe_extra_T(ret, FeInstReturn);
     if (index >= r->len) {
-        fe_runtime_crash("index >= ret->len");
+        FE_CRASH("index >= ret->len");
     }
     if (r->cap == 0) {
         return r->single;
@@ -594,7 +733,7 @@ FeInst* fe_return_arg(FeInst* ret, u16 index) {
 void fe_return_set_arg(FeInst* ret, u16 index, FeInst* arg) {
     FeInstReturn* r = fe_extra_T(ret, FeInstReturn);
     if (index >= r->len) {
-        fe_runtime_crash("index >= ret->len");
+        FE_CRASH("index >= ret->len");
     }
     
     // arg->use_len++; // since we dont do it earlier...
@@ -639,7 +778,7 @@ FeInst* fe_inst_phi(FeFunc* f, FeTy ty, u16 num_srcs) {
 FeInst* fe_phi_get_src_val(FeInst* inst, u16 index) {
     FeInstPhi* phi = fe_extra(inst);
     if (index >= phi->len) {
-        fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
+        FE_CRASH("phi src index is out of bounds [0, %u)", index);
     }
     return phi->vals[index];
 }
@@ -647,7 +786,7 @@ FeInst* fe_phi_get_src_val(FeInst* inst, u16 index) {
 FeBlock* fe_phi_get_src_block(FeInst* inst, u16 index) {
     FeInstPhi* phi = fe_extra(inst);
     if (index >= phi->len) {
-        fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
+        FE_CRASH("phi src index is out of bounds [0, %u)", index);
     }
     return phi->blocks[index];
 }
@@ -655,7 +794,7 @@ FeBlock* fe_phi_get_src_block(FeInst* inst, u16 index) {
 void fe_phi_set_src(FeInst* inst, u16 index, FeInst* val, FeBlock* block) {
     FeInstPhi* phi = fe_extra(inst);
     if (index >= phi->len) {
-        fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
+        FE_CRASH("phi src index is out of bounds [0, %u)", index);
     }
     phi->vals[index] = val;
     phi->blocks[index] = block;
@@ -676,7 +815,7 @@ void fe_phi_append_src(FeInst* inst, FeInst* val, FeBlock* block) {
 void fe_phi_remove_src_unordered(FeInst* inst, u16 index) {
     FeInstPhi* phi = fe_extra(inst);
     if (index >= phi->len) {
-        fe_runtime_crash("phi src index is out of bounds [0, %u)", index);
+        FE_CRASH("phi src index is out of bounds [0, %u)", index);
     }
     if (index != phi->len - 1) {
         phi->vals[index] = phi->vals[phi->len - 1];
@@ -735,7 +874,7 @@ void fe_call_indirect_set_callee(FeInst* call, FeInst* callee) {
 FeInst* fe_call_arg(FeInst* call, u16 index) {
     FeInstCall* c = fe_extra(call);
     if (index >= c->len) {
-        fe_runtime_crash("index >= ret->len");
+        FE_CRASH("index >= ret->len");
     }
     if (c->cap == 0) {
         return c->single.arg;
@@ -747,7 +886,7 @@ FeInst* fe_call_arg(FeInst* call, u16 index) {
 void fe_call_set_arg(FeInst* call, u16 index, FeInst* arg) {
     FeInstCall* c = fe_extra(call);
     if (index >= c->len) {
-        fe_runtime_crash("index >= ret->len");
+        FE_CRASH("index >= ret->len");
     }
     if (c->cap == 0) {
         c->single.arg = arg;
@@ -758,7 +897,7 @@ void fe_call_set_arg(FeInst* call, u16 index, FeInst* arg) {
 
 FeTy fe_proj_ty(FeInst* tuple, usize index) {
     if (tuple->ty != FE_TY_TUPLE) {
-        fe_runtime_crash("projection on non-tuple inst %s", inst_name(tuple));
+        FE_CRASH("projection on non-tuple inst %s", inst_name(tuple));
     }
     switch (tuple->kind) {
     case FE_CALL:
@@ -767,9 +906,9 @@ FeTy fe_proj_ty(FeInst* tuple, usize index) {
         if (index < icall->sig->return_len) {
             return fe_funcsig_return(icall->sig, index)->ty;
         }
-        fe_runtime_crash("index %zu out of bounds for [0, %u)", icall->sig->return_len);
+        FE_CRASH("index %zu out of bounds for [0, %u)", icall->sig->return_len);
     default:
-        fe_runtime_crash("unknown inst kind %u", tuple->kind);
+        FE_CRASH("unknown inst kind %u", tuple->kind);
     }
 }
 

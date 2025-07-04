@@ -1,23 +1,20 @@
 #include "iron/iron.h"
 
-static bool is_pow2(usize n) {
+static inline bool is_pow2(usize n) {
     return (n & (n - 1)) == 0;
 }
 
-static usize align_forward_p2(usize value, usize align) {
+static inline usize align_forward_p2(usize value, usize align) {
     return (value + (align - 1)) & ~(align - 1);
 }
 
-FeStackItem* fe_stack_item_new(u16 size, u16 align) {
-    if (!is_pow2(align)) {
-        fe_runtime_crash("stack item alignment must be power of two");
-    }
+FeStackItem* fe_stack_item_new(FeTy ty, FeComplexTy* cty) {
     FeStackItem* item = fe_malloc(sizeof(FeStackItem));
     memset(item, 0, sizeof(*item));
-    item->align = align;
-    item->size = size;
     item->_offset = FE_STACK_OFFSET_UNDEF;
-    
+    item->ty = ty;
+    item->complex_ty = cty;
+
     return item;
 }
 
@@ -71,9 +68,12 @@ u32 fe_stack_calculate_size(FeFunc* f) {
 
     FeStackItem* item = f->stack_bottom;
     while (item != nullptr) {
+        usize size  = fe_ty_get_size(item->ty, item->complex_ty);
+        usize align = fe_ty_get_align(item->ty, item->complex_ty);
+
         item->_offset = stack_size;
-        stack_size = align_forward_p2(stack_size, item->align);
-        stack_size += item->size;
+        stack_size = align_forward_p2(stack_size, align);
+        stack_size += size;
         item = item->next;
     }
 

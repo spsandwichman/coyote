@@ -268,7 +268,7 @@ FeInst** xr_list_inputs(FeInst* inst, usize* len_out) {
         *len_out = 0;
         return nullptr;
     default:
-        fe_runtime_crash("xr_list_inputs: unknown kind %d", inst->kind);
+        FE_CRASH("xr_list_inputs: unknown kind %d", inst->kind);
         break;
     }
 }
@@ -290,7 +290,7 @@ FeBlock** xr_term_list_targets(FeInst* term, usize* len_out) {
         *len_out = 0;
         return nullptr;
     default:
-        fe_runtime_crash("xr_list_targets: unknown kind %d", term->kind);
+        FE_CRASH("xr_list_targets: unknown kind %d", term->kind);
         break;
     }
 }
