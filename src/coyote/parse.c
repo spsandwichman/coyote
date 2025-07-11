@@ -100,14 +100,14 @@ static TyIndex ty_get_ptr(TyIndex t) {
 // gross
 thread_local ParseScope* global_scope;
 
-static TyIndex ty_unwrap_alias(TyIndex t) {
+TyIndex ty_unwrap_alias(TyIndex t) {
     while (TY_KIND(t) == TY_ALIAS) {
         t = TY(t, TyAlias)->aliasing;
     }
     return t;
 }
 
-static TyIndex ty_unwrap_alias_or_enum(TyIndex t) {
+TyIndex ty_unwrap_alias_or_enum(TyIndex t) {
     while (true) {
         switch (TY_KIND(t)) {
         case TY_ALIAS:
@@ -241,7 +241,7 @@ const char* ty_name(TyIndex t) {
     return buf.at;
 }
 
-static bool ty_is_scalar(TyIndex t) {
+bool ty_is_scalar(TyIndex t) {
     if_unlikely (t == TY_VOID) {
         return false;
     }
@@ -255,7 +255,7 @@ static bool ty_is_scalar(TyIndex t) {
     return ty_kind == TY_PTR || ty_kind == TY_ENUM;
 }
 
-static bool ty_is_integer(TyIndex t) {
+bool ty_is_integer(TyIndex t) {
     if (t == TY_VOID) {
         return false;
     }
@@ -272,7 +272,7 @@ static bool ty_is_integer(TyIndex t) {
     return false;
 }
 
-static bool ty_is_signed(TyIndex t) {
+bool ty_is_signed(TyIndex t) {
     switch (t) {
     case TY_BYTE:
     case TY_INT:
@@ -290,7 +290,7 @@ thread_local static TyIndex target_word  = TY_LONG;
 thread_local static TyIndex target_uword = TY_ULONG;
 #define TY_VOIDPTR (TY_VOID + TY_PTR)
 
-static usize ty_size(TyIndex t) {
+usize ty_size(TyIndex t) {
     switch (t) {
     case TY_VOID: return 0;
     case TY_BYTE:
@@ -319,7 +319,7 @@ static usize ty_size(TyIndex t) {
     TODO("AAAA");
 }
 
-static usize ty_align(TyIndex t) {
+usize ty_align(TyIndex t) {
     switch (t) {
     case TY_VOID: return 0;
     case TY_BYTE:
@@ -348,7 +348,7 @@ static usize ty_align(TyIndex t) {
     TODO("AAAA");
 }
 
-static bool ty_equal(TyIndex t1, TyIndex t2) {
+bool ty_equal(TyIndex t1, TyIndex t2) {
     if_likely (t1 == t2) {
         return true;
     }
@@ -425,8 +425,7 @@ static bool ty_equal(TyIndex t1, TyIndex t2) {
     return t1 == t2;
 }
 
-
-static bool ty_can_cast(TyIndex dst, TyIndex src, bool src_is_constant) {
+bool ty_can_cast(TyIndex dst, TyIndex src, bool src_is_constant) {
     if (ty_equal(dst, src)) {
         return true;
     }
@@ -442,7 +441,7 @@ static bool ty_can_cast(TyIndex dst, TyIndex src, bool src_is_constant) {
     return false;
 }
 
-static bool ty_compatible(TyIndex dst, TyIndex src, bool src_is_constant) {
+bool ty_compatible(TyIndex dst, TyIndex src, bool src_is_constant) {
     if (ty_equal(dst, src)) {
         return true;
     }

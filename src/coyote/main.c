@@ -3,6 +3,7 @@
 #include "common/util.h"
 #include "lex.h"
 #include "parse.h"
+#include "irgen.h"
 
 thread_local const char* filepath = nullptr;
 thread_local FlagSet flags = {};
@@ -92,4 +93,6 @@ int main(int argc, char** argv) {
     }
 
     CompilationUnit cu = parse_unit(&p);
+
+    FeModule* m = irgen(&cu);
 }

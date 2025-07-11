@@ -64,6 +64,8 @@
     T(JKL_FILE_NAME) \
     T(JKL_FUNC_NAME) \
     T(JKL_LINE_NUMBER) \
+    \
+    T(INSERTASM) \
 
 typedef struct {
     string src;

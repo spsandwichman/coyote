@@ -3,6 +3,7 @@
 
 #include "common/vec.h"
 #include "coyote.h"
+#include "iron/iron.h"
 #include "lex.h"
 
 // ----------------- TYPES AND SHIT ----------------- 
@@ -102,6 +103,18 @@ typedef struct {
 
 void ty_init();
 
+TyIndex ty_unwrap_alias(TyIndex t);
+TyIndex ty_unwrap_alias_or_enum(TyIndex t);
+const char* ty_name(TyIndex t);
+bool ty_is_scalar(TyIndex t);
+bool ty_is_integer(TyIndex t);
+bool ty_is_signed(TyIndex t);
+usize ty_size(TyIndex t);
+usize ty_align(TyIndex t);
+bool ty_equal(TyIndex t1, TyIndex t2);
+bool ty_can_cast(TyIndex dst, TyIndex src, bool src_is_constant);
+bool ty_compatible(TyIndex dst, TyIndex src, bool src_is_constant);
+
 // ------------------- PARSE/SEMA ------------------- 
 
 void token_error(Parser* ctx, ReportKind kind, u32 start_index, u32 end_index, const char* msg);
@@ -137,6 +150,8 @@ typedef struct Entity {
         Stmt* decl;
         u64 variant_value;
     };
+
+    FeSymbol* fe_sym;
 } Entity;
 
 typedef enum : u8 {

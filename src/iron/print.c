@@ -58,7 +58,6 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_PARAM] = "param",
 
     [FE_PROJ] = "proj",
-    [FE__MACH_PROJ] = "mach-proj",
 
     [FE_IADD] = "iadd",
     [FE_ISUB] = "isub",
@@ -100,12 +99,9 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_F2U] = "f2u",
 
     [FE_LOAD] = "load",
-    [FE_LOAD_VOLATILE] = "load-vol",
 
     [FE_STORE] = "store",
-    [FE_STORE_VOLATILE] = "store-vol",
 
-    [FE_CASCADE_VOLATILE] = "cascade-vol",
     [FE__MACH_REG] = "mach-reg",
 
     [FE_BRANCH] = "branch",
@@ -326,7 +322,6 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         fe__emit_ir_stack_label(db, item);
         break;
     case FE_LOAD:
-    case FE_LOAD_VOLATILE:
         ;
         FeInstLoad* load = fe_extra(inst);
         if (load->unaligned) {
@@ -335,7 +330,6 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         fe__emit_ir_ref(db, f, load->ptr);
         break;
     case FE_STORE:
-    case FE_STORE_VOLATILE:
         ;
         FeInstStore* store = fe_extra(inst);
         if (store->unaligned) {

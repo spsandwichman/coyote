@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
         bool* occupied = malloc(sizeof(bool) * table_size);
         memset(occupied, 0, sizeof(bool) * table_size);
 
-        constexpr usize bits = 10;
+        constexpr usize bits = 13;
 
         for_n(mult, 1, 1ll << bits) {
             for_n(offset, 1, 1ll << bits) {
