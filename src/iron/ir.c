@@ -1,8 +1,6 @@
 #include "iron.h"
 #include "common/util.h"
-#include <corecrt.h>
 #include <string.h>
-
 
 static const char* inst_name(FeInst* inst) {
     FeInst* bookend = inst;
@@ -457,10 +455,90 @@ FeInst* fe_inst_new(FeFunc* f, usize input_len, usize extra_size) {
     inst->in_len = input_len;
     inst->in_cap = usize_next_pow_2(input_len);
     inst->inputs = fe_ipool_list_alloc(f->ipool, inst->in_cap);
+    memset(inst->inputs, 0, sizeof(inst->inputs[0]) * inst->in_cap);
 
     inst->use_len = 0;
     inst->use_cap = 2;
     inst->uses = fe_ipool_list_alloc(f->ipool, inst->use_cap);
+    memset(inst->uses, 0, sizeof(inst->uses[0]) * inst->use_cap);
+
+    return inst;
+}
+
+static usize count_composite_items(FeTy ty, FeComplexTy* cty) {
+    if (ty == FE_TY_ARRAY) {
+        return cty->array.len * count_composite_items(
+            cty->array.elem_ty, 
+            cty->array.complex_elem_ty
+        );
+    } else if (ty == FE_TY_RECORD) {
+        usize n = 0;
+        for_n(i, 0, cty->record.fields_len) {
+            FeRecordField* field = &cty->record.fields[i];
+            n += count_composite_items(field->ty, field->complex_ty);
+        }
+        return n;
+    }
+    return 1;
+}
+
+FeFunc* fe_func_new(
+    FeModule* mod,
+    FeSymbol* sym,
+    FeFuncSig* sig,
+    FeInstPool* ipool,
+    FeVRegBuffer* vregs
+) {
+    FeFunc* func = fe_malloc(sizeof(*func));
+    memset(func, 0, sizeof(*func));
+    func->ipool = ipool;
+    func->mod = mod;
+    func->sym = sym;
+    func->vregs = vregs;
+
+    // construct params.
+    
+    
+    return func;
+}
+
+void fe_func_destroy(FeFunc* f) {
+    // unhook from symbol
+    f->sym->func = nullptr;
+
+    // destroy blocks
+    for (FeBlock* b = f->entry_block; b != nullptr; b = b->list_next) {
+        if (b->list_prev != nullptr) {
+            fe_block_destroy(b->list_prev);
+        }
+    }
+    fe_block_destroy(f->last_block);
+
+    // destroy stack
+    for (FeStackItem* s = f->stack_bottom; s != nullptr; s = s->next) {
+        if (s->prev != nullptr) {
+            fe_free(s->prev);
+        }
+    }
+    fe_free(f->stack_top);
+
+    // remove from func list
+    if (f->list_next) {
+        f->list_next->list_prev = f->list_prev;
+    } else {
+        f->mod->funcs.last = f->list_prev;
+    }
+    if (f->list_prev) {
+        f->list_prev->list_next = f->list_next;
+    } else {
+        f->mod->funcs.first = f->list_next;
+    }
+
+    // free parameter inst list
+    fe_free(f->params);
+
+    // free dat func
+    fe_free(f);
 }
 
 #include "short_traits.h"
@@ -505,13 +583,16 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_TRUNC] = UNOP | INT_IN,
     [FE_SIGN_EXT] = UNOP | INT_IN,
     [FE_ZERO_EXT] = UNOP | INT_IN,
-    [FE_BITCAST] = UNOP | 0,
+    [FE_BITCAST] = UNOP,
     [FE_I2F] = UNOP | INT_IN,
     [FE_F2I] = UNOP | FLT_IN,
     [FE_U2F] = UNOP | INT_IN,
     [FE_F2U] = UNOP | FLT_IN,
 
-    [FE_STORE] = VOL,
+    [FE_STORE] = VOL | MEM_USE | MEM_DEF,
+    [FE_MEM_BARRIER] = VOL | MEM_USE | MEM_DEF,
+    [FE_LOAD] = MEM_USE,
+    [FE_CALL] = MEM_USE | MEM_DEF,
 
     [FE_BRANCH] = TERM | VOL,
     [FE_JUMP]   = TERM | VOL,

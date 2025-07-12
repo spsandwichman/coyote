@@ -157,7 +157,6 @@ typedef enum: u8 {
     FE_TY_F32x8  = FE_TY_VEC(FE_TY_V256, FE_TY_F32),
     FE_TY_F64x4  = FE_TY_VEC(FE_TY_V256, FE_TY_F64),
     
-    FE_TY_I8x64  = FE_TY_VEC(FE_TY_V512, FE_TY_I8),
     FE_TY_I16x32 = FE_TY_VEC(FE_TY_V512, FE_TY_I16),
     FE_TY_I32x16 = FE_TY_VEC(FE_TY_V512, FE_TY_I32),
     FE_TY_I64x8  = FE_TY_VEC(FE_TY_V512, FE_TY_I64),
@@ -621,7 +620,10 @@ typedef enum : u16 {
     // is an algebraic unary operation
     FE_TRAIT_UNOP             = 1u << 13,
     // first input is a memory effect
-    FE_TRAIT_FIRST_MEM        = 1u << 14,
+    FE_TRAIT_MEM_USE          = 1u << 14,
+    // creates a memory effect
+    FE_TRAIT_MEM_DEF          = 1u << 15,
+
 } FeTrait;
 
 FeTrait fe_inst_traits(FeInstKind kind);
