@@ -1,6 +1,5 @@
 #include "iron.h"
 #include "iron/iron.h"
-#include <corecrt.h>
 #include <string.h>
 
 static const char* inst_name(FeInst* inst) {
