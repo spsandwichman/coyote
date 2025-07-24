@@ -30,8 +30,15 @@ WARNINGS = -Wall -Wimplicit-fallthrough -Wno-deprecated-declarations -Wno-enum-c
 ALLFLAGS = $(CFLAGS) $(WARNINGS)
 OPT = -Og
 
+LDFLAGS =
+
 ifneq ($(OS),Windows_NT)
 	CFLAGS += -rdynamic
+endif
+
+ifdef ASAN_ENABLE
+	CFLAGS += $(ASANFLAGS)
+	LDFLAGS += $(ASANFLAGS)
 endif
 
 FILE_NUM = 0
@@ -44,12 +51,12 @@ build/%.o: src/%.c
 .PHONY: coyote
 coyote: bin/coyote
 bin/coyote: bin/libiron.a $(COYOTE_OBJECTS)
-	@$(LD)  $(COYOTE_OBJECTS) -o bin/coyote -Lbin -lm -liron
+	@$(LD) $(LDFLAGS) $(COYOTE_OBJECTS) -o bin/coyote -Lbin -lm -liron
 
 .PHONY: cobalt
 cobalt: bin/cobalt
 bin/cobalt: bin/libiron.a $(COBALT_OBJECTS)
-	@$(LD) $(COBALT_OBJECTS) -o bin/cobalt -Lbin -lm -liron
+	@$(LD) $(LDFLAGS) $(COBALT_OBJECTS) -o bin/cobalt -Lbin -lm -liron
 
 .PHONY: iron
 iron-test: bin/iron-test
@@ -57,7 +64,7 @@ bin/iron-test: bin/libiron.a src/iron/driver/driver.c
 	@$(CC) src/iron/driver/driver.c -o bin/iron-test $(INCLUDEPATHS) $(CFLAGS) $(OPT) -Lbin -lm -liron
 
 bin/libiron.o: $(IRON_OBJECTS)
-	@$(LD) $(IRON_OBJECTS) -r -o bin/libiron.o -lm
+	@$(LD) $(LDFLAGS) $(IRON_OBJECTS) -r -o bin/libiron.o -lm
 
 .PHONY: libiron
 libiron: bin/libiron.a
