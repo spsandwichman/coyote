@@ -55,11 +55,11 @@ static bool is_const(FeInst* inst) {
 }
 
 static bool is_val(FeInst* inst, u64 val) {
-    return inst->kind == FE_CONST && fe_extra_T(inst, FeInstConst)->val == val;
+    return inst->kind == FE_CONST && fe_extra(inst, FeInstConst)->val == val;
 }
 
 static u64 val(FeInst* inst) {
-    return fe_extra_T(inst, FeInstConst)->val;
+    return fe_extra(inst, FeInstConst)->val;
 }
 
 static FeInst* consteval(FeFunc* f, FeInst* inst) {
@@ -72,8 +72,10 @@ static FeInst* consteval(FeFunc* f, FeInst* inst) {
     u64 rhs = 0;
     u64 result = 0;
     if (is_binop) {
-        lhs_inst = fe_extra_T(inst, FeInstBinop)->lhs;
-        rhs_inst = fe_extra_T(inst, FeInstBinop)->rhs;
+        // lhs_inst = fe_extra(inst, FeInstBinop)->lhs;
+        // rhs_inst = fe_extra(inst, FeInstBinop)->rhs;
+        lhs_inst = inst->inputs[0];
+        rhs_inst = inst->inputs[1];
         if (!(is_const(lhs_inst) && is_const(rhs_inst))) {
             return inst; // exit early
         }
@@ -107,47 +109,14 @@ static FeInst* consteval(FeFunc* f, FeInst* inst) {
     return fe_inst_const(f, inst->ty, result);
 }
 
-static void replace_input(const FeTarget* t, FeInst* user, FeInst* old_def, FeInst* new_def) {
-    usize len = 0;
-    FeInst** inputs = fe_inst_list_inputs(t, user, &len);
-    for_n(i, 0, len) {
-        if (inputs[i] == old_def) {
-            inputs[i] = new_def;
-        }
-    }
-}
+// static void replace_input(const FeTarget* t, FeInst* user, FeInst* old_def, FeInst* new_def) {
+//     for_n(i, 0, len) {
+//         if (inputs[i] == old_def) {
+//             inputs[i] = new_def;
+//         }
+//     }
+// }
 
 void fe_opt_algsimp(FeFunc* f) {
-    // while the use api is hot, just dont trust previous use info
-    fe_inst_calculate_uses(f);
-
-    if (!wl.at) {
-        fe_wl_init(&wl);
-    }
-    wl.len = 0;
-    
-    const FeTarget* t = f->mod->target;
-
-    // add everything to the worklist
-    for_blocks(block, f) {
-        for_inst(inst, block) {
-            fe_wl_push(&wl, inst);
-        }
-    }
-
-    while (wl.len != 0) {
-        FeInst* inst = fe_wl_pop(&wl);
-        FeInst* result = consteval(f, inst);
-        if (inst != result) {
-            fe_insert_before(inst, result);
-            for_n(i, 0, inst->use_len) {
-                FeInst* user = inst->uses[i];
-                fe_wl_push(&wl, user);
-
-                replace_input(t, user, inst, result);
-                fe_inst_add_use(result, user);
-            }
-            inst->use_len = 0;
-        }
-    }
+    FE_ASSERT(false);
 }

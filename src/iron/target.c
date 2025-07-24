@@ -1,5 +1,6 @@
 #include "iron/iron.h"
-#include "iron/xr17032/xr.h"
+
+#include "xr17032/xr.h"
 
 // target construction.
 const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
@@ -10,6 +11,7 @@ const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
 
     switch (arch) {
     case FE_ARCH_XR17032:
+        t->ptr_ty = FE_TY_I32;
         t->ir_print_args = xr_print_args;
         t->inst_name = xr_inst_name;
         t->list_inputs = xr_list_inputs;

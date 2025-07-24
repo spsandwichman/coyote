@@ -23,7 +23,7 @@ COBALT_OBJECTS = $(COBALT_SRC:src/%.c=build/%.o)
 CC = gcc
 LD = gcc
 
-INCLUDEPATHS = -Isrc/
+INCLUDEPATHS = -Iinclude/
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
 CFLAGS = -std=gnu2x -g -fwrapv -fno-strict-aliasing
 WARNINGS = -Wall -Wimplicit-fallthrough -Wno-deprecated-declarations -Wno-enum-compare -Wno-unused -Wno-format -Wno-enum-conversion -Wincompatible-pointer-types -Wno-discarded-qualifiers -Wno-strict-aliasing

@@ -2,14 +2,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+
 #ifdef __linux__
     #include <sys/types.h>
     #include <execinfo.h>
     #include <errno.h>
+#else
+    #include <windows.h>
+    // #include <dbghelp.h>
 #endif
 
-
-#include "iron.h"
+#include "iron/iron.h"
 
 [[noreturn]] void fe_runtime_crash(const char* error, ...) {
     fflush(stdout);
@@ -46,8 +49,23 @@
         }
     }
 #else
+    #define MAX_BACKTRACES 255
+    void* frames[MAX_BACKTRACES];
+
+    HANDLE process = GetCurrentProcess();
+
+    usize frames_len = CaptureStackBackTrace(0, MAX_BACKTRACES, frames, nullptr);
+
+    // printf("WINDOWS STACK TRACES BABY\n");
+
+    for_n (i, 0, frames_len) {
+        printf("| %p\n", frames[i]);
+    }
+
     // figure out windows stack traces!
 #endif
+
+    __debugbreak();
     exit(-1);
 }
 

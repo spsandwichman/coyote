@@ -110,16 +110,16 @@ static void emit_mem_operand(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
 
     switch ((XrInstKind)inst->kind) {
     case XR_LOAD8_REG ... XR_LOAD32_REG:
-        base = fe_extra_T(inst, XrRegReg)->r1;
-        shifted = fe_extra_T(inst, XrRegReg)->r2;
-        shift = fe_extra_T(inst, XrRegReg)->shift_kind;
-        shamt = fe_extra_T(inst, XrRegReg)->imm5;
+        base = fe_extra(inst, XrRegReg)->r1;
+        shifted = fe_extra(inst, XrRegReg)->r2;
+        shift = fe_extra(inst, XrRegReg)->shift_kind;
+        shamt = fe_extra(inst, XrRegReg)->imm5;
         break;
     case XR_STORE8_REG ... XR_STORE32_REG:
-        base = fe_extra_T(inst, XrRegRegReg)->r1;
-        shifted = fe_extra_T(inst, XrRegRegReg)->r2;
-        shift = fe_extra_T(inst, XrRegRegReg)->shift_kind;
-        shamt = fe_extra_T(inst, XrRegRegReg)->imm5;
+        base = fe_extra(inst, XrRegRegReg)->r1;
+        shifted = fe_extra(inst, XrRegRegReg)->r2;
+        shift = fe_extra(inst, XrRegRegReg)->shift_kind;
+        shamt = fe_extra(inst, XrRegRegReg)->imm5;
         break;
     default:
         FE_CRASH("incorrect inst type for emit_mem_operand");
@@ -158,21 +158,21 @@ static void emit_inst(FeFunc* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
         break;
     case XR_ADD ... XR_MOD:
         emit_reg_reg(f, db, inst);
-        emit_shift_group(db, fe_extra_T(inst, XrRegReg)->shift_kind, fe_extra_T(inst, XrRegReg)->imm5);
+        emit_shift_group(db, fe_extra(inst, XrRegReg)->shift_kind, fe_extra(inst, XrRegReg)->imm5);
         break;
     case XR_STORE8_IMM ... XR_STORE32_IMM:
         emit_inst_name(db, inst->kind);
         fe_db_writef(db, "%s [%s",
             mem_operand_size(inst->kind),
-            reg(f, fe_extra_T(inst, XrRegRegImm16)->r1)
+            reg(f, fe_extra(inst, XrRegRegImm16)->r1)
         );
-        if (fe_extra_T(inst, XrRegRegImm16)->imm16 != 0) {
+        if (fe_extra(inst, XrRegRegImm16)->imm16 != 0) {
             fe_db_writef(db, " + %u",
-                fe_extra_T(inst, XrRegRegImm16)->imm16
+                fe_extra(inst, XrRegRegImm16)->imm16
             );
         }
         fe_db_writef(db, "], %s",
-            reg(f, fe_extra_T(inst, XrRegRegImm16)->r2)
+            reg(f, fe_extra(inst, XrRegRegImm16)->r2)
         );
         break;
     case XR_LOAD8_IMM ... XR_LOAD32_IMM:
@@ -180,11 +180,11 @@ static void emit_inst(FeFunc* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
         fe_db_writef(db, "%s, %s [%s",
             reg(f, inst),
             mem_operand_size(inst->kind),
-            reg(f, fe_extra_T(inst, XrRegImm16)->reg)
+            reg(f, fe_extra(inst, XrRegImm16)->reg)
         );
-        if (fe_extra_T(inst, XrRegImm16)->imm16 != 0) {
+        if (fe_extra(inst, XrRegImm16)->imm16 != 0) {
             fe_db_writef(db, " + %u",
-                fe_extra_T(inst, XrRegImm16)->imm16
+                fe_extra(inst, XrRegImm16)->imm16
             );
         }
         fe_db_writecstr(db, "]");
@@ -195,7 +195,7 @@ static void emit_inst(FeFunc* f, FeBlock* b, FeDataBuffer* db, FeInst* inst) {
     case XR_J:
         emit_inst_name(db, inst->kind);
         // fe_db_writecstr(db, " ");
-        emit_block_name(db, fe_extra_T(inst, XrJump)->dest);
+        emit_block_name(db, fe_extra(inst, XrJump)->dest);
         break;
     case XR_RET:
         emit_inst_name(db, inst->kind);

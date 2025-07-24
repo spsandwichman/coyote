@@ -37,6 +37,16 @@ int main(int argc, char** argv) {
     keywords = vec_new(string, 256);
     // intake keywords file
 
+    if (argc <= 1) {
+        printf("provide a file name.\n");
+        return 1;
+    }
+    
+    if (argc <= 2) {
+        printf("provide a max number for search parameters.\n");
+        return 1;
+    }
+
     FsFile* file = fs_open(argv[1], false, false);
     string text = fs_read_entire(file);
     text = string_concat(text, constr("\n"));
@@ -63,14 +73,15 @@ int main(int argc, char** argv) {
     //     printf("["str_fmt"]\n", str_arg(keywords.at[i]));
     // }
 
+    const usize max_range = atoll(argv[2]);
+
     for_n(table_size, keywords.len, 100000000) {
         bool* occupied = malloc(sizeof(bool) * table_size);
         memset(occupied, 0, sizeof(bool) * table_size);
 
-        constexpr usize bits = 10;
 
-        for_n(mult, 1, 1ll << bits) {
-            for_n(offset, 1, 1ll << bits) {
+        for_n(mult, 1, max_range) {
+            for_n(offset, 1, max_range) {
                 // try this table configuration.
                 for_n(i, 0, keywords.len) {
                     string kw = keywords.at[i];

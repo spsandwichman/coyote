@@ -1,4 +1,7 @@
-#include "strmap.h"
+#include <string.h>
+
+#include "common/util.h"
+#include "common/strmap.h"
 
 #define MAX_SEARCH 30
 #define TOMBSTONE (void*)0xDEADBEEFDEADBEEF

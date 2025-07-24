@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "vec.h"
+#include "common/vec.h"
 
 _VecGeneric* _vec_new(size_t stride, size_t initial_cap) {
     // store the vec statically so it lives after vec_new has been called, 

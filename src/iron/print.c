@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "iron.h"
+#include "common/ansi.h"
+
 #include "iron/iron.h"
 
 static const char* ty_name[] = {
@@ -55,10 +56,13 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_STACK_ADDR] = "stack-addr",
     [FE_SYM_ADDR] = "sym-addr",
 
-    [FE_PARAM] = "param",
+    [FE__MACH_REG] = "mach-reg",
+    [FE__MACH_MOV] = "mach-mov",
+    [FE__MACH_UPSILON] = "mach-upsilon",
+
+    [FE__ROOT] = "root",
 
     [FE_PROJ] = "proj",
-    [FE__MACH_PROJ] = "mach-proj",
 
     [FE_IADD] = "iadd",
     [FE_ISUB] = "isub",
@@ -87,8 +91,6 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_FREM] = "frem",
 
     [FE_MOV] = "mov",
-    [FE__MACH_MOV] = "mach-mov",
-    [FE_UPSILON] = "upsilon",
     [FE_NOT] = "not",
     [FE_NEG] = "neg",
     [FE_TRUNC] = "trunc",
@@ -100,19 +102,17 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_F2U] = "f2u",
 
     [FE_LOAD] = "load",
-    [FE_LOAD_VOLATILE] = "load-vol",
 
     [FE_STORE] = "store",
-    [FE_STORE_VOLATILE] = "store-vol",
 
-    [FE_CASCADE_VOLATILE] = "cascade-vol",
-    [FE__MACH_REG] = "mach-reg",
+    [FE_MEM_BARRIER] = "mem-barrier",
 
     [FE_BRANCH] = "branch",
     [FE_JUMP] = "jump",
     [FE_RETURN] = "return",
 
     [FE_PHI] = "phi",
+    [FE_MEM_PHI] = "mem-phi",
 
     [FE_CALL] = "call",
 };
@@ -187,6 +187,17 @@ void fe__emit_ir_block_label(FeDataBuffer* db, FeFunc* f, FeBlock* ref) {
 }
 
 void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref) {
+    if (ref == nullptr) {
+        if (should_ansi) {
+            fe_db_writecstr(db, "\x1b[90m");
+        }
+        fe_db_writecstr(db, "null");
+        if (should_ansi) {
+            fe_db_writecstr(db, "\x1b[0m");
+        }
+        return;
+    }
+
     if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->flags));
     fe_db_writef(db, "%%%u", ref->flags);
     if (ref->vr_out != FE_VREG_NONE) {
@@ -216,14 +227,22 @@ const char* fe_ty_name(FeTy ty) {
     return nullptr;
 }
 
+static void print_input_list(FeDataBuffer* db, FeFunc* f, FeInst* inst, usize start_at) {
+    for_n(i, start_at, inst->in_len) {
+        if (i != start_at) fe_db_writecstr(db, ", ");
+        fe__emit_ir_ref(db, f, inst->inputs[i]);
+    }
+}
 
 static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
     const FeTarget* target = f->mod->target;
 
-    if (inst->ty != FE_TY_VOID) {
+    if (inst->use_len != 0) {
         fe__emit_ir_ref(db, f, inst);
-        fe_db_writef(db, ": ");
-        print_inst_ty(db, inst);
+        if (inst->ty != FE_TY_VOID) {
+            fe_db_writef(db, ": ");
+            print_inst_ty(db, inst);
+        }
         fe_db_writecstr(db, " = ");
     }
 
@@ -240,55 +259,42 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
     fe_db_writecstr(db, " ");
 
     switch (inst->kind) {
+    case FE__ROOT:
+        break;
+    case FE_PROJ:
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
+        fe_db_writef(db, ", %u", fe_extra(inst, FeInstProj)->index);
+        break;
     case FE_IADD ... FE_FREM:
-        fe__emit_ir_ref(db, f, fe_extra_T(inst, FeInstBinop)->lhs);
-        fe_db_writecstr(db, ", ");
-        fe__emit_ir_ref(db, f, fe_extra_T(inst, FeInstBinop)->rhs);
+        print_input_list(db, f, inst, 0);
         break;
     case FE_MOV ... FE_F2U:
-        fe__emit_ir_ref(db, f, fe_extra_T(inst, FeInstUnop)->un);
-        break;
-    case FE_PARAM:
-        fe_db_writef(db, "%u", fe_extra_T(inst, FeInstParam)->index);
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
         break;
     case FE_RETURN:
         ;
-        FeInstReturn* ret = fe_extra(inst);
-        for_n(i, 0, ret->len) {
-            if (i != 0) fe_db_writecstr(db, ", ");
-            fe__emit_ir_ref(db, f, fe_return_arg(inst, i));
+        fe_db_writecstr(db, "[");
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
+        fe_db_writecstr(db, "] ");
+        for_n(i, 1, inst->in_len) {
+            if (i != 1) fe_db_writecstr(db, ", ");
+            fe__emit_ir_ref(db, f, inst->inputs[i]);
         }
         break;
     case FE_CALL:
         ;
-        FeInstCall* call = fe_extra(inst);
-        if (call->cap == 0) {
-            fe__emit_ir_ref(db, f, call->single.callee);
-            fe_db_writecstr(db, " (");
-            if (call->len != 0) {
-                fe__emit_ir_ref(db, f, call->single.arg);
-                fe_db_writecstr(db, ": ");
-                fe_db_writecstr(db, fe_ty_name(call->single.arg->ty));
-            }
-            fe_db_writecstr(db, ")");
-        } else {
-            fe__emit_ir_ref(db, f, call->multi[0]);
-            fe_db_writecstr(db, " (");
-            for_n(i, 0, call->len) {
-                if (i != 0) fe_db_writecstr(db, ", ");
-                FeInst* arg = fe_call_arg(inst, i);
-                fe__emit_ir_ref(db, f, arg);
-                fe_db_writecstr(db, ": ");
-                fe_db_writecstr(db, fe_ty_name(arg->ty));
-            }
-            fe_db_writecstr(db, ")");
+        fe_db_writecstr(db, "[");
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
+        fe_db_writecstr(db, "] ");
+        for_n(i, 1, inst->in_len) {
+            if (i != 1) fe_db_writecstr(db, ", ");
+            fe__emit_ir_ref(db, f, inst->inputs[i]);
         }
-
         break;
     case FE_BRANCH:
         ;
         FeInstBranch* branch = fe_extra(inst);
-        fe__emit_ir_ref(db, f, branch->cond);
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
         fe_db_writecstr(db, ", ");
         fe__emit_ir_block_label(db, f, branch->if_true);
         fe_db_writecstr(db, ", ");
@@ -302,12 +308,12 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
     case FE_PHI:
         ;
         FeInstPhi* phi = fe_extra(inst);
-        for_n(i, 0, phi->len) {
+        for_n(i, 0, inst->in_len) {
             if (i != 0) {
                 fe_db_writecstr(db, ", ");
             }
             FeBlock* src_block = phi->blocks[i];
-            FeInst* src = phi->vals[i];
+            FeInst* src = inst->inputs[i];
             fe__emit_ir_block_label(db, f, src_block);
             fe_db_writecstr(db, " ");
             fe__emit_ir_ref(db, f, src);
@@ -315,46 +321,53 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         break;
     case FE_SYM_ADDR:
         ;
-        FeSymbol* sym = fe_extra_T(inst, FeInstSymAddr)->sym;
+        FeSymbol* sym = fe_extra(inst, FeInstSymAddr)->sym;
         fe_db_writecstr(db, "\"");
         fe_db_write(db, fe_compstr_data(sym->name), sym->name.len);
         fe_db_writecstr(db, "\"");
         break;
     case FE_STACK_ADDR:
         ;
-        FeStackItem* item = fe_extra_T(inst, FeInstStackAddr)->item;
+        FeStackItem* item = fe_extra(inst, FeInstStack)->item;
         fe__emit_ir_stack_label(db, item);
         break;
     case FE_LOAD:
-    case FE_LOAD_VOLATILE:
         ;
-        FeInstLoad* load = fe_extra(inst);
-        if (load->unaligned) {
-            fe_db_writecstr(db, "unaligned ");
+        FeInstMemop* load = fe_extra(inst);
+        fe_db_writef(db, "align(%u) ", load->align);
+        if (load->offset) {
+            fe_db_writef(db, "offset(%u) ", load->offset);
         }
-        fe__emit_ir_ref(db, f, load->ptr);
+        fe_db_writecstr(db, "[");
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
+        fe_db_writecstr(db, "] ");
+
+        fe__emit_ir_ref(db, f, inst->inputs[1]);
         break;
     case FE_STORE:
-    case FE_STORE_VOLATILE:
         ;
-        FeInstStore* store = fe_extra(inst);
-        if (store->unaligned) {
-            fe_db_writecstr(db, "unaligned ");
+        FeInstMemop* store = fe_extra(inst);
+        fe_db_writef(db, "align(%u) ", store->align);
+        if (store->offset) {
+            fe_db_writef(db, "offset(%u) ", store->offset);
         }
-        fe__emit_ir_ref(db, f, store->ptr);
-            fe_db_writecstr(db, ", ");
-        fe__emit_ir_ref(db, f, store->val);
+        fe_db_writecstr(db, "[");
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
+        fe_db_writecstr(db, "] ");
+        fe__emit_ir_ref(db, f, inst->inputs[1]);
+        fe_db_writecstr(db, ", ");
+        fe__emit_ir_ref(db, f, inst->inputs[2]);
         break;
     case FE_CONST:
         switch (inst->ty) {
-        case FE_TY_BOOL: fe_db_writef(db, "%s", fe_extra_T(inst, FeInstConst)->val ? "true" : "false"); break;
-        case FE_TY_F64:  fe_db_writef(db, "%lf", (f64)fe_extra_T(inst, FeInstConst)->val_f64); break;
-        case FE_TY_F32:  fe_db_writef(db, "%lf", (f64)fe_extra_T(inst, FeInstConst)->val_f32); break;
-        case FE_TY_F16:  fe_db_writef(db, "%lf", (f64)fe_extra_T(inst, FeInstConst)->val_f16); break;
-        case FE_TY_I64:  fe_db_writef(db, "0x%llx", (u64)fe_extra_T(inst, FeInstConst)->val); break;
-        case FE_TY_I32:  fe_db_writef(db, "0x%llx", (u64)(u32)fe_extra_T(inst, FeInstConst)->val); break;
-        case FE_TY_I16:  fe_db_writef(db, "0x%llx", (u64)(u16)fe_extra_T(inst, FeInstConst)->val); break;
-        case FE_TY_I8:   fe_db_writef(db, "0x%llx", (u64)(u8)fe_extra_T(inst, FeInstConst)->val); break;
+        case FE_TY_BOOL: fe_db_writef(db, "%s", fe_extra(inst, FeInstConst)->val ? "true" : "false"); break;
+        case FE_TY_F64:  fe_db_writef(db, "%lf", (f64)fe_extra(inst, FeInstConst)->val_f64); break;
+        case FE_TY_F32:  fe_db_writef(db, "%lf", (f64)fe_extra(inst, FeInstConst)->val_f32); break;
+        case FE_TY_F16:  fe_db_writef(db, "%lf", (f64)fe_extra(inst, FeInstConst)->val_f16); break;
+        case FE_TY_I64:  fe_db_writef(db, "0x%llx", (u64)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I32:  fe_db_writef(db, "0x%llx", (u64)(u32)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I16:  fe_db_writef(db, "0x%llx", (u64)(u16)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I8:   fe_db_writef(db, "0x%llx", (u64)(u8)fe_extra(inst, FeInstConst)->val); break;
         default:
             fe_db_writef(db, "[TODO]");
             break;
@@ -385,8 +398,9 @@ void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
     for_blocks(block, f) {
         block->flags = block_counter++;
         for_inst(inst, block) {
-            if (inst->ty != FE_TY_VOID)
+            if (inst->use_len != 0) {
                 inst->flags = inst_counter++;
+            }
         }
     }
 

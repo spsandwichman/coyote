@@ -2,7 +2,7 @@
 
 bool is_canon_def(FeVirtualReg* inst_out, FeInst* inst) {
     // upsilons are a kind of fake definition that get created during codegen as inputs for phi nodes.
-    return (inst->kind == FE_UPSILON || inst_out->def == inst);
+    return (inst->kind == FE__MACH_UPSILON || inst_out->def == inst);
 }
 
 static bool add_live_in(FeBlockLiveness* lv, FeVReg vr) {
@@ -41,7 +41,6 @@ static void calculate_liveness(FeFunc* f) {
     const FeTarget* t = f->mod->target;
 
     // make sure cfg is updated.
-    fe_cfg_calculate(f);
 
     // give every basic block a liveness chunk.
     for_blocks(block, f) {
@@ -62,12 +61,11 @@ static void calculate_liveness(FeFunc* f) {
         for_inst(inst, block) {
             if (inst->vr_out == FE_VREG_NONE) continue;
             
-            usize inputs_len;
-            FeInst** inputs = fe_inst_list_inputs(t, inst, &inputs_len);
-            for_n(i, 0, inputs_len) {
+            FeInst** inputs = inst->inputs;
+            for_n(i, 0, inst->in_len) {
                 FeInst* input = inputs[i];
                 FeVirtualReg* vr = fe_vreg(f->vregs, input->vr_out);
-                if (input->kind == FE_UPSILON || vr->def_block != block) {
+                if (input->kind == FE__MACH_UPSILON || vr->def_block != block) {
                     add_live_in(block->live, input->vr_out);
                 }
             }
@@ -80,8 +78,8 @@ static void calculate_liveness(FeFunc* f) {
         changed = false;
         // block.live_out = block.live_out U successor0.live_in U successor1.live_in ...
         for_blocks(block, f) {
-            for_n(succ_i, 0, block->cfg_node->out_len) {
-                FeBlock* succ = fe_cfgn_out(block->cfg_node, succ_i)->block;
+            for_n(succ_i, 0, block->succ_len) {
+                FeBlock* succ = block->succ[succ_i];
                 for_n(i, 0, succ->live->in_len) {
                     FeVReg succ_live_in = succ->live->in[i];
                     // add it to block.out
@@ -140,7 +138,7 @@ void fe_regalloc_linear_scan(FeFunc* f) {
             FeVirtualReg* inst_vr = fe_vreg(f->vregs, inst->vr_out);
 
             // hint input and output to each other
-            FeInst* input = fe_extra_T(inst, FeInstUnop)->un;
+            FeInst* input = inst->inputs[0];
             FeVirtualReg* input_vr = fe_vreg(f->vregs, input->vr_out);
 
             inst_vr->hint = input->vr_out;
@@ -172,9 +170,8 @@ void fe_regalloc_linear_scan(FeFunc* f) {
                 }
             }
 
-            usize inst_inputs_len = 0;
-            FeInst** inst_inputs = fe_inst_list_inputs(target, inst, &inst_inputs_len);
-            for_n(i, 0, inst_inputs_len) {
+            FeInst** inst_inputs = inst->inputs;
+            for_n(i, 0, inst->in_len) {
                 FeInst* input = inst_inputs[i];
                 FeVirtualReg* input_vr = fe_vreg(vbuf, input->vr_out);
 

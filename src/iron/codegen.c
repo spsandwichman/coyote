@@ -39,22 +39,23 @@ FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr) {
 }
 
 static void insert_upsilon(FeFunc* f) {
-    for_blocks(block, f) {
-        for_inst(inst, block) {
-            if (inst->kind != FE_PHI) continue;
+    // for_blocks(block, f) {
+    //     for_inst(inst, block) {
+    //         if (inst->kind != FE_PHI) continue;
 
-            usize len = fe_extra_T(inst, FeInstPhi)->len;
-            FeInst** srcs = fe_extra_T(inst, FeInstPhi)->vals;
-            FeBlock** blocks = fe_extra_T(inst, FeInstPhi)->blocks;
+    //         usize len = fe_extra(inst, FeInstPhi)->len;
+    //         FeInst** srcs = fe_extra(inst, FeInstPhi)->vals;
+    //         FeBlock** blocks = fe_extra(inst, FeInstPhi)->blocks;
 
-            // add upsilon nodes
-            for_n(i, 0, len) {
-                FeInst* upsilon = fe_inst_unop(f, inst->ty, FE_UPSILON, srcs[i]);
-                fe_insert_before(blocks[i]->bookend->prev, upsilon);
-                srcs[i] = upsilon;
-            }
-        }
-    }
+    //         // add upsilon nodes
+    //         for_n(i, 0, len) {
+    //             FeInst* upsilon = fe_inst_unop(f, inst->ty, FE__MACH_UPSILON, srcs[i]);
+    //             fe_insert_before(blocks[i]->bookend->prev, upsilon);
+    //             srcs[i] = upsilon;
+    //         }
+    //     }
+    // }
+    FE_ASSERT(false);
 }
 
 typedef struct {
@@ -68,7 +69,6 @@ void fe_codegen(FeFunc* f) {
 
     const FeTarget* target = f->mod->target;
 
-    fe_inst_calculate_uses(f);
     fe_stack_calculate_size(f);
 
 
@@ -101,7 +101,7 @@ void fe_codegen(FeFunc* f) {
     for_blocks(block, f) {
         for_inst(inst, block) {
             usize inputs_len = 0;
-            FeInst** inputs = fe_inst_list_inputs(target, inst, &inputs_len);
+            FeInst** inputs = inst->inputs;
             for_n(i, 0, inputs_len) {
                 FeInst* new_input = isel_map[inputs[i]->flags].to.end;
                 if (new_input != nullptr) {
@@ -113,7 +113,7 @@ void fe_codegen(FeFunc* f) {
 
     for_n(i, START, inst_count) {
         if (isel_map[i].from != isel_map[i].to.end) {
-            fe_inst_free(f, isel_map[i].from);
+            fe_inst_destroy(f, isel_map[i].from);
         }
     }
 
@@ -125,7 +125,7 @@ void fe_codegen(FeFunc* f) {
     // create virtual registers for instructions that dont have them yet
     for_blocks(block, f) {
         for_inst(inst, block) {
-            if (inst->kind == FE_UPSILON) continue;
+            if (inst->kind == FE__MACH_UPSILON) continue;
             if ((inst->ty != FE_TY_VOID && inst->ty != FE_TY_TUPLE) && inst->vr_out == FE_VREG_NONE) {
                 // TODO choose register class based on architecture and type
                 inst->vr_out = fe_vreg_new(f->vregs, inst, block, target->choose_regclass(inst->kind, inst->ty));
@@ -136,14 +136,16 @@ void fe_codegen(FeFunc* f) {
         for_inst(inst, block) {
             if (inst->kind != FE_PHI) continue;
 
-            usize len = fe_extra_T(inst, FeInstPhi)->len;
-            FeInst** srcs = fe_extra_T(inst, FeInstPhi)->vals;
+            FE_ASSERT(false);
 
-            // add upsilon nodes
-            for_n(i, 0, len) {
-                FeInst* upsilon = srcs[i];
-                upsilon->vr_out = inst->vr_out;
-            }
+            // usize len = fe_extra(inst, FeInstPhi)->len;
+            // FeInst** srcs = fe_extra(inst, FeInstPhi)->vals;
+
+            // // add upsilon nodes
+            // for_n(i, 0, len) {
+            //     FeInst* upsilon = srcs[i];
+            //     upsilon->vr_out = inst->vr_out;
+            // }
         }
     }
     

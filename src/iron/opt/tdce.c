@@ -11,14 +11,6 @@ void fe_opt_tdce(FeFunc* f) {
 
     // TODO fuck all these worklists into OUTERED SPACE
     FeWorklist wl;
-    FeWorklist dead;
-    FeWorklist to_free;
-    fe_wl_init(&wl);
-    fe_wl_init(&dead);
-    fe_wl_init(&to_free);
-
-    // update every instruction's use count
-    fe_inst_calculate_uses(f);
 
     for_blocks(block, f) {
         for_inst(inst, block) {
@@ -33,40 +25,9 @@ void fe_opt_tdce(FeFunc* f) {
         // }
 
         if (inst->use_len == 0 && !fe_inst_has_trait(inst->kind, FE_TRAIT_VOLATILE)) {
-            // get rid of it!!!!!!!!!!!!
-            fe_wl_push(&dead, inst);
-            inst->flags = TDCE_DEAD_LMAO;
-
-            // decrement all input use counts
-            usize len;
-            FeInst** inputs = fe_inst_list_inputs(t, inst, &len);
-            for_n (i, 0, len) {
-                if (inputs[i]->flags == TDCE_DEAD_LMAO) {
-                    continue;
-                }
-                fe_inst_unordered_remove_use(inputs[i], inst);
-                if (inputs[i]->use_len == 0) {
-                    fe_wl_push(&wl, inputs[i]);
-                }
-            }
+            fe_inst_destroy(f, inst);
         }
-    }
-
-    // get rid of dem
-    for_n(i, 0, dead.len) {
-        if (dead.at[i]->flags == 0) {
-            continue;
-        }
-        fe_inst_remove_pos(dead.at[i]); // remove from block
-        fe_wl_push(&to_free, dead.at[i]);
-        dead.at[i]->flags = 0;
-    }
-
-    for_n(i, 0, to_free.len) {
-        fe_inst_free(f, to_free.at[i]);
     }
 
     fe_wl_destroy(&wl);
-    fe_wl_destroy(&dead);
-    fe_wl_destroy(&to_free);
 }
