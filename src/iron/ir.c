@@ -704,6 +704,26 @@ void fe_set_input_null(FeInst* inst, u16 n) {
     }
 }
 
+// replace users of 'old_val' with users of 'new_val'
+usize fe_replace_uses(FeFunc* f, FeInst* old_val, FeInst* new_val) {
+    // kinda unsafe, directly manipulating inputs and use lists is not great
+    for_n (i, 0, old_val->use_len) {
+        FeInstUse old_val_use = old_val->uses[0];
+        FeInst* old_val_use_inst = FE_USE_PTR(old_val_use);
+        u16 old_val_use_input = old_val_use.idx; // which input of 'old_val_use_inst' is 'old_val'
+
+        // unlink so fe_set_input doesnt try to touch our precious use list
+        old_val_use_inst->inputs[old_val_use_input] = nullptr;
+
+        fe_set_input(f, old_val_use_inst, old_val_use_input, new_val);
+    }
+
+    usize num_replaced = old_val->use_len;
+    old_val->use_len = 0;
+    
+    return num_replaced;
+}
+
 FeInst* fe_inst_new(FeFunc* f, usize input_len, usize extra_size) {
     FeInst* inst = fe_ipool_alloc(f->ipool, extra_size);
     inst->in_len = input_len;
@@ -952,10 +972,10 @@ FeInst* fe_inst_phi(FeFunc* f, FeTy ty, u16 expected_len) {
     return i;
 }
 
-FeInst* fe_inst_mem_phi(FeFunc* f, FeTy ty, u16 expected_len) {
+FeInst* fe_inst_mem_phi(FeFunc* f, u16 expected_len) {
     FeInst* i = fe_inst_new(f, expected_len, sizeof(FeInstPhi));
     i->kind = FE_MEM_PHI;
-    i->ty = ty;
+    i->ty = FE_TY_VOID;
     i->in_len = 0;
 
     fe_extra(i, FeInstPhi)->blocks = fe_ipool_list_alloc(f->ipool, i->in_cap);

@@ -701,6 +701,7 @@ void fe_chain_destroy(FeFunc* f, FeInstChain chain);
 // instruction builders
 // -------------------------------------
 
+usize fe_replace_uses(FeFunc* f, FeInst* old_val, FeInst* new_val);
 void fe_set_input(FeFunc* f, FeInst* inst, u16 n, FeInst* input);
 void fe_set_input_null(FeInst* inst, u16 n);
 
@@ -724,7 +725,7 @@ FeInst* fe_inst_return(FeFunc* f);
 FeInst* fe_inst_branch(FeFunc* f, FeInst* cond);
 FeInst* fe_inst_jump(FeFunc* f);
 FeInst* fe_inst_phi(FeFunc* f, FeTy ty, u16 expected_len);
-FeInst* fe_inst_mem_phi(FeFunc* f, FeTy ty, u16 expected_len);
+FeInst* fe_inst_mem_phi(FeFunc* f, u16 expected_len);
 
 void fe_call_set_arg(FeFunc* f, FeInst* call, u16 n, FeInst* arg) ;
 void fe_return_set_arg(FeFunc* f, FeInst* ret, u16 n, FeInst* arg);
@@ -733,8 +734,6 @@ void fe_branch_set_false(FeFunc* f, FeInst* branch, FeBlock* block);
 void fe_jump_set_target(FeFunc* f, FeInst* jump, FeBlock* block);
 void fe_phi_add_src(FeFunc* f, FeInst* phi, FeInst* src_value, FeBlock* src_block);
 void fe_phi_remove_src(FeFunc* f, FeInst* phi, u16 n);
-
-// FeInst* fe_inst_phi(FeFunc* f, FeTy ty, u16 num_srcs);
 
 const char* fe_inst_name(const FeTarget* target, FeInstKind kind);
 const char* fe_ty_name(FeTy ty);
@@ -841,7 +840,8 @@ typedef struct {
 FeVerifyReportList fe_verify_module(FeModule* m);
 
 void fe_opt_tdce(FeFunc* f);
-void fe_opt_algsimp(FeFunc* f);
+// void fe_opt_algsimp(FeFunc* f);
+void fe_opt_local(FeFunc* f);
 
 // -------------------------------------
 // IO utilities

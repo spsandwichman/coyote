@@ -26,11 +26,13 @@ FeFunc* make_store_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 /*
     i32 foo(i32* ptr, i32 val) {
         ptr* = val;
-        return ptr*;
+        i32 retval = ptr*;
+        ptr* = 0;
+        return retval;
     }
 ----------------------------------------
     i32 foo(i32* ptr, i32 val) {
-        ptr* = val;
+        ptr* = 0;
         return val;
     }
 */
@@ -49,6 +51,17 @@ FeFunc* make_store_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
         FE_MEMOP_ALIGN_DEFAULT, 0
     );
     fe_append_end(entry, load);
+
+    FeInst* zero = fe_inst_const(f, FE_TY_I32, 0);
+    fe_append_end(entry, zero);
+
+    FeInst* zero_store = fe_inst_store(
+        f, 
+        fe_func_param(f, 0), 
+        zero, 
+        FE_MEMOP_ALIGN_DEFAULT, 0
+    );
+    fe_append_end(entry, zero_store);
 
     FeInst* ret = fe_inst_return(f);
     fe_append_end(entry, ret);
@@ -71,6 +84,9 @@ int main() {
     FeFunc* func = make_store_test(mod, &ipool, &vregs);
 
     quick_print(func);
+    fe_opt_local(func);
+    quick_print(func);
+
     // fe_opt_algsimp(func);
     // quick_print(func);
     // fe_codegen(func);
