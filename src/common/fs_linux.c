@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "fs.h"
 
 #ifdef OS_LINUX
@@ -6,6 +8,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+
 
 bool fs_real_path(const char* path, FsPath* out) {
     if (!realpath(path, out->raw)) return true;
@@ -58,6 +61,21 @@ void fs_destroy(FsFile* f) {
         fs_close(f);
     }
     free(f);
+}
+
+char* fs_get_current_dir() {
+    char* current_dir = get_current_dir_name();
+
+    if (current_dir == nullptr) {
+        perror("Error retrieving CWD: ");
+        exit(EXIT_FAILURE);
+    }
+
+    return current_dir;
+}
+
+bool fs_set_current_dir(const char* dir) {
+    return chdir(dir) == 0;
 }
 
 // returns contents. if contents == nullptr, return a newly allocated vec.
