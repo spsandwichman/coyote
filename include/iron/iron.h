@@ -50,7 +50,6 @@ typedef uintptr_t usize;
 
 typedef double   f64;
 typedef float    f32;
-typedef _Float16 f16;
 
 #ifdef FE_HOST_X86_64
     typedef struct FeCompactStr {
@@ -127,7 +126,6 @@ typedef enum: u8 {
     FE_TY_I32,
     FE_TY_I64,
 
-    FE_TY_F16,
     FE_TY_F32,
     FE_TY_F64,
 
@@ -146,7 +144,6 @@ typedef enum: u8 {
     FE_TY_I16x8 = FE_TY_VEC(FE_TY_V128, FE_TY_I16),
     FE_TY_I32x4 = FE_TY_VEC(FE_TY_V128, FE_TY_I32),
     FE_TY_I64x2 = FE_TY_VEC(FE_TY_V128, FE_TY_I64),
-    FE_TY_F16x8 = FE_TY_VEC(FE_TY_V128, FE_TY_F16),
     FE_TY_F32x4 = FE_TY_VEC(FE_TY_V128, FE_TY_F32),
     FE_TY_F64x2 = FE_TY_VEC(FE_TY_V128, FE_TY_F64),
 
@@ -154,7 +151,6 @@ typedef enum: u8 {
     FE_TY_I16x16 = FE_TY_VEC(FE_TY_V256, FE_TY_I16),
     FE_TY_I32x8  = FE_TY_VEC(FE_TY_V256, FE_TY_I32),
     FE_TY_I64x4  = FE_TY_VEC(FE_TY_V256, FE_TY_I64),
-    FE_TY_F16x16 = FE_TY_VEC(FE_TY_V256, FE_TY_F16),
     FE_TY_F32x8  = FE_TY_VEC(FE_TY_V256, FE_TY_F32),
     FE_TY_F64x4  = FE_TY_VEC(FE_TY_V256, FE_TY_F64),
     
@@ -162,7 +158,6 @@ typedef enum: u8 {
     FE_TY_I16x32 = FE_TY_VEC(FE_TY_V512, FE_TY_I16),
     FE_TY_I32x16 = FE_TY_VEC(FE_TY_V512, FE_TY_I32),
     FE_TY_I64x8  = FE_TY_VEC(FE_TY_V512, FE_TY_I64),
-    FE_TY_F16x32 = FE_TY_VEC(FE_TY_V512, FE_TY_F16),
     FE_TY_F32x16 = FE_TY_VEC(FE_TY_V512, FE_TY_F32),
     FE_TY_F64x8  = FE_TY_VEC(FE_TY_V512, FE_TY_F64),
 
@@ -432,9 +427,6 @@ typedef enum: FeInstKind {
     FE__MACH_MOV, // mostly for hardcoding register clobbers
     FE__MACH_UPSILON, // for phi-movs in codegen
 
-    FE_NOT,
-    FE_NEG,
-
     FE_TRUNC,    // integer downcast
     FE_SIGN_EXT,  // signed integer upcast
     FE_ZERO_EXT,  // unsigned integer upcast
@@ -541,7 +533,6 @@ typedef union {
     u64 val;
     f64 val_f64;
     f32 val_f32;
-    f16 val_f16;
 } FeInstConst;
 
 typedef struct {
@@ -713,7 +704,6 @@ FeInst* fe_inst_proj(FeFunc* f, FeInst* inst, usize index);
 FeInst* fe_inst_const(FeFunc* f, FeTy ty, u64 val);
 FeInst* fe_inst_const_f64(FeFunc* f, f64 val);
 FeInst* fe_inst_const_f32(FeFunc* f, f32 val);
-FeInst* fe_inst_const_f16(FeFunc* f, f16 val);
 FeInst* fe_inst_stack_addr(FeFunc* f, FeStackItem* item);
 FeInst* fe_inst_sym_addr(FeFunc* f, FeSymbol* sym);
 FeInst* fe_inst_unop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* val);
@@ -839,8 +829,6 @@ typedef struct {
 
 FeVerifyReportList fe_verify_module(FeModule* m);
 
-void fe_opt_tdce(FeFunc* f);
-// void fe_opt_algsimp(FeFunc* f);
 void fe_opt_local(FeFunc* f);
 
 // -------------------------------------

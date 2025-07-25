@@ -120,7 +120,7 @@ void fe_codegen(FeFunc* f) {
     fe_free(isel_map);
 
     target->pre_regalloc_opt(f);
-    fe_opt_tdce(f);
+    fe_opt_local(f);
 
     // create virtual registers for instructions that dont have them yet
     for_blocks(block, f) {

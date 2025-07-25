@@ -20,6 +20,5 @@ typedef uintptr_t usize;
 
 typedef double   f64;
 typedef float    f32;
-typedef _Float16 f16;
 
 #endif // ORBIT_TYPES_H

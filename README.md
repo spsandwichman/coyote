@@ -1,7 +1,7 @@
 # Coyote
 
 Coyote (stylized `coyote`) is a **work-in-progress** implementation of the [Jackal](https://github.com/xrarch/newsdk) programming language by [hyenasky](https://github.com/hyenasky).
-Coyote focuses on lower memory usage, faster compile times, and higher quality code generation compared to the XR/SDK implementation.
+Coyote focuses on useful diagnostics, lower memory usage, faster compile times, and high quality code generation compared to the XR/SDK implementation.
 
 Coyote introduces various features to Jackal for ergonomics (pointers to scalar stack variables, implicit `IN`, `ALIGNOF` and `ALIGNOFVALUE`, etc.) and optimization (`NOALIAS` qualifier, etc.). 
 To discourage use of these features, use `--xrsdk` and add `--error-on-warn` to enforce it.

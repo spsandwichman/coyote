@@ -15,6 +15,7 @@ static u8 extra_size_table[FE__INST_END] = {
     [FE_CONST] = sizeof(FeInstConst),
     [FE_SYM_ADDR] = sizeof(FeInstSymAddr),
     [FE_STACK_ADDR] = sizeof(FeInstStack),
+    [FE_IADD ... FE_FREM] = 0,
     [FE_MOV ... FE_F2I] = 0,
     [FE_LOAD ... FE_MEM_BARRIER] = sizeof(FeInstMemop),
     [FE__MACH_REG] = 0,

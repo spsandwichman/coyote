@@ -15,7 +15,6 @@ static const char* ty_name[] = {
     [FE_TY_I32] = "i32",
     [FE_TY_I64] = "i64",
 
-    [FE_TY_F16] = "f16",
     [FE_TY_F32] = "f32",
     [FE_TY_F64] = "f64",
 
@@ -27,7 +26,6 @@ static const char* ty_name[] = {
     [FE_TY_I16x8] = "i16x8",
     [FE_TY_I32x4] = "i32x4",
     [FE_TY_I64x2] = "i64x2",
-    [FE_TY_F16x8] = "f16x8",
     [FE_TY_F32x4] = "f32x4",
     [FE_TY_F64x2] = "f64x2",
 
@@ -35,7 +33,6 @@ static const char* ty_name[] = {
     [FE_TY_I16x16] = "i16x16",
     [FE_TY_I32x8]  = "i32x8",
     [FE_TY_I64x4]  = "i64x4",
-    [FE_TY_F16x16] = "f16x16",
     [FE_TY_F32x8]  = "f32x8",
     [FE_TY_F64x4]  = "f64x4",
 
@@ -43,7 +40,6 @@ static const char* ty_name[] = {
     [FE_TY_I16x32] = "i16x32",
     [FE_TY_I32x16] = "i32x16",
     [FE_TY_I64x8]  = "i64x8",
-    [FE_TY_F16x32] = "f16x32",
     [FE_TY_F32x16] = "f32x16",
     [FE_TY_F64x8]  = "f64x8",
 };
@@ -91,8 +87,6 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_FREM] = "frem",
 
     [FE_MOV] = "mov",
-    [FE_NOT] = "not",
-    [FE_NEG] = "neg",
     [FE_TRUNC] = "trunc",
     [FE_SIGN_EXT] = "sign-ext",
     [FE_ZERO_EXT] = "zero-ext",
@@ -363,7 +357,6 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         case FE_TY_BOOL: fe_db_writef(db, "%s", fe_extra(inst, FeInstConst)->val ? "true" : "false"); break;
         case FE_TY_F64:  fe_db_writef(db, "%lf", (f64)fe_extra(inst, FeInstConst)->val_f64); break;
         case FE_TY_F32:  fe_db_writef(db, "%lf", (f64)fe_extra(inst, FeInstConst)->val_f32); break;
-        case FE_TY_F16:  fe_db_writef(db, "%lf", (f64)fe_extra(inst, FeInstConst)->val_f16); break;
         case FE_TY_I64:  fe_db_writef(db, "0x%llx", (u64)fe_extra(inst, FeInstConst)->val); break;
         case FE_TY_I32:  fe_db_writef(db, "0x%llx", (u64)(u32)fe_extra(inst, FeInstConst)->val); break;
         case FE_TY_I16:  fe_db_writef(db, "0x%llx", (u64)(u16)fe_extra(inst, FeInstConst)->val); break;

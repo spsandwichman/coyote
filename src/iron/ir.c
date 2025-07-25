@@ -107,7 +107,6 @@ usize fe_ty_get_align(FeTy ty, FeComplexTy *cty) {
     case FE_TY_I8:
         return 1;
     case FE_TY_I16:
-    case FE_TY_F16:
         return 2;
     case FE_TY_I32:
     case FE_TY_F32:
@@ -157,7 +156,6 @@ usize fe_ty_get_size(FeTy ty, FeComplexTy *cty) {
     case FE_TY_I8:
         return 1;
     case FE_TY_I16:
-    case FE_TY_F16:
         return 2;
     case FE_TY_I32:
     case FE_TY_F32:
@@ -769,6 +767,9 @@ void fe_inst_add_input(FeFunc* f, FeInst* inst, FeInst* input) {
 
 void fe_inst_destroy(FeFunc* f, FeInst* inst) {
 
+    FE_ASSERT(inst);
+    FE_ASSERT(inst->use_len == 0);
+
     // disconnect from other nodes
     for_n(i, 0, inst->in_len) {
         fe_set_input_null(inst, i);
@@ -824,16 +825,6 @@ FeInst* fe_inst_const_f32(FeFunc* f, f32 val) {
     i->ty = FE_TY_F32;
 
     fe_extra(i, FeInstConst)->val_f32 = val;
-
-    return i;
-}
-
-FeInst* fe_inst_const_f16(FeFunc* f, f16 val) {
-    FeInst* i = fe_inst_new(f, 0, sizeof(FeInstConst));
-    i->kind = FE_CONST;
-    i->ty = FE_TY_F16;
-
-    fe_extra(i, FeInstConst)->val_f16 = val;
 
     return i;
 }
@@ -901,7 +892,7 @@ FeInst* fe_inst_load(FeFunc* f, FeTy ty, FeInst* ptr, u16 align, u8 offset) {
 FeInst* fe_inst_store(FeFunc* f, FeInst* ptr, FeInst* val, u16 align, u8 offset) {
     FeInst* i = fe_inst_new(f, 3, sizeof(FeInstMemop));
     i->kind = FE_STORE;
-    i->ty = val->ty;
+    i->ty = FE_TY_VOID;
 
     if (align == FE_MEMOP_ALIGN_DEFAULT) {
         align = fe_ty_get_align(val->ty, nullptr);
@@ -1141,8 +1132,6 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_MOV]      = UNOP | SAME_IN_OUT,
     [FE__MACH_MOV] = UNOP | VOL | SAME_IN_OUT | MOV_HINT,
     [FE__MACH_UPSILON]  = UNOP | VOL | SAME_IN_OUT | MOV_HINT,
-    [FE_NOT]   = UNOP | INT_IN | SAME_IN_OUT,
-    [FE_NEG]   = UNOP | INT_IN | SAME_IN_OUT,
     [FE_TRUNC] = UNOP | INT_IN,
     [FE_SIGN_EXT] = UNOP | INT_IN,
     [FE_ZERO_EXT] = UNOP | INT_IN,
@@ -1183,6 +1172,13 @@ void fe_wl_init(FeWorklist* wl) {
 }
 
 void fe_wl_push(FeWorklist* wl, FeInst* inst) {
+    // BAD change this soon
+    for_n(i, 0, wl->len) {
+        if (wl->at[i] == inst) {
+            return;
+        }
+    }
+
     if (wl->len == wl->cap) {
         wl->cap += wl->cap >> 1;
         wl->at = fe_realloc(wl->at, sizeof(wl->at[0]) * wl->cap);
