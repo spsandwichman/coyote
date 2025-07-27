@@ -23,13 +23,16 @@
     T(IF) \
     T(IN) \
     T(INT) \
+    T(INSERTASM) \
     T(LEAVE) \
     T(LONG) \
     T(NOT) \
+    T(NOTHING) \
     T(NULLPTR) \
     T(OUT) \
     T(PACKED) \
     T(RETURN) \
+    T(ROR) \
     T(SIZEOF) \
     T(OFFSETOF) \
     T(SIZEOFVALUE) \
@@ -45,7 +48,6 @@
     T(VOID) \
     T(WHILE) \
     T(BARRIER) \
-    T(NOTHING) \
     \
     T(PUBLIC) \
     T(PRIVATE) \
@@ -57,13 +59,16 @@
     T(UWORD) \
     T(WORD) \
     \
-    T(NOALIAS) \
-    T(ALIGNOF) \
-    T(ALIGNOFVALUE) \
-    \
     T(JKL_FILE_NAME) \
     T(JKL_FUNC_NAME) \
     T(JKL_LINE_NUMBER) \
+    \
+    /* coyote extensions begin here */ \
+    \
+    T(NOALIAS) \
+    T(NORETURN) \
+    T(ALIGNOF) \
+    T(ALIGNOFVALUE) \
 
 typedef struct {
     string src;

@@ -3,7 +3,7 @@
 Coyote (stylized `coyote`) is a **work-in-progress** implementation of the [Jackal](https://github.com/xrarch/newsdk) programming language by [hyenasky](https://github.com/hyenasky).
 Coyote focuses on useful diagnostics, lower memory usage, faster compile times, and high quality code generation compared to the XR/SDK implementation.
 
-Coyote introduces various features to Jackal for ergonomics (pointers to scalar stack variables, implicit `IN`, `ALIGNOF` and `ALIGNOFVALUE`, etc.) and optimization (`NOALIAS` qualifier, etc.). 
+Coyote introduces various features to Jackal for ergonomics (pointers to scalar stack variables, implicit `IN`, `ALIGNOF` and `ALIGNOFVALUE`, etc.) and optimization (`NOALIAS` attribute, etc.). 
 To discourage use of these features, use `--xrsdk` and add `--error-on-warn` to enforce it.
 
 This repository is also home to Iron, a lightweight but powerful code optimization and generation library. Iron can (and should!) be built as a standalone library for use in other projects.

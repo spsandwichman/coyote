@@ -134,19 +134,19 @@ string tok_span(Token t) {
 // perfect hash function
 // WARNING: THIS HAS TO BE REMADE EVERY TIME A KEYWORD IS ADDED
 // USE SCRIPTS/HASHGEN FOR THIS
-static usize hashfunc(const char* key, usize key_len) {
-    usize hash = 189;
+usize hashfunc(const char* key, usize key_len) {
+    usize hash = 31899;
 
     for (usize i = 0; i < key_len; ++i) {
         hash ^= key[i];
-        hash *= 103;
+        hash *= 5196;
     }
-    return hash % 146;
+    return hash % 101;
 }
 
-static const char* keyword_table[146];
-static u8 keyword_len_table[146];
-static u8 keyword_code_table[146];
+static const char* keyword_table[101];
+static u8 keyword_len_table[101];
+static u8 keyword_code_table[101];
 
 static u8 lex_categorize_keyword(char* s, size_t len) {
     u8 index = hashfunc(s, len);

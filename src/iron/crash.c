@@ -17,6 +17,8 @@
 [[noreturn]] void fe_runtime_crash(const char* error, ...) {
     fflush(stdout);
 
+    fprintf(stderr, "iron: ");
+
     va_list args;
     va_start(args, error);
     vfprintf(stderr, error, args);

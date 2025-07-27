@@ -15,10 +15,10 @@ extern "C" {
 #endif
 
 #if defined(__x86_64__)
-    #define FE_HOST_X86_64
+    #define FE_HOST_X64
     #define FE_HOST_BITS 64
 #elif defined (__i386__)
-    #define FE_HOST_X86_32
+    #define FE_HOST_X86
     #define FE_HOST_BITS 32
 #elif defined (__aarch64__)
     #define FE_HOST_ARM64
@@ -51,7 +51,7 @@ typedef uintptr_t usize;
 typedef double   f64;
 typedef float    f32;
 
-#ifdef FE_HOST_X86_64
+#ifdef FE_HOST_X64
     typedef struct FeCompactStr {
         i64 data : 48;
         u64 len : 16;
@@ -83,9 +83,9 @@ typedef float    f32;
     #define for_n(iterator, start, end) for (usize iterator = (start); iterator < (end); ++iterator)
 #endif
 
-#define FE_CRASH(fmt, ...) fe_runtime_crash("iron crash in %s() at %s:%zu -> " fmt, __func__, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
+#define FE_CRASH(fmt, ...) fe_runtime_crash("crash in %s() at %s:%zu -> " fmt, __func__, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
 
-#define FE_ASSERT(cond) if (!(cond)) fe_runtime_crash("FE_ASSERT(" #cond ") failed in %s() at %s:%zu", __func__, __FILE__, __LINE__)
+#define FE_ASSERT(cond) if (!(cond)) fe_runtime_crash("assert (" #cond ") failed in %s() at %s:%zu", __func__, __FILE__, __LINE__)
 
 // -------------------------------------
 // predefs!
@@ -200,12 +200,13 @@ usize fe_ty_get_align(FeTy ty, FeComplexTy* cty);
 // -------------------------------------
 
 typedef enum: u8 {
-    FE_ARCH_X86_64 = 1,
+    FE_ARCH_X64 = 1,
+    FE_ARCH_ARM64,
 
     // esoteric
     FE_ARCH_XR17032,
-    FE_ARCH_FOX32,
-    FE_ARCH_APHELION,
+    // FE_ARCH_FOX32,
+    // FE_ARCH_APHELION,
 } FeArch;
 
 typedef enum: u8 {
@@ -477,14 +478,17 @@ typedef enum: FeInstKind {
 
     FE__BASE_INST_END,
 
-    FE__XR_INST_BEGIN = FE_ARCH_XR17032 * 256,
-    FE__XR_INST_END = FE__XR_INST_BEGIN + 256,
+    FE__X64_INST_BEGIN = FE_ARCH_X64 * 512,
+    FE__X64_INST_END = FE__X64_INST_BEGIN + 512,
+
+    FE__XR_INST_BEGIN = FE_ARCH_XR17032 * 512,
+    FE__XR_INST_END = FE__XR_INST_BEGIN + 512,
 
     FE__INST_END,
 } FeInstKindGeneric;
 
 // if possible, bit-pack uses
-#ifdef FE_HOST_X86_64
+#ifdef FE_HOST_X64
     typedef struct FeInstUse {
         u64 idx : 16; // shouldn't need more than this...
         i64 ptr : 48;

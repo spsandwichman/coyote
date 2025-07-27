@@ -1,13 +1,13 @@
 #include <ctype.h>
 
-#include "../src/common/orbit.h"
+#include "common/type.h"
 
-#include "../src/common/fs.h"
-#include "../src/common/fs_win.c"
-#include "../src/common/fs_linux.c"
+#include "common/fs.h"
+#include "common/fs_win.c"
+#include "common/fs_linux.c"
 
-#include "../src/common/str.c"
-#include "../src/common/vec.c"
+#include "common/str.c"
+#include "common/vec.c"
 
 usize hashfunc(const char* key, usize key_len, usize offset, usize mult, usize table_size) {
     usize hash = offset;
@@ -75,7 +75,12 @@ int main(int argc, char** argv) {
 
     const usize max_range = atoll(argv[2]);
 
-    for_n(table_size, keywords.len, 100000000) {
+    // for_n(table_size, keywords.len, 100000000) {
+    
+    // work backwards
+    for (isize table_size = keywords.len * 3; table_size != keywords.len; table_size--) {
+        next_table_size:
+
         bool* occupied = malloc(sizeof(bool) * table_size);
         memset(occupied, 0, sizeof(bool) * table_size);
 
@@ -92,13 +97,15 @@ int main(int argc, char** argv) {
                     occupied[index] = true;
                 }
                 // config works!!!
-                printf("for keywords:");
-                for_n(i, 0, keywords.len) {
-                    string kw = keywords.at[i];
-                    printf("  "str_fmt" -> %llu\n", str_arg(kw), hashfunc(kw.raw, kw.len, offset, mult, table_size));
-                }
-                printf("CONFIG:\n\n" func_text"\n", offset, mult, table_size);
-                return 0;
+                // printf("for keywords:");
+                // for_n(i, 0, keywords.len) {
+                //     string kw = keywords.at[i];
+                //     printf("  "str_fmt" -> %llu\n", str_arg(kw), hashfunc(kw.raw, kw.len, offset, mult, table_size));
+                // }
+                printf("CONFIG FOUND FOR LENGTH %zi:\n" func_text"\n", table_size, offset, mult, table_size);
+                // return 0;
+                table_size--;
+                goto next_table_size;
                     
                 next_config:
                 memset(occupied, 0, sizeof(bool) * table_size);
