@@ -64,10 +64,11 @@
         printf("| %p\n", frames[i]);
     }
 
-    // figure out windows stack traces!
-#endif
+    // todo: figure out windows stack traces!
 
     __debugbreak();
+#endif
+
     exit(-1);
 }
 
