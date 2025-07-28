@@ -23,7 +23,6 @@
     T(IF) \
     T(IN) \
     T(INT) \
-    T(INSERTASM) \
     T(LEAVE) \
     T(LONG) \
     T(NOT) \
@@ -48,6 +47,7 @@
     T(VOID) \
     T(WHILE) \
     T(BARRIER) \
+    T(INSERTASM) \
     \
     T(PUBLIC) \
     T(PRIVATE) \
@@ -127,7 +127,7 @@ enum {
     TOK_MINUS_EQ,   // -=
     TOK_MUL_EQ,     // *=
     TOK_DIV_EQ,     // /=
-    TOK_MOD_EQ,     // %=
+    TOK_REM_EQ,     // %=
     TOK_AND_EQ,     // &=
     TOK_OR_EQ,      // |=
     TOK_XOR_EQ,     // $=
@@ -138,7 +138,7 @@ enum {
     TOK_MINUS,      // -
     TOK_MUL,        // *
     TOK_DIV,        // /
-    TOK_MOD,        // %
+    TOK_REM,        // %
     TOK_AND,        // &
     TOK_OR,         // |
     TOK_XOR,        // $

@@ -95,6 +95,7 @@ typedef struct {
     u8 kind;
     u8 len;
     bool variadic; // last parameter is a variadic argument
+    bool is_noreturn;
     TyIndex ret_ty;
     CompactString name;
     Ty_FnParam params[];
@@ -167,7 +168,7 @@ typedef enum : u8 {
     STMT_RETURN,
 
     STMT_IF,
-    STMT__BLOCK,
+    STMT_BLOCK,
 
     STMT_WHILE,
 
@@ -238,12 +239,16 @@ typedef enum : u8 {
     EXPR_SUB,
     EXPR_MUL,
     EXPR_DIV,
-    EXPR_MOD,
+    EXPR_REM,
     EXPR_AND,
     EXPR_OR,
     EXPR_XOR,
     EXPR_LSH,
     EXPR_RSH,
+    EXPR_ROR,
+    
+    EXPR_BOOL_OR,
+    EXPR_BOOL_AND,
 
     EXPR_EQ,
     EXPR_NEQ,

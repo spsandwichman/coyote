@@ -18,7 +18,7 @@ static FeInstKind expr_kind_to_inst_kind(ExprKind kind, bool is_signed) {
     case EXPR_SUB: return FE_ISUB;
     case EXPR_MUL: return FE_IMUL;
     case EXPR_DIV: return is_signed ? FE_IDIV : FE_UDIV;
-    case EXPR_MOD: return is_signed ? FE_IDIV : FE_UDIV;
+    case EXPR_REM: return is_signed ? FE_IDIV : FE_UDIV;
     case EXPR_AND: return FE_AND;
     case EXPR_OR:  return FE_OR;
     case EXPR_XOR: return FE_XOR;

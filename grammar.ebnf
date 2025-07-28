@@ -65,6 +65,8 @@ stmt =
     | NOTHING         (* blank *)
     | IF expr THEN {stmt} (END | else)
     | WHILE expr DO {stmt} END
+    | DO {stmt} END
+    | INSERTASM literal
     ;
 
 else = 
@@ -74,7 +76,7 @@ else =
 
 binop =
     | "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "|" | "&" | "$"
-    | "!=" | "==" | "<" | ">" | "<=" | ">=" | AND | OR
+    | "!=" | "==" | "<" | ">" | "<=" | ">=" | AND | OR | ROR
     ;
 
 expr = 

@@ -78,15 +78,18 @@ int main(int argc, char** argv) {
     // for_n(table_size, keywords.len, 100000000) {
     
     // work backwards
-    for (isize table_size = keywords.len * 3; table_size != keywords.len; table_size--) {
+    for (isize table_size = (isize)(keywords.len * 2.5); table_size != keywords.len; table_size--) {
         next_table_size:
 
         bool* occupied = malloc(sizeof(bool) * table_size);
         memset(occupied, 0, sizeof(bool) * table_size);
 
+        
+        // for_n(mult, 1, max_range) {
+        //     for_n(offset, 1, max_range) {
 
-        for_n(mult, 1, max_range) {
-            for_n(offset, 1, max_range) {
+        for_n(offset, 1, max_range) {
+            for_n(mult, 1, max_range) {
                 // try this table configuration.
                 for_n(i, 0, keywords.len) {
                     string kw = keywords.at[i];

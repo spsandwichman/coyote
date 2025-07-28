@@ -909,7 +909,7 @@ u32 expr_leftmost_token(Expr* expr) {
     case EXPR_SUB:
     case EXPR_MUL:
     case EXPR_DIV:
-    case EXPR_MOD:
+    case EXPR_REM:
     case EXPR_AND:
     case EXPR_OR:
     case EXPR_XOR:
@@ -942,7 +942,7 @@ u32 expr_rightmost_token(Expr* expr) {
     case EXPR_SUB:
     case EXPR_MUL:
     case EXPR_DIV:
-    case EXPR_MOD:
+    case EXPR_REM:
     case EXPR_AND:
     case EXPR_OR:
     case EXPR_XOR:
@@ -1455,13 +1455,14 @@ static isize bin_precedence(u8 kind) {
     switch (kind) {
         case TOK_MUL:
         case TOK_DIV:
-        case TOK_MOD:
+        case TOK_REM:
             return 10;
         case TOK_PLUS:
         case TOK_MINUS:
             return 9;
         case TOK_LSHIFT:
         case TOK_RSHIFT:
+        case TOK_KW_ROR:
             return 8;
         case TOK_AND:
             return 7;
@@ -1486,11 +1487,21 @@ static isize bin_precedence(u8 kind) {
 }
 
 static ExprKind binary_expr_kind(u8 tok_kind) {
-    return tok_kind - TOK_PLUS + EXPR_ADD;
+    if_unlikely(tok_kind == TOK_KW_AND) {
+        return EXPR_BOOL_AND;
+    }
+    if_unlikely(tok_kind == TOK_KW_OR) {
+        return EXPR_BOOL_OR;
+    }
+    if_unlikely(tok_kind == TOK_KW_ROR) {
+        return EXPR_ROR;
+    }
+
+    return tok_kind - (TOK_PLUS + EXPR_ADD);
 }
 
 static bool is_bool_op(ExprKind op_kind) {
-    return op_kind == TOK_KW_AND || op_kind == TOK_KW_OR;
+    return op_kind == EXPR_BOOL_AND || op_kind == EXPR_BOOL_OR;
 }
 
 Expr* parse_binary(Parser* p, isize precedence) {
@@ -1538,7 +1549,7 @@ Expr* parse_binary(Parser* p, isize precedence) {
                     lit->literal = lhs_val / rhs_val;
                 }
                 break;
-            case EXPR_MOD: 
+            case EXPR_REM: 
                 if (signed_op) {
                     lit->literal = (isize)lhs_val % (isize)rhs_val;
                 } else {
@@ -1555,6 +1566,9 @@ Expr* parse_binary(Parser* p, isize precedence) {
                 } else {
                     lit->literal = lhs_val >> rhs_val;
                 }
+                break;
+            case EXPR_ROR: lit->literal = (lhs_val >> rhs_val) 
+                                        | (lhs_val << (ty_size(target_uword) * 8 - rhs_val)); // 💀
                 break;
             case EXPR_EQ:  lit->literal = lhs_val == rhs_val; break;
             case EXPR_NEQ: lit->literal = lhs_val != rhs_val; break;
@@ -1993,6 +2007,19 @@ static StmtList parse_stmt_block(Parser* p) {
     };
 }
 
+static Stmt* parse_do_stmt(Parser* p) {
+    expect(p, TOK_KW_DO);
+    Stmt* block = new_stmt(p, STMT_BLOCK, block);
+    advance(p);
+
+    enter_scope(p);
+    block->block = parse_stmt_block(p);
+    advance(p);
+
+    exit_scope(p);
+    return block;
+}
+
 static Stmt* parse_while(Parser* p) {
     Stmt* while_ = new_stmt(p, STMT_WHILE, while_);
     advance(p);
@@ -2064,7 +2091,7 @@ Stmt* parse_stmt_if(Parser* p) {
         advance(p);
         break;
     case TOK_KW_ELSE:
-        if_false = new_stmt(p, STMT__BLOCK, block);
+        if_false = new_stmt(p, STMT_BLOCK, block);
         advance(p);
         if_false->block = parse_stmt_block(p);
         if_false->retkind = if_false->block.retkind;
@@ -2139,6 +2166,8 @@ Stmt* parse_stmt(Parser* p) {
         return parse_stmt_if(p);
     case TOK_KW_WHILE:
         return parse_while(p);
+    case TOK_KW_DO:
+        return parse_do_stmt(p);
     case TOK_KW_PUBLIC:
     case TOK_KW_PRIVATE:
     case TOK_KW_EXTERN:
@@ -2270,12 +2299,22 @@ TyIndex parse_fn_prototype(Parser* p) {
 
     TyIndex ret_ty = TY_VOID;
 
+    bool is_noreturn = false;
+
     if (match(p, TOK_COLON)) {
         advance(p);
-        u32 ty_begin = p->cursor;
-        ret_ty = parse_type(p, false);
-        if_unlikely (!ty_is_scalar(ret_ty)) {
-            parse_error(p, ty_begin, p->cursor - 1, REPORT_ERROR, "cannot use non-scalar type %s", ty_name(ret_ty));
+        if (match(p, TOK_KW_NORETURN)) {
+            if (p->flags.xrsdk) {
+                parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "NORETURN is not XR/SDK compatible");
+            }
+            is_noreturn = true;
+            advance(p);
+        } else {
+            u32 ty_begin = p->cursor;
+            ret_ty = parse_type(p, false);
+            if_unlikely (!ty_is_scalar(ret_ty)) {
+                parse_error(p, ty_begin, p->cursor - 1, REPORT_ERROR, "cannot use non-scalar type %s", ty_name(ret_ty));
+            }
         }
     }
 
@@ -2285,6 +2324,7 @@ TyIndex parse_fn_prototype(Parser* p) {
     fn->kind = TY_FN;
     fn->len = params_len;
     fn->variadic = is_variadic;
+    fn->is_noreturn = is_noreturn;
     fn->ret_ty = ret_ty;
     memcpy(fn->params, params, sizeof(Ty_FnParam) * params_len);
 
@@ -2537,7 +2577,7 @@ TyIndex parse_enum_decl(Parser* p) {
         expect(p, TOK_IDENTIFIER);
         string span = tok_span(p->current);
         if_unlikely (get_entity(p, span)) {
-            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "symbol '' already exists");
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "symbol already exists");
         }
 
         advance(p);

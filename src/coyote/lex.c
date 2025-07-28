@@ -32,7 +32,7 @@ const char* token_kind[TOK__COUNT] = {
     [TOK_MINUS]     = "-",
     [TOK_MUL]       = "*",
     [TOK_DIV]       = "/",
-    [TOK_MOD]       = "%",
+    [TOK_REM]       = "%",
     [TOK_DOT]       = ".",
     [TOK_AT]        = "@",
     [TOK_XOR]       = "$",
@@ -48,7 +48,7 @@ const char* token_kind[TOK__COUNT] = {
     [TOK_MINUS_EQ]  = "-=",
     [TOK_MUL_EQ]    = "*=",
     [TOK_DIV_EQ]    = "/=",
-    [TOK_MOD_EQ]    = "%=",
+    [TOK_REM_EQ]    = "%=",
     [TOK_AND_EQ]    = "&=",
     [TOK_OR_EQ]     = "|=",
     [TOK_XOR_EQ]    = "$=",
@@ -293,9 +293,9 @@ static Token lex_next_raw(Lexer* l) {
                 return construct_and_advance(l, TOK_DIV, 1);
         case '%':
             if (peek(l, 1) == '=')
-                return construct_and_advance(l, TOK_MOD_EQ, 2);
+                return construct_and_advance(l, TOK_REM_EQ, 2);
             else
-                return construct_and_advance(l, TOK_MOD, 1);
+                return construct_and_advance(l, TOK_REM, 1);
         case '$':
             if (peek(l, 1) == '=')
                 return construct_and_advance(l, TOK_XOR_EQ, 2);
@@ -578,7 +578,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
             case TOK_MINUS:      v.integer = lhs.integer - rhs.integer; break;
             case TOK_MUL:        v.integer = lhs.integer * rhs.integer; break;
             case TOK_DIV:        v.integer = lhs.integer / rhs.integer; break;
-            case TOK_MOD:        v.integer = lhs.integer % rhs.integer; break;
+            case TOK_REM:        v.integer = lhs.integer % rhs.integer; break;
             case TOK_AND:        v.integer = lhs.integer & rhs.integer; break;
             case TOK_OR:         v.integer = lhs.integer | rhs.integer; break;
             case TOK_XOR:        v.integer = lhs.integer ^ rhs.integer; break;

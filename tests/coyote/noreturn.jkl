@@ -1,0 +1,6 @@
+
+FN doesnt_return(x: ^WORD): NORETURN
+    WHILE TRUE DO
+        x^ += 1
+    END
+END
