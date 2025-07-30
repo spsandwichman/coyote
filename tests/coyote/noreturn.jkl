@@ -3,4 +3,12 @@ FN doesnt_return(x: ^WORD): NORETURN
     WHILE TRUE DO
         x^ += 1
     END
+
+    UNREACHABLE
+END
+
+FN dead_code_after_noreturn(y: ^WORD)
+    doesnt_return(y)
+
+    y^ += 1
 END

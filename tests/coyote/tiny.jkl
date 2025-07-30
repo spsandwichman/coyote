@@ -1,4 +1,4 @@
 
-FN foo(): UWORD
-    RETURN 1
+FN foo(IN x: UWORD): UWORD
+    RETURN ALIGNOFVALUE x
 END

@@ -174,6 +174,8 @@ typedef enum : u8 {
 
     STMT_LABEL,
     STMT_GOTO,
+
+    STMT_UNREACHABLE,
 } StmtKind;
 
 typedef enum : u8 {

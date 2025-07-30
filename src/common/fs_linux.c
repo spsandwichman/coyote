@@ -64,14 +64,19 @@ void fs_destroy(FsFile* f) {
 }
 
 char* fs_get_current_dir() {
-    char* current_dir = get_current_dir_name();
-
-    if (current_dir == nullptr) {
-        perror("Error retrieving CWD: ");
-        exit(EXIT_FAILURE);
+    // char* current_dir = get_current_dir_name();
+    usize cap = 256;
+    char* buffer = malloc(cap);
+    while (!getcwd(buffer, cap)) {
+        cap *= 2;
+        buffer = realloc(buffer, cap);
     }
 
-    return current_dir;
+    char* cwd = malloc(strlen(buffer) + 1);
+    strcpy(cwd, buffer);
+    free(buffer);
+
+    return cwd;
 }
 
 bool fs_set_current_dir(const char* dir) {

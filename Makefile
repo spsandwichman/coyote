@@ -51,20 +51,20 @@ build/%.o: src/%.c
 .PHONY: coyote
 coyote: bin/coyote
 bin/coyote: bin/libiron.a $(COYOTE_OBJECTS)
-	@$(LD) $(LDFLAGS) $(COYOTE_OBJECTS) -o bin/coyote -Lbin -lm -liron
+	@$(LD) $(LDFLAGS) $(COYOTE_OBJECTS) -o bin/coyote -Lbin -liron
 
 .PHONY: cobalt
 cobalt: bin/cobalt
 bin/cobalt: bin/libiron.a $(COBALT_OBJECTS)
-	@$(LD) $(LDFLAGS) $(COBALT_OBJECTS) -o bin/cobalt -Lbin -lm -liron
+	@$(LD) $(LDFLAGS) $(COBALT_OBJECTS) -o bin/cobalt -Lbin -liron
 
 .PHONY: iron
 iron-test: bin/iron-test
 bin/iron-test: bin/libiron.a src/iron/driver/driver.c
-	@$(CC) src/iron/driver/driver.c -o bin/iron-test $(INCLUDEPATHS) $(CFLAGS) $(OPT) -Lbin -lm -liron
+	@$(CC) src/iron/driver/driver.c -o bin/iron-test $(INCLUDEPATHS) $(CFLAGS) $(OPT) -Lbin -liron
 
 bin/libiron.o: $(IRON_OBJECTS)
-	@$(LD) $(LDFLAGS) $(IRON_OBJECTS) -r -o bin/libiron.o -lm
+	@$(LD) $(LDFLAGS) $(IRON_OBJECTS) -r -o bin/libiron.o
 
 .PHONY: libiron
 libiron: bin/libiron.a

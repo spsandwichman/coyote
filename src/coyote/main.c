@@ -14,9 +14,13 @@ static void print_help() {
     puts(" --xrsdk           Warn on code that would not compile with the");
     puts("                   original XR/SDK compiler.");
     puts(" --error-on-warn   Turn warnings into errors.");
-    puts(" --preproc         Only perform the preprocessor. This strips");
+    puts(" --preproc,        Only perform the preprocessor. This strips");
     puts("                   all hygenic macro scope information and may");
     puts("                   not produce re-compilable code.");
+}
+
+static void print_version() {
+    puts("");
 }
 
 static void parse_args(int argc, char** argv) {
@@ -31,7 +35,7 @@ static void parse_args(int argc, char** argv) {
             print_help();
             exit(0);
         } else if (strcmp(arg, "--version") == 0) {
-            print_help();
+            print_version();
             exit(0);
         } else if (strcmp(arg, "--xrsdk") == 0) {
             flags.xrsdk = true;

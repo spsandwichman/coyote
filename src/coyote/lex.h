@@ -69,6 +69,7 @@
     T(NORETURN) \
     T(ALIGNOF) \
     T(ALIGNOFVALUE) \
+    T(UNREACHABLE) \
 
 typedef struct {
     string src;

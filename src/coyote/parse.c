@@ -1085,10 +1085,16 @@ Expr* parse_atom_terminal(Parser* p) {
         atom->literal = 0;
         advance(p);
         break;
-    case TOK_KW_SIZEOF:
+    case TOK_KW_ALIGNOF:
         atom = new_expr(p, EXPR_LITERAL, target_uword, literal);
         advance(p);
         TyIndex type = parse_type(p, false); 
+        atom->literal = ty_align(type);
+        break;
+    case TOK_KW_SIZEOF:
+        atom = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        advance(p);
+        type = parse_type(p, false); 
         atom->literal = ty_size(type);
         break;
     case TOK_STRING:
@@ -1362,6 +1368,36 @@ Expr* parse_unary(Parser* p) {
     u32 op_position = p->cursor;
 
     switch (p->current.kind) {
+    case TOK_KW_ALIGNOFVALUE: {
+        advance(p);
+
+        ArenaState save = arena_save(&p->arena);
+
+        Expr* value = parse_expr(p);
+        TyIndex type = value->ty;
+
+        arena_restore(&p->arena, save);
+
+        Expr* alignofvalue = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        alignofvalue->literal = ty_align(type);
+
+        return alignofvalue;
+    }
+    case TOK_KW_SIZEOFVALUE: {
+        advance(p);
+
+        ArenaState save = arena_save(&p->arena);
+
+        Expr* value = parse_expr(p);
+        TyIndex type = value->ty;
+
+        arena_restore(&p->arena, save);
+
+        Expr* sizeofvalue = new_expr(p, EXPR_LITERAL, target_uword, literal);
+        sizeofvalue->literal = ty_size(type);
+
+        return sizeofvalue;
+    }
     case TOK_AND: {
         advance(p);
         Expr* inner = parse_unary(p);
@@ -1966,7 +2002,7 @@ Stmt* parse_stmt_assign(Parser* p, u8 assign_kind, Expr* left_expr) {
 }
 
 Stmt* parse_stmt_expr(Parser* p) {
-    // expression! who knows what this could be
+    // expression! who fuckin knows
     u32 start = p->cursor;
     Expr* expr = parse_expr(p);
     if (TOK_EQ <= p->current.kind && p->current.kind <= TOK_RSHIFT_EQ) {
@@ -1980,6 +2016,12 @@ Stmt* parse_stmt_expr(Parser* p) {
         Stmt* stmt_expr = new_stmt(p, STMT_EXPR, expr);
         stmt_expr->expr = expr;
         stmt_expr->token_index = start;
+        if_likely(expr->kind == EXPR_CALL) {
+            TyFn* fn_ty = TY(expr->call.callee->ty, TyFn);
+            if (fn_ty->is_noreturn) {
+                stmt_expr->retkind = RETKIND_YES;
+            }
+        }
         return stmt_expr;
     }
 }
@@ -2024,6 +2066,7 @@ static Stmt* parse_while(Parser* p) {
     Stmt* while_ = new_stmt(p, STMT_WHILE, while_);
     advance(p);
     Expr* cond = parse_expr(p);
+
     if_unlikely (!ty_is_scalar(cond->ty)) {
         error_at_expr(p, cond, REPORT_ERROR, "condition must be scalar");
     }
@@ -2032,6 +2075,11 @@ static Stmt* parse_while(Parser* p) {
 
     enter_scope(p);
     while_->while_.block = parse_stmt_block(p);
+    while_->retkind = while_->while_.block.retkind;
+    if (cond->kind == EXPR_LITERAL && cond->literal) {
+        while_->retkind = RETKIND_YES;
+    }
+
     advance(p);
 
     exit_scope(p);
@@ -2116,9 +2164,13 @@ Stmt* parse_stmt_if(Parser* p) {
 Stmt* parse_stmt(Parser* p) {
     switch (p->current.kind) {
     case TOK_KW_LEAVE: {
-        TyIndex ret_ty = TY(p->current_function->ty, TyFn)->ret_ty;
+        TyFn* current_fn = TY(p->current_function->ty, TyFn);
+        TyIndex ret_ty = current_fn->ret_ty;
         if (ret_ty != TY_VOID) {
             parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "cannot LEAVE from non-VOID function");
+        }
+        if (current_fn->is_noreturn) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "cannot LEAVE from NORETURN function");
         }
         Stmt* leave = new_stmt(p, STMT_LEAVE, nothing);
         leave->retkind = RETKIND_YES;
@@ -2126,8 +2178,12 @@ Stmt* parse_stmt(Parser* p) {
         return leave;
     }
     case TOK_KW_RETURN: {
-        TyIndex ret_ty = TY(p->current_function->ty, TyFn)->ret_ty;
+        TyFn* current_fn = TY(p->current_function->ty, TyFn);
+        TyIndex ret_ty = current_fn->ret_ty;
         Stmt* return_ = new_stmt(p, STMT_RETURN, expr);
+        if (current_fn->is_noreturn) {
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "cannot RETURN from NORETURN function");
+        }
         if (ret_ty == TY_VOID) {
             if (p->flags.xrsdk) {
                 parse_error(p, p->cursor, p->cursor, REPORT_WARNING, "void RETURN is not XR/SDK compatible");
@@ -2147,7 +2203,15 @@ Stmt* parse_stmt(Parser* p) {
         return_->retkind = RETKIND_YES;
         return return_;
     }
+    case TOK_KW_UNREACHABLE:
+        Stmt* unreachable_ = new_stmt(p, STMT_UNREACHABLE, nothing);
+        unreachable_->retkind = RETKIND_YES;
+        advance(p);
+        return unreachable_;
     case TOK_KW_BREAK:
+        Stmt* continue_ = new_stmt(p, STMT_CONTINUE, nothing);
+        advance(p);
+        return continue_;
     case TOK_KW_CONTINUE:
         Stmt* break_ = new_stmt(p, STMT_BREAK, nothing);
         advance(p);
@@ -2417,11 +2481,18 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
         u32 stmts_start = dynbuf_start();
         u32 stmts_len = 0;
         bool has_returned = false;
+        bool has_warned = false;
         while (!match(p, TOK_KW_END)) {
             Stmt* stmt = parse_stmt(p);
             if (stmt == nullptr) {
                 continue;
             }
+            if (has_returned && !has_warned && stmt->kind != STMT_UNREACHABLE) {
+                // parse_error(p, ident_pos, ident_pos, REPORT_NOTE, "in function '"str_fmt"'", str_arg(identifier));
+                parse_error(p, stmt->token_index, stmt->token_index, REPORT_WARNING, "dead code after control flow diverges");
+                has_warned = true;
+            }
+
             if (stmt->retkind == RETKIND_YES) {
                 has_returned = true;
             }
@@ -2430,6 +2501,11 @@ Stmt* parse_fn_decl(Parser* p, u8 storage) {
         }
         Stmt** stmts = (Stmt**)dynbuf_to_arena(p, stmts_start);
         dynbuf_restore(stmts_start);
+
+        if (!has_returned && fn_type->is_noreturn) {
+            parse_error(p, ident_pos, ident_pos, REPORT_NOTE, "in function '"str_fmt"'", str_arg(identifier));
+            parse_error(p, p->cursor, p->cursor, REPORT_ERROR, "control might reach end of NORETURN function");
+        }
 
         if (!has_returned && fn_type->ret_ty != TY_VOID) {
             parse_error(p, ident_pos, ident_pos, REPORT_NOTE, "in function '"str_fmt"'", str_arg(identifier));
