@@ -1,4 +1,4 @@
 
 FN foo(IN x: UWORD): UWORD
-    RETURN ALIGNOFVALUE x
+    RETURN x ROR 3
 END

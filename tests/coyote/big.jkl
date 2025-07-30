@@ -8,6 +8,8 @@
 // order to reuse these things for the other self-hosted tools.
 //
 
+#DEFINE BITS 64
+
 ENUM TlStatus : UWORD
     TL_SUCCESS,
     TL_NO_MEMORY,

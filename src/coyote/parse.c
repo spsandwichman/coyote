@@ -1554,10 +1554,22 @@ Expr* parse_binary(Parser* p, isize precedence) {
 
         TyIndex op_ty = target_uword;
         if (!is_bool_op(op_kind)) {
+            if_unlikely (!ty_compatible(lhs->ty, rhs->ty, rhs->kind == EXPR_LITERAL)) {
+                parse_error(p, op_token_index, op_token_index, REPORT_ERROR, 
+                    "types %s and %s are not compatible", ty_name(lhs->ty), ty_name(rhs->ty));
+            }
+            // parse_error(p, op_token_index, op_token_index, REPORT_NOTE, "yuh");
+            // printf("is_bool ");
             op_ty = lhs->ty;
-        } else if_unlikely (!ty_compatible(lhs->ty, rhs->ty, rhs->kind == EXPR_LITERAL)) {
-            parse_error(p, op_token_index, op_token_index, REPORT_ERROR, 
-                "types %s and %s are not compatible", ty_name(lhs->ty), ty_name(rhs->ty));
+        } else {
+            if_unlikely(!ty_is_scalar(lhs->ty)) {
+                parse_error(p, expr_leftmost_token(lhs), expr_rightmost_token(lhs), REPORT_ERROR, 
+                    "type %s is not scalar", ty_name(lhs->ty));
+            }
+            if_unlikely(!ty_is_scalar(rhs->ty)) {
+                parse_error(p, expr_leftmost_token(rhs), expr_rightmost_token(rhs), REPORT_ERROR, 
+                    "type %s is not scalar", ty_name(rhs->ty));
+            }
         }
 
         if (lhs->kind == EXPR_LITERAL && rhs->ty != EXPR_LITERAL) {
@@ -1661,6 +1673,7 @@ Expr* parse_expr(Parser* p) {
 static Stmt* new_stmt_(Parser* p, u8 kind, usize size) {
     Stmt* stmt = arena_alloc(&p->arena, size, alignof(Stmt));
     memset(stmt, 0, size);
+    stmt->retkind = RETKIND_NO;
     stmt->kind = kind;
     stmt->token_index = p->cursor;
     return stmt;
@@ -2017,7 +2030,13 @@ Stmt* parse_stmt_expr(Parser* p) {
         stmt_expr->expr = expr;
         stmt_expr->token_index = start;
         if_likely(expr->kind == EXPR_CALL) {
-            TyFn* fn_ty = TY(expr->call.callee->ty, TyFn);
+            TyFn* fn_ty;
+            if (TY_KIND(expr->call.callee->ty) == TY_PTR) {
+                fn_ty = TY(TY(expr->call.callee->ty, TyPtr)->to, TyFn);
+            } else {
+                fn_ty = TY(expr->call.callee->ty, TyFn);
+            }
+
             if (fn_ty->is_noreturn) {
                 stmt_expr->retkind = RETKIND_YES;
             }
@@ -2076,9 +2095,9 @@ static Stmt* parse_while(Parser* p) {
     enter_scope(p);
     while_->while_.block = parse_stmt_block(p);
     while_->retkind = while_->while_.block.retkind;
-    if (cond->kind == EXPR_LITERAL && cond->literal) {
-        while_->retkind = RETKIND_YES;
-    }
+    // if (cond->kind == EXPR_LITERAL && cond->literal) {
+    //     while_->retkind = RETKIND_YES;
+    // }
 
     advance(p);
 
