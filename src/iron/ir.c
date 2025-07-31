@@ -1164,32 +1164,32 @@ void fe__load_trait_table(usize start_index, FeTrait* table, usize len) {
     memcpy(&inst_traits[start_index], table, sizeof(table[0]) * len);
 }
 
-void fe_wl_init(FeWorklist* wl) {
-    wl->cap = 256;
-    wl->len = 0;
-    wl->at = fe_malloc(sizeof(wl->at[0]) * wl->cap);
+void fe_iset_init(FeInstSet* iset) {
+    iset->cap = 256;
+    iset->len = 0;
+    iset->at = fe_malloc(sizeof(iset->at[0]) * iset->cap);
 }
 
-void fe_wl_push(FeWorklist* wl, FeInst* inst) {
+void fe_iset_push(FeInstSet* iset, FeInst* inst) {
     // BAD change this soon
-    for_n(i, 0, wl->len) {
-        if (wl->at[i] == inst) {
+    for_n(i, 0, iset->len) {
+        if (iset->at[i] == inst) {
             return;
         }
     }
 
-    if (wl->len == wl->cap) {
-        wl->cap += wl->cap >> 1;
-        wl->at = fe_realloc(wl->at, sizeof(wl->at[0]) * wl->cap);
+    if (iset->len == iset->cap) {
+        iset->cap += iset->cap >> 1;
+        iset->at = fe_realloc(iset->at, sizeof(iset->at[0]) * iset->cap);
     }
-    wl->at[wl->len++] = inst;
+    iset->at[iset->len++] = inst;
 }
 
-FeInst* fe_wl_pop(FeWorklist* wl) {
-    return wl->at[--wl->len];
+FeInst* fe_iset_pop(FeInstSet* iset) {
+    return iset->at[--iset->len];
 }
 
-void fe_wl_destroy(FeWorklist* wl) {
-    fe_free(wl->at);
-    *wl = (FeWorklist){0};
+void fe_iset_destroy(FeInstSet* iset) {
+    fe_free(iset->at);
+    *iset = (FeInstSet){0};
 }

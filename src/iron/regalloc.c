@@ -59,14 +59,14 @@ static void calculate_liveness(FeFunc* f) {
     // initialize simple live-ins
     for_blocks(block, f) {
         for_inst(inst, block) {
-            if (inst->vr_out == FE_VREG_NONE) continue;
+            if (inst->vr_def == FE_VREG_NONE) continue;
             
             FeInst** inputs = inst->inputs;
             for_n(i, 0, inst->in_len) {
                 FeInst* input = inputs[i];
-                FeVirtualReg* vr = fe_vreg(f->vregs, input->vr_out);
+                FeVirtualReg* vr = fe_vreg(f->vregs, input->vr_def);
                 if (input->kind == FE__MACH_UPSILON || vr->def_block != block) {
-                    add_live_in(block->live, input->vr_out);
+                    add_live_in(block->live, input->vr_def);
                 }
             }
         }
@@ -135,14 +135,14 @@ void fe_regalloc_linear_scan(FeFunc* f) {
                 continue;
             }
 
-            FeVirtualReg* inst_vr = fe_vreg(f->vregs, inst->vr_out);
+            FeVirtualReg* inst_vr = fe_vreg(f->vregs, inst->vr_def);
 
             // hint input and output to each other
             FeInst* input = inst->inputs[0];
-            FeVirtualReg* input_vr = fe_vreg(f->vregs, input->vr_out);
+            FeVirtualReg* input_vr = fe_vreg(f->vregs, input->vr_def);
 
-            inst_vr->hint = input->vr_out;
-            input_vr->hint = inst->vr_out;
+            inst_vr->hint = input->vr_def;
+            input_vr->hint = inst->vr_def;
         }
     }
 
@@ -158,9 +158,9 @@ void fe_regalloc_linear_scan(FeFunc* f) {
         }
 
         for_inst_reverse(inst, block) {
-            if (inst->kind == FE_PHI || inst->vr_out != FE_VREG_NONE) {
+            if (inst->kind == FE_PHI || inst->vr_def != FE_VREG_NONE) {
                 // this instruction defines a virtual register
-                FeVirtualReg* inst_out = fe_vreg(vbuf, inst->vr_out);
+                FeVirtualReg* inst_out = fe_vreg(vbuf, inst->vr_def);
                 
                 // if this instruction is the "canonical" definition of the 
                 // virtual register, or the instruction is an upsilon inst,
@@ -173,7 +173,7 @@ void fe_regalloc_linear_scan(FeFunc* f) {
             FeInst** inst_inputs = inst->inputs;
             for_n(i, 0, inst->in_len) {
                 FeInst* input = inst_inputs[i];
-                FeVirtualReg* input_vr = fe_vreg(vbuf, input->vr_out);
+                FeVirtualReg* input_vr = fe_vreg(vbuf, input->vr_def);
 
                 // if this vreg has already been allocated, skip past it
                 if (input_vr->real != FE_VREG_REAL_UNASSIGNED) {

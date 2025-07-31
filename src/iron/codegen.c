@@ -29,7 +29,7 @@ FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class)
     buf->at[vr].real = FE_VREG_REAL_UNASSIGNED;
     buf->at[vr].hint = FE_VREG_NONE;
     buf->at[vr].is_phi_out = def->kind == FE_PHI;
-    def->vr_out = vr;
+    def->vr_def = vr;
     return vr;
 }
 
@@ -126,9 +126,9 @@ void fe_codegen(FeFunc* f) {
     for_blocks(block, f) {
         for_inst(inst, block) {
             if (inst->kind == FE__MACH_UPSILON) continue;
-            if ((inst->ty != FE_TY_VOID && inst->ty != FE_TY_TUPLE) && inst->vr_out == FE_VREG_NONE) {
+            if ((inst->ty != FE_TY_VOID && inst->ty != FE_TY_TUPLE) && inst->vr_def == FE_VREG_NONE) {
                 // TODO choose register class based on architecture and type
-                inst->vr_out = fe_vreg_new(f->vregs, inst, block, target->choose_regclass(inst->kind, inst->ty));
+                inst->vr_def = fe_vreg_new(f->vregs, inst, block, target->choose_regclass(inst->kind, inst->ty));
             }
         }
     }
@@ -144,7 +144,7 @@ void fe_codegen(FeFunc* f) {
             // // add upsilon nodes
             // for_n(i, 0, len) {
             //     FeInst* upsilon = srcs[i];
-            //     upsilon->vr_out = inst->vr_out;
+            //     upsilon->vr_def = inst->vr_def;
             // }
         }
     }

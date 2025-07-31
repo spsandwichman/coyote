@@ -78,7 +78,7 @@ void fe_ipool_init(FeInstPool* pool) {
 static FeInst* init_inst(FeInst* inst) {
     memset(inst, 0, sizeof(*inst));
     inst->kind = 0xAAAA;
-    inst->vr_out = FE_VREG_NONE;
+    inst->vr_def = FE_VREG_NONE;
     return inst;
 }
 

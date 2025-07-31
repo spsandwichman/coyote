@@ -19,12 +19,13 @@ const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
         break;
     case FE_ARCH_XR17032:
         FE_ASSERT(false);
-        // t->ptr_ty = FE_TY_I32;
+        t->ptr_ty = FE_TY_I32;
+        t->stack_pointer_align = 4;
+        // t->isel = xr_isel;
         // t->ir_print_args = xr_print_args;
         // t->inst_name = xr_inst_name;
         // t->list_inputs = xr_list_inputs;
         // t->list_targets = xr_term_list_targets;
-        // t->isel = xr_isel;
         // t->reg_name = xr_reg_name;
         // t->reg_status = xr_reg_status;
         // t->num_regclasses = XR_REGCLASS_REG + 1;
@@ -33,7 +34,6 @@ const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
         // t->choose_regclass = xr_choose_regclass;
         // t->pre_regalloc_opt = xr_pre_regalloc_opt;
         // t->final_touchups = xr_final_touchups;
-        // t->stack_pointer_align = 4;
 
         // fe__load_extra_size_table(FE__XR_INST_BEGIN, xr_size_table, FE__XR_INST_END - FE__XR_INST_BEGIN);
         // fe__load_trait_table(FE__XR_INST_BEGIN, xr_trait_table, FE__XR_INST_END - FE__XR_INST_BEGIN);

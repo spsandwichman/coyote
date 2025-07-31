@@ -3,14 +3,14 @@
 
 // various local transformations
 
-static void push_uses(FeWorklist* wlist, FeInst* inst) {
+static void push_uses(FeInstSet* wlist, FeInst* inst) {
     for_n(i, 0, inst->use_len) {
-        fe_wl_push(wlist, FE_USE_PTR(inst->uses[i]));
+        fe_iset_push(wlist, FE_USE_PTR(inst->uses[i]));
     }
 }
 
 // returns new value or nullptr if didnt work
-static FeInst* try_load_elim(FeFunc* f, FeWorklist* wlist, FeInst* load) {
+static FeInst* try_load_elim(FeFunc* f, FeInstSet* wlist, FeInst* load) {
     if (load->kind != FE_LOAD) {
         return nullptr;
     }
@@ -41,15 +41,15 @@ static FeInst* try_load_elim(FeFunc* f, FeWorklist* wlist, FeInst* load) {
     fe_inst_destroy(f, load);
 
     // add the store and its uses to the worklist
-    fe_wl_push(wlist, dependent_store);
+    fe_iset_push(wlist, dependent_store);
     for_n(i, 0, dependent_store->use_len) {
-        fe_wl_push(wlist, FE_USE_PTR(dependent_store->uses[i]));
+        fe_iset_push(wlist, FE_USE_PTR(dependent_store->uses[i]));
     }
 
     return new_val;
 }
 
-static FeInst* try_store_elim(FeFunc* f, FeWorklist* wlist, FeInst* store) {
+static FeInst* try_store_elim(FeFunc* f, FeInstSet* wlist, FeInst* store) {
     if (store->kind != FE_STORE) {
         return nullptr;
     }
@@ -82,18 +82,18 @@ static FeInst* try_store_elim(FeFunc* f, FeWorklist* wlist, FeInst* store) {
     fe_inst_destroy(f, dependent_store);
 
     // add the store and its uses to the worklist
-    fe_wl_push(wlist, store);
+    fe_iset_push(wlist, store);
     for_n(i, 0, store->use_len) {
-        fe_wl_push(wlist, FE_USE_PTR(store->uses[i]));
+        fe_iset_push(wlist, FE_USE_PTR(store->uses[i]));
     }
 
     return store;
 }
 
-static bool try_tdce(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
+static bool try_tdce(FeFunc* f, FeInstSet* wlist, FeInst* inst) {
     if (inst->use_len == 0 && !fe_inst_has_trait(inst->kind, FE_TRAIT_VOLATILE)) {
         for_n(i, 0, inst->in_len) {
-            fe_wl_push(wlist, inst->inputs[i]);
+            fe_iset_push(wlist, inst->inputs[i]);
         }
         fe_inst_destroy(f, inst);
     }
@@ -117,7 +117,7 @@ static inline usize u64_log2(usize x) {
     return (sizeof(x) * 8 - 1) - __builtin_clzll(x);
 }
 
-static bool try_strength_binop(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
+static bool try_strength_binop(FeFunc* f, FeInstSet* wlist, FeInst* inst) {
     if (!fe_inst_has_trait(inst->kind, FE_TRAIT_BINOP)) {
         return false;
     }
@@ -144,7 +144,7 @@ static bool try_strength_binop(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
     }
 
     if (modified) {
-        fe_wl_push(wlist, inst);
+        fe_iset_push(wlist, inst);
     }
 
     return modified;
@@ -179,7 +179,7 @@ static bool is_const(FeInst* inst, u64 val) {
     return inst->kind == FE_CONST && fe_extra(inst, FeInstConst)->val == val;
 }
 
-static bool try_identity_binop(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
+static bool try_identity_binop(FeFunc* f, FeInstSet* wlist, FeInst* inst) {
     if (!fe_inst_has_trait(inst->kind, FE_TRAIT_BINOP)) {
         return false;
     }
@@ -209,7 +209,7 @@ static bool try_identity_binop(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
     if (replace) {
         fe_replace_uses(f, inst, replace);
 
-        fe_wl_push(wlist, inst);
+        fe_iset_push(wlist, inst);
         push_uses(wlist, replace);
     }
 
@@ -225,7 +225,7 @@ static bool try_identity_binop(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
         (x ^ y) ^ z  ->  x ^ (y ^ z)
 */
 
-static bool try_reassoc(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
+static bool try_reassoc(FeFunc* f, FeInstSet* wlist, FeInst* inst) {
     /*
         %2 = op %x, %y
         %3 = op %2, %z
@@ -260,8 +260,8 @@ static bool try_reassoc(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
     fe_inst_remove_from_block(first);
     fe_insert_before(inst, first);
 
-    fe_wl_push(wlist, inst);
-    fe_wl_push(wlist, first);
+    fe_iset_push(wlist, inst);
+    fe_iset_push(wlist, first);
 
     return true;
 }
@@ -276,7 +276,7 @@ static bool try_reassoc(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
         ...
 */
 
-static bool try_consteval_binop(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
+static bool try_consteval_binop(FeFunc* f, FeInstSet* wlist, FeInst* inst) {
     if (!fe_inst_has_trait(inst->kind, FE_TRAIT_BINOP)) {
         return false;
     }
@@ -332,16 +332,16 @@ static bool try_consteval_binop(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
     // transfer all uses of inst to c
     fe_replace_uses(f, inst, c);
     
-    fe_wl_push(wlist, inst);
+    fe_iset_push(wlist, inst);
 
     for_n(i, 0, c->use_len) {
-        fe_wl_push(wlist, FE_USE_PTR(c->uses[i]));
+        fe_iset_push(wlist, FE_USE_PTR(c->uses[i]));
     }
 
     return true;
 }
 
-static bool try_commute(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
+static bool try_commute(FeFunc* f, FeInstSet* wlist, FeInst* inst) {
     if (!fe_inst_has_trait(inst->kind, FE_TRAIT_BINOP)) {
         return false;
     }
@@ -360,23 +360,23 @@ static bool try_commute(FeFunc* f, FeWorklist* wlist, FeInst* inst) {
     fe_set_input(f, inst, 0, rhs_inst);
     fe_set_input(f, inst, 1, lhs_inst);
 
-    fe_wl_push(wlist, inst);
+    fe_iset_push(wlist, inst);
 
     return true;
 }
 
 void fe_opt_local(FeFunc* f) {
-    FeWorklist wlist;
-    fe_wl_init(&wlist);
+    FeInstSet wlist;
+    fe_iset_init(&wlist);
 
     for_blocks(block, f) {
         for_inst(inst, block) {
-            fe_wl_push(&wlist, inst);
+            fe_iset_push(&wlist, inst);
         }
     }
 
     while (wlist.len != 0) {
-        FeInst* inst = fe_wl_pop(&wlist);
+        FeInst* inst = fe_iset_pop(&wlist);
 
         bool opts = false
             || try_commute(f, &wlist, inst)
@@ -394,5 +394,5 @@ void fe_opt_local(FeFunc* f) {
         }
     }
 
-    fe_wl_destroy(&wlist);
+    fe_iset_destroy(&wlist);
 }

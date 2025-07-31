@@ -194,12 +194,12 @@ void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref) {
 
     if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->flags));
     fe_db_writef(db, "%%%u", ref->flags);
-    if (ref->vr_out != FE_VREG_NONE) {
+    if (ref->vr_def != FE_VREG_NONE) {
         // BAD ASSUMPTION
-        if (fe_vreg(f->vregs, ref->vr_out)->real == FE_VREG_REAL_UNASSIGNED) {
-            fe_db_writef(db, "(vr%u)", ref->vr_out);
+        if (fe_vreg(f->vregs, ref->vr_def)->real == FE_VREG_REAL_UNASSIGNED) {
+            fe_db_writef(db, "(vr%u)", ref->vr_def);
         } else {
-            FeVirtualReg* vr = fe_vreg(f->vregs, ref->vr_out);
+            FeVirtualReg* vr = fe_vreg(f->vregs, ref->vr_def);
             fe_db_writef(db, "(%s)", f->mod->target->reg_name(vr->class, vr->real));
         }
     }
@@ -368,7 +368,7 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         break;
     case FE__MACH_REG:
         ;
-        FeVReg vr = inst->vr_out;
+        FeVReg vr = inst->vr_def;
         FeVirtualReg* vreg = fe_vreg(f->vregs, vr);
         u8 class = vreg->class;
         u16 real = vreg->real;

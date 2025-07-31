@@ -438,11 +438,11 @@ typedef enum: FeInstKind {
     FE_F2U, // float to unsigned nteger
 
     // FeInstMemop
-    // {last_effect, ptr}
+    // {last_mem, ptr}
     FE_LOAD,
 
     // FeInstMemop
-    // {last_effect, ptr, val}
+    // {last_mem, ptr, val}
     FE_STORE,
 
     // FeInstMemop
@@ -456,7 +456,7 @@ typedef enum: FeInstKind {
     FE_JUMP,
 
     // FeInstReturn
-    // {last_effect, src1, src2, ...}
+    // {last_mem, src1, src2, ...}
     FE_RETURN,
 
     // FeInstPhi
@@ -465,8 +465,12 @@ typedef enum: FeInstKind {
     FE_MEM_PHI,
 
     // FeInstCall
-    // {last_effect, ptr, src1, src2, ...}
+    // {last_mem, ptr, src1, src2, ...}
     FE_CALL,
+
+    // FeInstInlineAsm
+    // {?last_mem, in1, in2, ...} -> {out1, out2, ...}
+    FE_INLINE_ASM,
 
     // (void)
     FE__MACH_REG,
@@ -513,7 +517,7 @@ typedef struct FeInst {
     u16 in_cap;
 
     u32 flags;
-    FeVReg vr_out;
+    FeVReg vr_def;
     
     FeInstUse* uses;
     FeInst** inputs;
@@ -524,6 +528,37 @@ typedef struct FeInst {
 
     usize extra[];
 } FeInst;
+
+typedef enum : u8 {
+    FE_ASM_SCRATCH = 0b00, // used when an register needs to be picked but is neither IN nor OUT
+    FE_ASM_IN      = 0b01,
+    FE_ASM_OUT     = 0b10,
+    FE_ASM_INOUT   = 0b11,
+} FeInlineAsmParamKind;
+
+typedef struct {
+    FeTy ty; // target chooses register class from provided type
+    FeInlineAsmParamKind kind;
+} FeInlineAsmParam;
+
+typedef struct {
+    /*
+        a: in, b: out, c: inout, d: inout, e: in, f: out
+    ==
+        (a, c, d, e) -> (c, d, f)  
+    */
+    u16 num_params;
+    bool mem_use;
+    bool mem_def;
+    u32 alias_space;
+
+    /* regular assembly text (no labels allowed)
+        - use `#{N}` to designate spots for registers
+    */
+    FeCompactStr assembly;
+
+    FeInlineAsmParam params[];
+} FeInstInlineAsm;
 
 typedef struct {
     FeBlock* block;
@@ -684,6 +719,8 @@ typedef struct FeInstChain {
     FeInst* end;
 } FeInstChain;
 
+#define FE_EMPTY_CHAIN (FeInstChain){nullptr, nullptr}
+
 FeInstChain fe_chain_new(FeInst* initial);
 FeInstChain fe_chain_append_end(FeInstChain chain, FeInst* i);
 FeInstChain fe_chain_append_begin(FeInstChain chain, FeInst* i);
@@ -748,16 +785,16 @@ FeTy fe_proj_ty(FeInst* tuple, usize index);
 // worklist
 // -------------------------------------
 
-typedef struct FeWorklist {
+typedef struct FeInstSet {
     FeInst** at;
     u32 len;
     u32 cap;
-} FeWorklist;
+} FeInstSet;
 
-void fe_wl_init(FeWorklist* wl);
-void fe_wl_push(FeWorklist* wl, FeInst* inst);
-FeInst* fe_wl_pop(FeWorklist* wl);
-void fe_wl_destroy(FeWorklist* wl);
+void fe_iset_init(FeInstSet* iset);
+void fe_iset_push(FeInstSet* iset, FeInst* inst);
+FeInst* fe_iset_pop(FeInstSet* iset);
+void fe_iset_destroy(FeInstSet* iset);
 
 // -------------------------------------
 // allocation
