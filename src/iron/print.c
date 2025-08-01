@@ -175,8 +175,8 @@ void fe__emit_ir_stack_label(FeDataBuffer* db, FeStackItem* item) {
 }
 
 void fe__emit_ir_block_label(FeDataBuffer* db, FeFunc* f, FeBlock* ref) {
-    if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->flags));
-    fe_db_writef(db, "%u:", ref->flags);
+    if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->id));
+    fe_db_writef(db, "%u:", ref->id);
     if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
 }
 
@@ -192,8 +192,8 @@ void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref) {
         return;
     }
 
-    if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->flags));
-    fe_db_writef(db, "%%%u", ref->flags);
+    if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->id));
+    fe_db_writef(db, "%%%u", ref->id);
     if (ref->vr_def != FE_VREG_NONE) {
         // BAD ASSUMPTION
         if (fe_vreg(f->vregs, ref->vr_def)->real == FE_VREG_REAL_UNASSIGNED) {
@@ -385,17 +385,6 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
 
 void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
     should_ansi = fancy;
-    // number all instructions and blocks
-    u32 inst_counter = 1;
-    u32 block_counter = 1;
-    for_blocks(block, f) {
-        block->flags = block_counter++;
-        for_inst(inst, block) {
-            if (inst->use_len != 0) {
-                inst->flags = inst_counter++;
-            }
-        }
-    }
 
     switch (f->sym->bind) {
     case FE_BIND_EXTERN: fe_db_writecstr(db, "extern "); break;

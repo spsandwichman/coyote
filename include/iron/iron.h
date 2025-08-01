@@ -284,6 +284,8 @@ typedef struct FeFunc {
     FeSymbol* sym;
     FeModule* mod;
 
+    u32 max_id;
+    u32 max_block_id;
     FeInstPool* ipool;
     FeVRegBuffer* vregs;
 
@@ -297,6 +299,7 @@ typedef struct FeFunc {
 
     FeStackItem* stack_top; // most-positive offset from stack pointer
     FeStackItem* stack_bottom;
+
 } FeFunc;
 
 typedef struct FeSymTab {
@@ -349,6 +352,7 @@ typedef struct FeModule {
 
 typedef struct FeBlock {
     u32 flags;
+    u32 id;
     u16 pred_len;
     u16 pred_cap;
     u16 succ_len;
@@ -517,6 +521,7 @@ typedef struct FeInst {
     u16 in_cap;
 
     u32 flags;
+    u32 id;
     FeVReg vr_def;
     
     FeInstUse* uses;
@@ -786,9 +791,10 @@ FeTy fe_proj_ty(FeInst* tuple, usize index);
 // -------------------------------------
 
 typedef struct FeInstSet {
-    FeInst** at;
-    u32 len;
-    u32 cap;
+    FeInst** insts;
+    usize* exists;
+    u32 id_start;
+    u32 id_end;
 } FeInstSet;
 
 void fe_iset_init(FeInstSet* iset);

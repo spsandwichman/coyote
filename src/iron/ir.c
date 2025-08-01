@@ -242,6 +242,8 @@ FeBlock* fe_block_new(FeFunc* f) {
     FeBlock* block = fe_malloc(sizeof(*block));
     memset(block, 0, sizeof(*block));
 
+    block->id = f->max_block_id++;
+
     // init predecessor list
     block->pred_len = 0;
     block->pred_cap = 2;
@@ -724,6 +726,7 @@ usize fe_replace_uses(FeFunc* f, FeInst* old_val, FeInst* new_val) {
 FeInst* fe_inst_new(FeFunc* f, usize input_len, usize extra_size) {
     FeInst* inst = fe_ipool_alloc(f->ipool, extra_size);
     inst->in_len = input_len;
+    inst->id = f->max_id++;
 
     if (input_len != 0) {
         inst->in_cap = usize_next_pow_2(input_len);
@@ -1164,32 +1167,77 @@ void fe__load_trait_table(usize start_index, FeTrait* table, usize len) {
     memcpy(&inst_traits[start_index], table, sizeof(table[0]) * len);
 }
 
+#define USIZE_BITS (sizeof(usize) * 8)
+
 void fe_iset_init(FeInstSet* iset) {
-    iset->cap = 256;
-    iset->len = 0;
-    iset->at = fe_malloc(sizeof(iset->at[0]) * iset->cap);
+    *iset = (FeInstSet){};
+    iset->id_start = UINT32_MAX;
+}
+
+bool fe_iset_contains(FeInstSet* iset, FeInst* inst) {
+    u32 id = inst->id;
+    u32 id_block = id / USIZE_BITS;
+    usize id_bit = (usize)(1) << (id % USIZE_BITS);
+
+    if_likely (iset->id_start <= id_block && id_block < iset->id_end) {
+        usize exists_block = iset->exists[id_block - iset->id_start];
+        return (exists_block & id_bit) != 0;
+    }
+    return false;
 }
 
 void fe_iset_push(FeInstSet* iset, FeInst* inst) {
-    // BAD change this soon
-    for_n(i, 0, iset->len) {
-        if (iset->at[i] == inst) {
-            return;
-        }
+    u32 id = inst->id;
+    u32 id_block = id / USIZE_BITS;
+    usize id_bit = (usize)(1) << (id % USIZE_BITS);
+
+    // construct the initial state for the set centered around this inst
+    if_unlikely (iset->id_start == UINT32_MAX) {
+        iset->id_start = id_block;
+        iset->id_end   = id_block + 1;
+        iset->exists = fe_malloc(sizeof(usize));
+        // memset(iset->exists, 0, sizeof(usize));
+        iset->insts = fe_malloc(sizeof(FeInst*) * USIZE_BITS);
+        memset(iset->insts, 0, sizeof(FeInst*) * USIZE_BITS);
+
+        iset->exists[0] = id_bit; 
+        iset->insts[id - iset->id_start * USIZE_BITS] = inst;
+        return;
     }
 
-    if (iset->len == iset->cap) {
-        iset->cap += iset->cap >> 1;
-        iset->at = fe_realloc(iset->at, sizeof(iset->at[0]) * iset->cap);
+    if_likely (iset->id_start <= id_block && id_block < iset->id_end) {
+        usize exists_block = iset->exists[id_block - iset->id_start];
+        if (!(exists_block & id_bit)) {
+            iset->exists[id_block - iset->id_start] |= id_bit; 
+            iset->insts[id - iset->id_start * USIZE_BITS] = inst;
+        }
+        return;
     }
-    iset->at[iset->len++] = inst;
+
+    FE_ASSERT(false);
+}
+
+void fe_iset_remove(FeInstSet* iset, FeInst* inst) {
+    u32 id = inst->id;
+    u32 id_block = id / USIZE_BITS;
+    usize id_bit = (usize)(1) << (id % USIZE_BITS);
+
+    if_likely (iset->id_start <= id_block && id_block < iset->id_end) {
+        iset->exists[id_block - iset->id_start] &= ~id_bit;
+    }
 }
 
 FeInst* fe_iset_pop(FeInstSet* iset) {
-    return iset->at[--iset->len];
+    u32 len = iset->id_end - iset->id_start;
+    for_n (id_block, 0, len) {
+        if (iset->exists[id_block] == 0) {
+            // we can skip this block
+            continue;
+        }
+    }
 }
 
-void fe_iset_destroy(FeInstSet* iset) {
-    fe_free(iset->at);
-    *iset = (FeInstSet){0};
-}
+// void fe_iset_destroy(FeInstSet* iset) {
+//     fe_free(iset->at);
+//     *iset = (FeInstSet){0};
+// }
