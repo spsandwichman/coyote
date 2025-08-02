@@ -723,6 +723,8 @@ usize fe_replace_uses(FeFunc* f, FeInst* old_val, FeInst* new_val) {
     return num_replaced;
 }
 
+// #include <stdio.h>
+
 FeInst* fe_inst_new(FeFunc* f, usize input_len, usize extra_size) {
     FeInst* inst = fe_ipool_alloc(f->ipool, extra_size);
     inst->in_len = input_len;
@@ -1186,6 +1188,7 @@ bool fe_iset_contains(FeInstSet* iset, FeInst* inst) {
     return false;
 }
 
+
 void fe_iset_push(FeInstSet* iset, FeInst* inst) {
     u32 id = inst->id;
     u32 id_block = id / USIZE_BITS;
@@ -1202,42 +1205,79 @@ void fe_iset_push(FeInstSet* iset, FeInst* inst) {
 
         iset->exists[0] = id_bit; 
         iset->insts[id - iset->id_start * USIZE_BITS] = inst;
+
         return;
     }
+
+    // printf("push %u %p\n", id, inst);
 
     if_likely (iset->id_start <= id_block && id_block < iset->id_end) {
         usize exists_block = iset->exists[id_block - iset->id_start];
+        // printf("> %064lb\n", exists_block);
         if (!(exists_block & id_bit)) {
-            iset->exists[id_block - iset->id_start] |= id_bit; 
+            exists_block |= id_bit;
+            iset->exists[id_block - iset->id_start] = exists_block; 
             iset->insts[id - iset->id_start * USIZE_BITS] = inst;
         }
+        // printf("> %064lb\n\n", exists_block);
         return;
     }
 
-    FE_ASSERT(false);
+    FE_CRASH("fuck! implement set expansion");
 }
 
 void fe_iset_remove(FeInstSet* iset, FeInst* inst) {
     u32 id = inst->id;
-    u32 id_block = id / USIZE_BITS;
+    u32 exists_block_index = id / USIZE_BITS;
     usize id_bit = (usize)(1) << (id % USIZE_BITS);
 
-    if_likely (iset->id_start <= id_block && id_block < iset->id_end) {
-        iset->exists[id_block - iset->id_start] &= ~id_bit;
-    }
-}
-
-FeInst* fe_iset_pop(FeInstSet* iset) {
-    u32 len = iset->id_end - iset->id_start;
-    for_n (id_block, 0, len) {
-        if (iset->exists[id_block] == 0) {
-            // we can skip this block
-            continue;
+    if_likely (iset->id_start <= exists_block_index && exists_block_index < iset->id_end) {
+        usize exists_block = iset->exists[exists_block_index - iset->id_start];
+        if (exists_block & id_bit) {
+            iset->exists[exists_block_index - iset->id_start] = exists_block ^ id_bit;
         }
     }
 }
 
-// void fe_iset_destroy(FeInstSet* iset) {
-//     fe_free(iset->at);
-//     *iset = (FeInstSet){0};
-// }
+static inline usize count_trailing_zeros(usize n) {
+#if USIZE_MAX == UINT64_MAX
+    return __builtin_ctzll(n);
+#else
+    return __builtin_ctz(n);
+#endif
+}
+
+FeInst* fe_iset_pop(FeInstSet* iset) {
+
+    u32 blocks_len = iset->id_end - iset->id_start;
+    for_n (exists_block_index, 0, blocks_len) {
+
+        usize exists_block = iset->exists[exists_block_index];
+        if (exists_block == 0) {
+            // we can skip this block
+            continue;
+        }
+
+        // pop the next instruction in the set
+        usize set_bit = count_trailing_zeros(exists_block);
+        // return the instruction at that position
+        FeInst* inst = iset->insts[set_bit + exists_block_index * USIZE_BITS];
+
+        // printf("pop %u %p\n", inst->id, inst);
+
+        // remove it from its 'exists' block
+        // printf("> %064lb\n", iset->exists[exists_block_index]);
+        iset->exists[exists_block_index] ^= (usize)(1) << set_bit;
+        // printf("> %064lb\n\n", iset->exists[exists_block_index]);
+
+        return inst;
+    }
+
+    return nullptr;
+}
+
+void fe_iset_destroy(FeInstSet* iset) {
+    fe_free(iset->insts);
+    fe_free(iset->exists);
+    *iset = (FeInstSet){0};
+}

@@ -25,10 +25,10 @@ LD = gcc
 
 INCLUDEPATHS = -Iinclude/
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
-CFLAGS = -std=gnu2x -g -fwrapv -fno-strict-aliasing
-WARNINGS = -Wall -Wimplicit-fallthrough -Wno-deprecated-declarations -Wno-enum-compare -Wno-unused -Wno-format -Wno-enum-conversion -Wincompatible-pointer-types -Wno-discarded-qualifiers -Wno-strict-aliasing
+CFLAGS = -std=gnu23 -fwrapv -fno-strict-aliasing
+WARNINGS = -Wall -Wextra -Wimplicit-fallthrough -Wno-override-init -Wno-enum-compare -Wno-unused -Wno-enum-conversion -Wno-discarded-qualifiers -Wno-strict-aliasing
 ALLFLAGS = $(CFLAGS) $(WARNINGS)
-OPT = -Og
+OPT = -g3 -O0
 
 LDFLAGS =
 
@@ -58,7 +58,7 @@ cobalt: bin/cobalt
 bin/cobalt: bin/libiron.a $(COBALT_OBJECTS)
 	@$(LD) $(LDFLAGS) $(COBALT_OBJECTS) -o bin/cobalt -Lbin -liron
 
-.PHONY: iron
+.PHONY: iron-test
 iron-test: bin/iron-test
 bin/iron-test: bin/libiron.a src/iron/driver/driver.c
 	@$(CC) src/iron/driver/driver.c -o bin/iron-test $(INCLUDEPATHS) $(CFLAGS) $(OPT) -Lbin -liron
@@ -84,3 +84,9 @@ clean:
 -include $(IRON_OBJECTS:.o=.d)
 -include $(COYOTE_OBJECTS:.o=.d)
 -include $(COBALT_OBJECTS:.o=.d)
+
+# generate compile commands with bear if u got it!!! 
+# very good highly recommended ʕ·ᴥ·ʔ
+.PHONY: bear-gen-cc
+bear-gen-cc: clean
+	bear -- $(MAKE) coyote iron-test

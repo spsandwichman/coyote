@@ -109,7 +109,7 @@ int main() {
     FeVRegBuffer vregs;
     fe_vrbuf_init(&vregs, 2048);
 
-    FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
+    FeModule* mod = fe_module_new(FE_ARCH_X64, FE_SYSTEM_FREESTANDING);
 
     FeFunc* func = make_alg_test(mod, &ipool, &vregs);
 

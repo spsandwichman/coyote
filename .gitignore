@@ -9,3 +9,5 @@ bin
 gmon.out
 .clangd
 ares
+compile_commands.json
+.cache

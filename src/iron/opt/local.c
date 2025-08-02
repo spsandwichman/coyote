@@ -136,6 +136,7 @@ static bool try_strength_binop(FeFunc* f, FeInstSet* wlist, FeInst* inst) {
             );
             fe_insert_before(inst, new_const);
             
+            fe_iset_push(wlist, rhs);
             fe_set_input(f, inst, 1, new_const);
 
             inst->kind = FE_IADD;
@@ -375,12 +376,15 @@ void fe_opt_local(FeFunc* f) {
         }
     }
 
-    while (wlist.len != 0) {
+    while (true) {
         FeInst* inst = fe_iset_pop(&wlist);
+        if (inst == nullptr) {
+            break;
+        }
 
         bool opts = false
-            || try_commute(f, &wlist, inst)
             || try_tdce(f, &wlist, inst)
+            || try_commute(f, &wlist, inst)
             || try_reassoc(f, &wlist, inst)
             || try_strength_binop(f, &wlist, inst)
             || try_identity_binop(f, &wlist, inst)

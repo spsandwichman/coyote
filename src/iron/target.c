@@ -13,7 +13,7 @@ const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
 
     switch (arch) {
     case FE_ARCH_X64:
-        printf("warning: x64 target is under construction");
+        printf("warning: x64 target is under construction\n");
         t->ptr_ty = FE_TY_I64;
         t->stack_pointer_align = 8;
         break;
