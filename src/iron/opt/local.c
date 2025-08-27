@@ -366,6 +366,28 @@ static bool try_commute(FeFunc* f, FeInstSet* wlist, FeInst* inst) {
     return true;
 }
 
+void fe_opt_tdce(FeFunc* f) {
+    FeInstSet wlist;
+    fe_iset_init(&wlist);
+
+    for_blocks(block, f) {
+        for_inst(inst, block) {
+            fe_iset_push(&wlist, inst);
+        }
+    }
+
+    while (true) {
+        FeInst* inst = fe_iset_pop(&wlist);
+        if (inst == nullptr) {
+            break;
+        }
+        
+        try_tdce(f, &wlist, inst);
+    }
+
+    fe_iset_destroy(&wlist);
+}
+
 void fe_opt_local(FeFunc* f) {
     FeInstSet wlist;
     fe_iset_init(&wlist);
@@ -392,10 +414,6 @@ void fe_opt_local(FeFunc* f) {
             || try_load_elim(f, &wlist, inst)
             || try_store_elim(f, &wlist, inst)
         ;
-
-        if (opts) {
-            continue;
-        }
     }
 
     fe_iset_destroy(&wlist);

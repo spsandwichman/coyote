@@ -13,7 +13,7 @@ FeInst* fe_solve_alias_space(FeFunc* f, u32 alias_space);
 FeFunc* make_store_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
     FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
-    FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_C, 2, 1);
+    FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_ANY, 2, 1);
     fe_funcsig_param(f_sig, 0)->ty = FE_TY_I64;
     fe_funcsig_param(f_sig, 1)->ty = FE_TY_I64;
     fe_funcsig_return(f_sig, 0)->ty = FE_TY_I64;
@@ -63,9 +63,11 @@ FeFunc* make_store_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 FeFunc* make_alg_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
     FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
-    FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_C, 1, 1);
-    fe_funcsig_param(f_sig, 0)->ty = FE_TY_I64;
-    fe_funcsig_return(f_sig, 0)->ty = FE_TY_I64;
+    FeTy ptr_ty = mod->target->ptr_ty;
+
+    FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_ANY, 1, 1);
+    fe_funcsig_param(f_sig, 0)->ty = ptr_ty;
+    fe_funcsig_return(f_sig, 0)->ty = ptr_ty;
 
     // make the function and its symbol
     FeSymbol* f_sym = fe_symbol_new(mod, "foo", 0, text, FE_BIND_GLOBAL);
@@ -73,21 +75,21 @@ FeFunc* make_alg_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
     FeBlock* entry = f->entry_block;
 
-    FeInst* x = fe_inst_const(f, FE_TY_I64, 0x20);
+    FeInst* x = fe_inst_const(f, ptr_ty, 0x20);
     fe_append_end(entry, x);
 
     FeInst* add_x = fe_inst_binop(f, 
-        FE_TY_I64, FE_IADD, 
+        ptr_ty, FE_IADD, 
         fe_func_param(f, 0),
         x
     );
     fe_append_end(entry, add_x);
 
-    FeInst* y = fe_inst_const(f, FE_TY_I64, 0x10);
+    FeInst* y = fe_inst_const(f, ptr_ty, 0x10);
     fe_append_end(entry, y);
     
     FeInst* sub_y = fe_inst_binop(f, 
-        FE_TY_I64, FE_ISUB,
+        ptr_ty, FE_ISUB,
         add_x,
         y
     );
@@ -109,7 +111,7 @@ int main() {
     FeVRegBuffer vregs;
     fe_vrbuf_init(&vregs, 2048);
 
-    FeModule* mod = fe_module_new(FE_ARCH_X64, FE_SYSTEM_FREESTANDING);
+    FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
     FeFunc* func = make_alg_test(mod, &ipool, &vregs);
 
@@ -117,9 +119,7 @@ int main() {
     fe_opt_local(func);
     quick_print(func);
 
-    // fe_opt_algsimp(func);
-    // quick_print(func);
-    // fe_codegen(func);
+    fe_codegen(func);
     // quick_print(func);
 
     // printf("------ final assembly ------\n");

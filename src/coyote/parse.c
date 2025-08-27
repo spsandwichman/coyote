@@ -133,17 +133,9 @@ static void vec_char_print_num(Vec(char)* v, u64 val) {
     }
 }
 
-// static void vec_char_print_num(Vec(char)* v, u64 val) {
-//     if (val == 0) {
-//         vec_append(v, '0');
-//     } else {
-
-//     }
-// }
-
 static void _ty_name(Vec(char)* v, TyIndex t) {
     switch (TY_KIND(t)) {
-    case TY__INVALID: vec_char_append_str(v, "INVALID"); return;
+    case TY__INVALID: vec_char_append_str(v, "!!!"); return;
     case TY_VOID:     vec_char_append_str(v, "VOID"); return;
     case TY_BYTE:     vec_char_append_str(v, "BYTE"); return;
     case TY_UBYTE:    vec_char_append_str(v, "UBYTE"); return;

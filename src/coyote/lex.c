@@ -65,11 +65,11 @@ const char* token_kind[TOK__COUNT] = {
         _LEX_KEYWORDS_
     #undef T
 
-    [TOK_PREPROC_MACRO_PASTE]     = "MACRO_PASTE",
-    // [TOK_PREPROC_MACRO_ARG_PASTE] = "MACRO_ARG_PASTE",
-    [TOK_PREPROC_DEFINE_PASTE]    = "DEFINE_PASTE",
-    [TOK_PREPROC_INCLUDE_PASTE]   = "INCLUDE_PASTE",
-    [TOK_PREPROC_PASTE_END]       = "PASTE_END",
+    [TOK_PREPROC_MACRO_PASTE]     = "[[MACRO_PASTE]]",
+    // [TOK_PREPROC_MACRO_ARG_PASTE] = "[[MACRO_ARG_PASTE]]",
+    [TOK_PREPROC_DEFINE_PASTE]    = "[[DEFINE_PASTE]]",
+    [TOK_PREPROC_INCLUDE_PASTE]   = "[[INCLUDE_PASTE]]",
+    [TOK_PREPROC_PASTE_END]       = "[[PASTE_END]]",
 
     [TOK_PREPROC_SECTION]      = "#SECTION",
     [TOK_PREPROC_ENTERSECTION] = "#ENTERSECTION",
@@ -527,14 +527,14 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
         Token op = lex_next_raw(l);
 
         if (op.kind == TOK_IDENTIFIER) {
-            if (string_eq(tok_span(op), constr("DEFINED"))) {
+            if (string_eq(tok_span(op), strlit("DEFINED"))) {
                 Token ident = lex_next_raw(l);
                 if (ident.kind != TOK_IDENTIFIER) {
                     TODO("error: expected identifier");
                 }
                 v.kind = PPVAL_INTEGER;
                 v.integer = replacement_exists(tok_span(ident), scope);
-            } else if (string_eq(tok_span(op), constr("STRCAT"))) {
+            } else if (string_eq(tok_span(op), strlit("STRCAT"))) {
                 PreprocVal lhs = preproc_collect_value(l, scope);
                 PreprocVal rhs = preproc_collect_value(l, scope);
                 if (lhs.kind != PPVAL_STRING && rhs.kind != PPVAL_STRING) {
@@ -554,7 +554,7 @@ static PreprocVal preproc_collect_value(Lexer* l, PreprocScope* scope) {
                 v.kind = PPVAL_STRING;
                 v.string = to_compact(newstr);
 
-            } else if (string_eq(tok_span(op), constr("STRCMP"))) {
+            } else if (string_eq(tok_span(op), strlit("STRCMP"))) {
                 PreprocVal lhs = preproc_collect_value(l, scope);
                 PreprocVal rhs = preproc_collect_value(l, scope);
                 if (lhs.kind != PPVAL_STRING && rhs.kind != PPVAL_STRING) {
@@ -811,6 +811,13 @@ static void preproc_if(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
     }
 }
 
+static void preproc_include(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
+    // next thing should be a string literal.
+
+    Token path = lex_next_raw(l);
+    
+}
+
 static Token preproc_dispatch(Lexer* l, Vec(Token)* tokens, PreprocScope* scope) {
 
     // todo: add preproc keywords to the hash table
@@ -819,7 +826,7 @@ static Token preproc_dispatch(Lexer* l, Vec(Token)* tokens, PreprocScope* scope)
     switch (t.kind) {
     case TOK_KW_IF:
         preproc_if(l, tokens, scope);
-        break;
+        break;      
     case TOK_KW_ELSE:
     case TOK_KW_ELSEIF:
     case TOK_KW_END:
@@ -829,11 +836,13 @@ static Token preproc_dispatch(Lexer* l, Vec(Token)* tokens, PreprocScope* scope)
     }
     
     string span = tok_span(t);
-    if (string_eq(span, constr("DEFINE"))) {
+    if (string_eq(span, strlit("INCLUDE"))) {
+        preproc_include(l, tokens, scope);
+    } else if (string_eq(span, strlit("DEFINE"))) {
         preproc_define(l, scope);
-    } else if (string_eq(span, constr("UNDEFINE"))) {
+    } else if (string_eq(span, strlit("UNDEFINE"))) {
         preproc_undefine(l, scope);
-    } else if (string_eq(span, constr("MACRO"))) {
+    } else if (string_eq(span, strlit("MACRO"))) {
         preproc_macro(l, scope);
     } else {
         // TODO("error: unrecognized directive");

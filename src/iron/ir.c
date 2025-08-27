@@ -1102,8 +1102,8 @@ FeTy fe_proj_ty(FeInst* tuple, usize index) {
 #include "short_traits.h"
 
 static FeTrait inst_traits[FE__INST_END] = {
-    [FE_PROJ] = 0,
     [FE__ROOT] = VOL | MEM_DEF,
+    [FE_PROJ] = 0,
     [FE_CONST] = 0,
     [FE_STACK_ADDR] = 0,
     [FE_SYM_ADDR] = 0,
@@ -1201,7 +1201,6 @@ void fe_iset_push(FeInstSet* iset, FeInst* inst) {
         iset->exists = fe_malloc(sizeof(usize));
         // memset(iset->exists, 0, sizeof(usize));
         iset->insts = fe_malloc(sizeof(FeInst*) * USIZE_BITS);
-        memset(iset->insts, 0, sizeof(FeInst*) * USIZE_BITS);
 
         iset->exists[0] = id_bit; 
         iset->insts[id - iset->id_start * USIZE_BITS] = inst;
@@ -1216,14 +1215,34 @@ void fe_iset_push(FeInstSet* iset, FeInst* inst) {
         // printf("> %064lb\n", exists_block);
         if (!(exists_block & id_bit)) {
             exists_block |= id_bit;
-            iset->exists[id_block - iset->id_start] = exists_block; 
+            iset->exists[id_block - iset->id_start] = exists_block;
             iset->insts[id - iset->id_start * USIZE_BITS] = inst;
         }
         // printf("> %064lb\n\n", exists_block);
         return;
     }
 
-    FE_CRASH("fuck! implement set expansion");
+    if (iset->id_end <= id_block) {
+        // expand upwards
+        usize new_end = id_block + 1;
+        usize new_size = new_end - iset->id_start;
+        // we can realloc
+        iset->insts = fe_realloc(iset->insts, sizeof(FeInst*) * new_size * USIZE_BITS);
+        iset->exists = fe_realloc(iset->insts, sizeof(FeInst*) * new_size);
+        // have to memset the newly allocated exists space
+        for_n (i, iset->id_end, new_end) {
+            iset->exists[i] = 0;
+        }
+        // do this more efficiently later idk
+        iset->id_end = new_end;
+        // fe_iset_push(iset, inst);
+        iset->exists[id_block] = id_bit;
+        iset->insts[id - iset->id_start * USIZE_BITS] = inst;
+    } else {
+        // expand downwards
+        FE_CRASH("fuck! implement downwards set expansion");
+    }
+
 }
 
 void fe_iset_remove(FeInstSet* iset, FeInst* inst) {

@@ -1,6 +1,10 @@
 #ifndef IRON_H
 #define IRON_H
 
+#define FE_VERSION_MAJOR 0
+#define FE_VERSION_MINOR 1
+#define FE_VERSION (FE_VERSION_MAJOR * 100 + FE_VERSION_MINOR)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -566,6 +570,20 @@ typedef struct {
 } FeInstInlineAsm;
 
 typedef struct {
+    // analysis
+    bool mem_def : 1;
+    bool mem_use : 1;
+    bool may_diverge : 1;
+
+    // error reporting
+    bool error : 1;
+    FeCompactStr error_snippet;
+    FeCompactStr error_message;
+} FeInlineAsmAnalysis;
+
+FeInlineAsmAnalysis fe_inline_asm_analyze(FeFunc* f, FeBlock* b, FeInst* inline_asm);
+
+typedef struct {
     FeBlock* block;
 } FeInst_Bookend;
 
@@ -877,6 +895,8 @@ typedef struct {
 FeVerifyReportList fe_verify_module(FeModule* m);
 
 void fe_opt_local(FeFunc* f);
+void fe_opt_tdce(FeFunc* f);
+void fe_opt_compact_ids(FeFunc* f);
 
 // -------------------------------------
 // IO utilities
@@ -965,7 +985,7 @@ typedef enum : u8 {
     FE_REG_UNUSABLE,
 } FeRegStatus;
 
-typedef u8 FeRegclass;
+typedef u8 FeRegClass;
 #define FE_REGCLASS_NONE 0
 
 typedef struct FeTarget {
@@ -982,7 +1002,7 @@ typedef struct FeTarget {
     void (*pre_regalloc_opt)(FeFunc* f);
     void (*final_touchups)(FeFunc* f);
 
-    FeRegclass (*choose_regclass)(FeInstKind kind, FeTy ty);
+    FeRegClass (*choose_regclass)(FeInstKind kind, FeTy ty);
     const char* (*reg_name)(u8 regclass, u16 real);
     FeRegStatus (*reg_status)(u8 cconv, u8 regclass, u16 real);
     
@@ -991,8 +1011,7 @@ typedef struct FeTarget {
 
     u64 stack_pointer_align;
 
-    void (*ir_print_args)(FeDataBuffer* db, FeFunc* f, FeInst* inst);
-    void (*emit_asm)(FeDataBuffer* db, FeModule* m);
+    void (*ir_print_inst)(FeDataBuffer* db, FeFunc* f, FeInst* inst);
 } FeTarget;
 
 const FeTarget* fe_make_target(FeArch arch, FeSystem system);
@@ -1007,7 +1026,6 @@ FeVReg fe_vreg_new(FeVRegBuffer* buf, FeInst* def, FeBlock* def_block, u8 class)
 FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr);
 
 void fe_codegen(FeFunc* f);
-void fe_emit_asm(FeDataBuffer* db, FeModule* m);
 
 #ifdef __cplusplus
 }

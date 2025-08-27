@@ -26,7 +26,7 @@ LD = gcc
 INCLUDEPATHS = -Iinclude/
 ASANFLAGS = -fsanitize=undefined -fsanitize=address
 CFLAGS = -std=gnu23 -fwrapv -fno-strict-aliasing
-WARNINGS = -Wall -Wextra -Wimplicit-fallthrough -Wno-override-init -Wno-enum-compare -Wno-unused -Wno-enum-conversion -Wno-discarded-qualifiers -Wno-strict-aliasing
+WARNINGS = -Wall -Wimplicit-fallthrough -Wno-override-init -Wno-enum-compare -Wno-unused -Wno-enum-conversion -Wno-discarded-qualifiers -Wno-strict-aliasing
 ALLFLAGS = $(CFLAGS) $(WARNINGS)
 OPT = -g3 -O0
 

@@ -1,26 +1,43 @@
 #include <stdio.h>
 
+#include "coyote.h"
+
 #include "common/util.h"
 #include "lex.h"
 #include "parse.h"
+
+#include "iron/iron.h"
 
 thread_local const char* filepath = nullptr;
 thread_local FlagSet flags = {};
 
 static void print_help() {
     puts("coyote path/file.jkl [options]");
-    puts(" --help            Display this info.");
-    puts(" --version         Display version and copyright information.");
-    puts(" --xrsdk           Warn on code that would not compile with the");
-    puts("                   original XR/SDK compiler.");
-    puts(" --error-on-warn   Turn warnings into errors.");
-    puts(" --preproc,        Only perform the preprocessor. This strips");
-    puts("                   all hygenic macro scope information and may");
-    puts("                   not produce re-compilable code.");
+    puts(" --help              Display this info.");
+    puts(" --version           Display version and copyright information.");
+    puts(" --xrsdk             Warn on code that would not compile with the");
+    puts("                     original XR/SDK compiler.");
+    puts(" --error-on-warn     Turn warnings into errors.");
+    puts(" --preproc,          Only perform the preprocessor. This strips");
+    puts("                     all hygenic macro scope information and may");
+    puts("                     not produce re-compilable code.");
+    puts(" --incdir=/path/     Add a directory to search for INCLUDE");
+    puts("                     directives with '<inc>/'");
+    puts(" --libdir=/path/     Add a directory to search for INCLUDE");
+    puts("                     directives with '<ll>/'");
+    puts(" --arch=...          Specify the target architecture:");
+    puts("                      xr17032");
+    puts("                      fox32");
+    puts("                      x86_64/x64");
+    puts("                      aarch64");
+    puts(" --system=...        Specify the target system:");
+    puts("                      freestanding/none");
+    puts("                      linux");
+    puts("                      windows");
 }
 
 static void print_version() {
-    puts("");
+    printf("Coyote v%d.%d using Iron v%d.%d\n", COYOTE_MAJOR, COYOTE_MINOR, FE_VERSION_MAJOR, FE_VERSION_MINOR);
 }
 
 static void parse_args(int argc, char** argv) {

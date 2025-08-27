@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
 
     FsFile* file = fs_open(argv[1], false, false);
     string text = fs_read_entire(file);
-    text = string_concat(text, constr("\n"));
+    text = string_concat(text, strlit("\n"));
 
     usize i = 0;
     while (i < text.len) {

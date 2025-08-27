@@ -27,7 +27,7 @@ typedef struct string {
 #define substring(str, start, end) ((string){(str).raw + (start), (end) - (start)})
 #define substring_len(str, start, len) ((string){(str).raw + (start), (len)})
 #define str(cstring) ((string){(char*)(cstring), strlen((cstring))})
-#define constr(cstring) ((string){(char*)cstring, sizeof(cstring)-1})
+#define strlit(cstring) ((string){(char*)cstring, sizeof(cstring)-1})
 
 char*  clone_to_cstring(string str); // this allocates
 void   printstr(string str);

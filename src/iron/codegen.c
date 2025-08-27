@@ -1,4 +1,5 @@
 #include "iron/iron.h"
+#include <string.h>
 
 void fe_vrbuf_init(FeVRegBuffer* buf, usize cap) {
     if (cap < 2) cap = 2;
@@ -39,29 +40,25 @@ FeVirtualReg* fe_vreg(FeVRegBuffer* buf, FeVReg vr) {
 }
 
 static void insert_upsilon(FeFunc* f) {
-    // for_blocks(block, f) {
-    //     for_inst(inst, block) {
-    //         if (inst->kind != FE_PHI) continue;
+    for_blocks(block, f) {
+        for_inst(inst, block) {
+            if (inst->kind != FE_PHI) continue;
 
-    //         usize len = fe_extra(inst, FeInstPhi)->len;
-    //         FeInst** srcs = fe_extra(inst, FeInstPhi)->vals;
-    //         FeBlock** blocks = fe_extra(inst, FeInstPhi)->blocks;
+            FE_ASSERT(false);
 
-    //         // add upsilon nodes
-    //         for_n(i, 0, len) {
-    //             FeInst* upsilon = fe_inst_unop(f, inst->ty, FE__MACH_UPSILON, srcs[i]);
-    //             fe_insert_before(blocks[i]->bookend->prev, upsilon);
-    //             srcs[i] = upsilon;
-    //         }
-    //     }
-    // }
-    FE_ASSERT(false);
+            // usize len = fe_extra(inst, FeInstPhi)->len;
+            // FeInst** srcs = fe_extra(inst, FeInstPhi)->vals;
+            // FeBlock** blocks = fe_extra(inst, FeInstPhi)->blocks;
+
+            // // add upsilon nodes
+            // for_n(i, 0, len) {
+            //     FeInst* upsilon = fe_inst_unop(f, inst->ty, FE__MACH_UPSILON, srcs[i]);
+            //     fe_insert_before(blocks[i]->bookend->prev, upsilon);
+            //     srcs[i] = upsilon;
+            // }
+        }
+    }
 }
-
-typedef struct {
-    FeInstChain to;
-    FeInst* from;
-} InstPair;
 
 void fe_codegen(FeFunc* f) {
 
@@ -71,89 +68,60 @@ void fe_codegen(FeFunc* f) {
 
     fe_stack_calculate_size(f);
 
+    fe_opt_compact_ids(f);
 
-    usize START = 1;
-    // assign each instruction an index starting from 1.
-    usize inst_count = START;
+    // create mapping from old values to new values
+    // [old_inst->id] == new_inst
+    struct {
+        FeInst* from;
+        FeInstChain selected;
+    }* value_map = fe_malloc(sizeof(value_map[0]) * f->max_id);
+    memset(value_map, 0, sizeof(value_map[0]) * f->max_id);
+    usize value_map_len = f->max_id;
+
+    // isel
     for_blocks(block, f) {
         for_inst(inst, block) {
-            inst->flags = inst_count++;
+            FeInstChain selected = target->isel(f, block, inst);
+            value_map[inst->id].from = inst;
+            value_map[inst->id].selected = selected;
         }
     }
 
-    InstPair* isel_map = fe_malloc(sizeof(*isel_map) * inst_count);
-    memset(isel_map, 0, sizeof(*isel_map) * inst_count);
+    // replace
+    for_n (i, 0, value_map_len) {
+        FeInst* from = value_map[i].from;
+        FeInstChain selected = value_map[i].selected;
 
-    for_blocks(block, f) {
-        for_inst(inst, block) {
-            FeInstChain sel = target->isel(f, block, inst);
-            isel_map[inst->flags].from = inst;
-            isel_map[inst->flags].to = sel;
+        if (from == nullptr || selected.begin == nullptr) {
+            continue;
         }
+        fe_chain_replace_pos(from, selected);
+        fe_replace_uses(f, from, selected.end);
     }
 
-    // replace instructions with selected instructions
-    for_n(i, START, inst_count) {
-        fe_chain_replace_pos(isel_map[i].from, isel_map[i].to);
-    }
+    // fe_opt_tdce(f);
 
-    // replace inputs to all selected instructions
-    for_blocks(block, f) {
-        for_inst(inst, block) {
-            usize inputs_len = 0;
-            FeInst** inputs = inst->inputs;
-            for_n(i, 0, inputs_len) {
-                FeInst* new_input = isel_map[inputs[i]->flags].to.end;
-                if (new_input != nullptr) {
-                    inputs[i] = new_input;
-                }
-            }
-        }
-    }
+    // fe_free(value_map);
 
-    for_n(i, START, inst_count) {
-        if (isel_map[i].from != isel_map[i].to.end) {
-            fe_inst_destroy(f, isel_map[i].from);
-        }
-    }
-
-    fe_free(isel_map);
-
-    target->pre_regalloc_opt(f);
-    fe_opt_local(f);
+    // fe_opt_tdce(f);
 
     // create virtual registers for instructions that dont have them yet
-    for_blocks(block, f) {
-        for_inst(inst, block) {
-            if (inst->kind == FE__MACH_UPSILON) continue;
-            if ((inst->ty != FE_TY_VOID && inst->ty != FE_TY_TUPLE) && inst->vr_def == FE_VREG_NONE) {
-                // TODO choose register class based on architecture and type
-                inst->vr_def = fe_vreg_new(f->vregs, inst, block, target->choose_regclass(inst->kind, inst->ty));
-            }
-        }
-    }
-    for_blocks(block, f) {
-        for_inst(inst, block) {
-            if (inst->kind != FE_PHI) continue;
+    // for_blocks(block, f) {
+    //     for_inst(inst, block) {
+    //         if (inst->kind == FE__MACH_UPSILON) continue;
+    //         if ((inst->ty != FE_TY_VOID && inst->ty != FE_TY_TUPLE) && inst->vr_def == FE_VREG_NONE) {
+    //             // TODO choose register class based on architecture and type
+    //             inst->vr_def = fe_vreg_new(f->vregs, inst, block, target->choose_regclass(inst->kind, inst->ty));
+    //         }
+    //     }
+    // }
+    // for_blocks(block, f) {
+    //     for_inst(inst, block) {
+    //         if (inst->kind != FE_PHI) continue;
 
-            FE_ASSERT(false);
+    //         FE_ASSERT(false);
 
-            // usize len = fe_extra(inst, FeInstPhi)->len;
-            // FeInst** srcs = fe_extra(inst, FeInstPhi)->vals;
-
-            // // add upsilon nodes
-            // for_n(i, 0, len) {
-            //     FeInst* upsilon = srcs[i];
-            //     upsilon->vr_def = inst->vr_def;
-            // }
-        }
-    }
-    
-    fe_regalloc_linear_scan(f);
-
-    f->mod->target->final_touchups(f);
-}
-
-void fe_emit_asm(FeDataBuffer* db, FeModule* m) {
-    m->target->emit_asm(db, m);
+    //     }
+    // }
 }

@@ -1,0 +1,31 @@
+types
+    void
+    bool
+    i1 ... i64, isize
+    u1 ... u64, usize
+    type // comptime only
+    noreturn
+    
+    ^T, [^]T
+    []T
+    [N]T
+    ?T
+
+    struct {...}
+    union {...}
+    enum {...}
+
+
+
+
+
+switch x
+case 0 {
+
+}
+case 1 {
+
+}
+else {
+
+}

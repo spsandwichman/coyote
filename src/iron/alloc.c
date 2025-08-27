@@ -102,6 +102,9 @@ FeInst* fe_ipool_alloc(FeInstPool* pool, usize extra_size) {
     if (extra_size > FE__INST_EXTRA_MAX_SIZE)  {
         FE_CRASH("extra size > max size");
     }
+    if (extra_size < sizeof(usize)) {
+        extra_size = sizeof(usize);
+    }
 
     usize extra_slots = extra_size / sizeof(usize);
     usize node_slots = extra_slots + sizeof(FeInst) / 8;

@@ -328,39 +328,39 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
     case FE_LOAD:
         ;
         FeInstMemop* load = fe_extra(inst);
-        fe_db_writef(db, "align(%u) ", load->align);
-        if (load->offset) {
-            fe_db_writef(db, "offset(%u) ", load->offset);
-        }
         fe_db_writecstr(db, "[");
         fe__emit_ir_ref(db, f, inst->inputs[0]);
         fe_db_writecstr(db, "] ");
 
         fe__emit_ir_ref(db, f, inst->inputs[1]);
+        fe_db_writef(db, " align(%u)", load->align);
+        if (load->offset) {
+            fe_db_writef(db, " offset(%u) ", load->offset);
+        }
         break;
     case FE_STORE:
         ;
         FeInstMemop* store = fe_extra(inst);
-        fe_db_writef(db, "align(%u) ", store->align);
-        if (store->offset) {
-            fe_db_writef(db, "offset(%u) ", store->offset);
-        }
         fe_db_writecstr(db, "[");
         fe__emit_ir_ref(db, f, inst->inputs[0]);
         fe_db_writecstr(db, "] ");
         fe__emit_ir_ref(db, f, inst->inputs[1]);
         fe_db_writecstr(db, ", ");
         fe__emit_ir_ref(db, f, inst->inputs[2]);
+        fe_db_writef(db, " align(%u)", store->align);
+        if (store->offset) {
+            fe_db_writef(db, " offset(%u) ", store->offset);
+        }
         break;
     case FE_CONST:
         switch (inst->ty) {
         case FE_TY_BOOL: fe_db_writef(db, "%s", fe_extra(inst, FeInstConst)->val ? "true" : "false"); break;
         case FE_TY_F64:  fe_db_writef(db, "%lf", (f64)fe_extra(inst, FeInstConst)->val_f64); break;
         case FE_TY_F32:  fe_db_writef(db, "%lf", (f64)fe_extra(inst, FeInstConst)->val_f32); break;
-        case FE_TY_I64:  fe_db_writef(db, "0x%llx", (u64)fe_extra(inst, FeInstConst)->val); break;
-        case FE_TY_I32:  fe_db_writef(db, "0x%llx", (u64)(u32)fe_extra(inst, FeInstConst)->val); break;
-        case FE_TY_I16:  fe_db_writef(db, "0x%llx", (u64)(u16)fe_extra(inst, FeInstConst)->val); break;
-        case FE_TY_I8:   fe_db_writef(db, "0x%llx", (u64)(u8)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I64:  fe_db_writef(db, "%llx", (u64)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I32:  fe_db_writef(db, "%llx", (u64)(u32)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I16:  fe_db_writef(db, "%llx", (u64)(u16)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I8:   fe_db_writef(db, "%llx", (u64)(u8)fe_extra(inst, FeInstConst)->val); break;
         default:
             fe_db_writef(db, "[TODO]");
             break;
@@ -373,9 +373,6 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         u8 class = vreg->class;
         u16 real = vreg->real;
         fe_db_writecstr(db, f->mod->target->reg_name(class, real));
-        break;
-    case FE__XR_INST_BEGIN ... FE__XR_INST_END:
-        target->ir_print_args(db, f, inst);
         break;
     default:
         fe_db_writef(db, "[TODO LMFAO]");

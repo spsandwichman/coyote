@@ -18,17 +18,19 @@ const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
         t->stack_pointer_align = 8;
         break;
     case FE_ARCH_XR17032:
-        FE_ASSERT(false);
         t->ptr_ty = FE_TY_I32;
         t->stack_pointer_align = 4;
+        t->num_regclasses = 1;
+        t->isel = fe_xr_isel;
+        t->choose_regclass = fe_xr_choose_regclass;
         // t->isel = xr_isel;
         // t->ir_print_args = xr_print_args;
         // t->inst_name = xr_inst_name;
         // t->list_inputs = xr_list_inputs;
         // t->list_targets = xr_term_list_targets;
-        // t->reg_name = xr_reg_name;
-        // t->reg_status = xr_reg_status;
-        // t->num_regclasses = XR_REGCLASS_REG + 1;
+        // t->reg_name = XR_GPR_name;
+        // t->reg_status = XR_GPR_status;
+        // t->num_regclasses = XR_REGCLASS_GPR + 1;
         // t->regclass_lens = xr_regclass_lens;
         // t->emit_asm = xr_emit_assembly;
         // t->choose_regclass = xr_choose_regclass;

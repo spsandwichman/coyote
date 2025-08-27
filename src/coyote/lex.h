@@ -228,6 +228,8 @@ typedef struct {
 
     Entity* current_function;
 
+    struct Stmt* recent_while;
+
     Arena arena;
     Arena entities;
 
