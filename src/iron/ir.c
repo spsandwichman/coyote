@@ -600,6 +600,20 @@ FeInstChain fe_chain_append_begin(FeInstChain chain, FeInst* i) {
     return chain;
 }
 
+FeInstChain fe_chain_concat(FeInstChain front, FeInstChain back) {
+    if (front.begin == nullptr) {
+        return back;
+    }
+    if (back.begin == nullptr) {
+        return front;
+    }
+
+    front.end->next = back.begin;
+    back.begin->prev = front.end;
+    front.end = back.end;
+
+    return front;
+}
 void fe_insert_chain_before(FeInst* point, FeInstChain chain) {
     FeInst* p_prev = point->prev;
     p_prev->next = chain.begin;
@@ -621,6 +635,8 @@ void fe_chain_replace_pos(FeInst* from, FeInstChain to) {
     from->prev->next = to.begin;
     to.end->next = from->next;
     to.begin->prev = from->prev;
+    from->next = nullptr;
+    from->prev = nullptr;
 }
 
 void fe_chain_destroy(FeFunc* f, FeInstChain chain) {
@@ -707,7 +723,7 @@ void fe_set_input_null(FeInst* inst, u16 n) {
 usize fe_replace_uses(FeFunc* f, FeInst* old_val, FeInst* new_val) {
     // kinda unsafe, directly manipulating inputs and use lists is not great
     for_n (i, 0, old_val->use_len) {
-        FeInstUse old_val_use = old_val->uses[0];
+        FeInstUse old_val_use = old_val->uses[i];
         FeInst* old_val_use_inst = FE_USE_PTR(old_val_use);
         u16 old_val_use_input = old_val_use.idx; // which input of 'old_val_use_inst' is 'old_val'
 
@@ -858,7 +874,8 @@ FeInst* fe_inst_unop(FeFunc* f, FeTy ty, FeInstKind kind, FeInst* val) {
     i->kind = kind;
     i->ty = ty;
 
-    fe_set_input(f, i, 0, val);
+    fe_set_input(f, i, 0, 
+        val);
 
     return i;
 }
@@ -1133,7 +1150,7 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_FDIV] = BINOP | FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
     [FE_FREM] = BINOP | FLT_IN | VEC_IN | SAME_IN_OUT | SAME_INS,
 
-    [FE_MOV]      = UNOP | SAME_IN_OUT,
+    [FE_MOV] = UNOP | SAME_IN_OUT | MOV_HINT,
     [FE__MACH_MOV] = UNOP | VOL | SAME_IN_OUT | MOV_HINT,
     [FE__MACH_UPSILON]  = UNOP | VOL | SAME_IN_OUT | MOV_HINT,
     [FE_TRUNC] = UNOP | INT_IN,
@@ -1150,9 +1167,12 @@ static FeTrait inst_traits[FE__INST_END] = {
     [FE_LOAD] = MEM_USE,
     [FE_CALL] = MEM_USE | MEM_DEF,
 
+    [FE_UNREACHABLE] = TERM | VOL,
     [FE_BRANCH] = TERM | VOL,
     [FE_JUMP]   = TERM | VOL,
     [FE_RETURN] = TERM | VOL | MEM_USE,
+
+    [FE__MACH_RETURN] = TERM | VOL,
 };
 
 FeTrait fe_inst_traits(FeInstKind kind) {
@@ -1165,7 +1185,7 @@ bool fe_inst_has_trait(FeInstKind kind, FeTrait trait) {
     return (inst_traits[kind] & trait) != 0;
 }
 
-void fe__load_trait_table(usize start_index, FeTrait* table, usize len) {
+void fe__load_trait_table(usize start_index, const FeTrait* table, usize len) {
     memcpy(&inst_traits[start_index], table, sizeof(table[0]) * len);
 }
 
@@ -1200,7 +1220,7 @@ void fe_iset_push(FeInstSet* iset, FeInst* inst) {
         iset->id_end   = id_block + 1;
         iset->exists = fe_malloc(sizeof(usize));
         // memset(iset->exists, 0, sizeof(usize));
-        iset->insts = fe_malloc(sizeof(FeInst*) * USIZE_BITS);
+        iset->insts = fe_malloc(sizeof(iset->insts[0]) * USIZE_BITS);
 
         iset->exists[0] = id_bit; 
         iset->insts[id - iset->id_start * USIZE_BITS] = inst;
@@ -1229,7 +1249,7 @@ void fe_iset_push(FeInstSet* iset, FeInst* inst) {
         // we can realloc
         iset->insts = fe_realloc(iset->insts, sizeof(FeInst*) * new_size * USIZE_BITS);
         iset->exists = fe_realloc(iset->insts, sizeof(FeInst*) * new_size);
-        // have to memset the newly allocated exists space
+        // have to memset the newly allocated '.exists' space
         for_n (i, iset->id_end, new_end) {
             iset->exists[i] = 0;
         }

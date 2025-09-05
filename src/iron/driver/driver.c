@@ -13,10 +13,12 @@ FeInst* fe_solve_alias_space(FeFunc* f, u32 alias_space);
 FeFunc* make_store_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
     FeSection* text = fe_section_new(mod, "text", 0, FE_SECTION_EXECUTABLE);
 
+    FeTy ptr_ty = mod->target->ptr_ty;
+
     FeFuncSig* f_sig = fe_funcsig_new(FE_CCONV_ANY, 2, 1);
-    fe_funcsig_param(f_sig, 0)->ty = FE_TY_I64;
-    fe_funcsig_param(f_sig, 1)->ty = FE_TY_I64;
-    fe_funcsig_return(f_sig, 0)->ty = FE_TY_I64;
+    fe_funcsig_param(f_sig, 0)->ty = ptr_ty;
+    fe_funcsig_param(f_sig, 1)->ty = ptr_ty;
+    fe_funcsig_return(f_sig, 0)->ty = ptr_ty;
 
     // make the function and its symbol
     FeSymbol* f_sym = fe_symbol_new(mod, "foo", 0, text, FE_BIND_GLOBAL);
@@ -34,13 +36,13 @@ FeFunc* make_store_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
     FeInst* load = fe_inst_load(
         f, 
-        FE_TY_I64, 
+        ptr_ty, 
         fe_func_param(f, 0), 
         FE_MEMOP_ALIGN_DEFAULT, 0
     );
     fe_append_end(entry, load);
 
-    FeInst* zero = fe_inst_const(f, FE_TY_I64, 0);
+    FeInst* zero = fe_inst_const(f, ptr_ty, 0);
     fe_append_end(entry, zero);
 
     FeInst* zero_store = fe_inst_store(
@@ -75,29 +77,19 @@ FeFunc* make_alg_test(FeModule* mod, FeInstPool* ipool, FeVRegBuffer* vregs) {
 
     FeBlock* entry = f->entry_block;
 
-    FeInst* x = fe_inst_const(f, ptr_ty, 0x20);
+    FeInst* x = fe_inst_const(f, ptr_ty, 10);
     fe_append_end(entry, x);
 
-    FeInst* add_x = fe_inst_binop(f, 
+    FeInst* shift_x = fe_inst_binop(f,
         ptr_ty, FE_IADD, 
         fe_func_param(f, 0),
         x
     );
-    fe_append_end(entry, add_x);
-
-    FeInst* y = fe_inst_const(f, ptr_ty, 0x10);
-    fe_append_end(entry, y);
-    
-    FeInst* sub_y = fe_inst_binop(f, 
-        ptr_ty, FE_ISUB,
-        add_x,
-        y
-    );
-    fe_append_end(entry, sub_y);
+    fe_append_end(entry, shift_x);
 
     FeInst* ret = fe_inst_return(f);
     fe_append_end(entry, ret);
-    fe_return_set_arg(f, ret, 0, sub_y);
+    fe_return_set_arg(f, ret, 0, shift_x);
     
     fe_solve_alias_space(f, 0);
 
@@ -120,7 +112,7 @@ int main() {
     quick_print(func);
 
     fe_codegen(func);
-    // quick_print(func);
+    quick_print(func);
 
     // printf("------ final assembly ------\n");
 

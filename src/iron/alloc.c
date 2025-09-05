@@ -18,17 +18,19 @@ static u8 extra_size_table[FE__INST_END] = {
     [FE_IADD ... FE_FREM] = 0,
     [FE_MOV ... FE_F2I] = 0,
     [FE_LOAD ... FE_MEM_BARRIER] = sizeof(FeInstMemop),
-    [FE__MACH_REG] = 0,
+    [FE_UNREACHABLE] = 0,
     [FE_BRANCH] = sizeof(FeInstBranch),
     [FE_JUMP] = sizeof(FeInstJump),
     [FE_RETURN] = 0,
     [FE_PHI ... FE_MEM_PHI] = sizeof(FeInstPhi),
     [FE_CALL] = sizeof(FeInstCall),
+    [FE__MACH_REG] = 0,
+    [FE__MACH_RETURN] = 0,
     [FE__MACH_STACK_SPILL] = sizeof(FeInstStack),
     [FE__MACH_STACK_RELOAD] = sizeof(FeInstStack),
 };
 
-void fe__load_extra_size_table(usize start_index, u8* table, usize len) {
+void fe__load_extra_size_table(usize start_index, const u8* table, usize len) {
     memcpy(&extra_size_table[start_index], table, sizeof(table[0]) * len);
 }
 

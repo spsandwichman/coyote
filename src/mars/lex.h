@@ -24,6 +24,7 @@ typedef enum : u8 {
     TOK_COLON_COLON, // ::
     TOK_RANGE,       // ..
     TOK_RANGE_EQ,    // ..=
+    TOK_UNDERSCORE, // _
 
     TOK_EQ,     // =
     TOK_ADD_EQ, // +=
@@ -37,7 +38,6 @@ typedef enum : u8 {
     TOK_LSH_EQ, // <<=
     TOK_RSH_EQ, // >>=
 
-    TOK_UNDERSCORE, // _
     TOK_ADD,    // +
     TOK_SUB,    // -
     TOK_MUL,    // *
@@ -62,24 +62,36 @@ typedef enum : u8 {
 
     TOK_HASH,       // #
 
+    TOK_IBIT, // arbitrary bit size up to isize
+    TOK_UBIT, // arbitrary bit size up to usize
+
     TOK_KW_MODULE,
+    TOK_KW_BUILTIN,
     TOK_KW_COMMON,
     TOK_KW_THREADLOCAL,
     TOK_KW_EXTERN,
     TOK_KW_PUB,
+    TOK_KW_CONST,
     TOK_KW_DEF,
     TOK_KW_LET,
     TOK_KW_MUT,
     TOK_KW_TRUE,
     TOK_KW_FALSE,
     TOK_KW_NULL,
+    TOK_KW_UNDEF,
+    TOK_KW_UNREACHABLE,
+    TOK_KW_DEFER,
     TOK_KW_IF,
     TOK_KW_ELSE,
     TOK_KW_WHILE,
     TOK_KW_FOR,
     TOK_KW_IN,
     TOK_KW_AS,
+    TOK_KW_WHERE,
     TOK_KW_INLINE,
+    TOK_KW_PACKED,
+    TOK_KW_NOALIAS,
+    TOK_KW_ALIGN,
     TOK_KW_VOID,
     TOK_KW_BOOL,
     TOK_KW_F32,
@@ -88,27 +100,17 @@ typedef enum : u8 {
     TOK_KW_STRUCT,
     TOK_KW_UNION,
     TOK_KW_ENUM,
-    TOK_KW_BUILTIN,
     TOK_KW_NORETURN,
 
-    TOK_KW_I8,
-    TOK_KW_I16,
-    TOK_KW_I32,
-    TOK_KW_I64,
     TOK_KW_ISIZE,
-    TOK_KW_IBIT, // arbitrary bit size up to isize
-    TOK_KW_U8,
-    TOK_KW_U16,
-    TOK_KW_U32,
-    TOK_KW_U64,
     TOK_KW_USIZE,
-    TOK_KW_UBIT, // arbitrary bit size up to usize
+
 } TokenKind;
 
 typedef struct {
     TokenKind kind;
     u32 len;
-    char* data;
+    const char* data;
 } Token;
 
 typedef struct {

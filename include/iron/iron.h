@@ -62,6 +62,8 @@ typedef float    f32;
     } FeCompactStr;
     #define fe_compstr(data_, len_) ((FeCompactStr){.data = (i64)(char*)(data_), .len = (len_)})
     #define fe_compstr_data(compstr) ((char*)(i64)(compstr).data)
+    #define fe_compstr_fmt "%.*s"
+    #define fe_compstr_arg(compstr) (compstr).data, (char*)(i64)(compstr).data
 #else // fallback to regular string
     typedef struct FeCompactStr {
         char* data;
@@ -243,12 +245,13 @@ typedef enum : u8 {
 typedef enum: u8 {
     FE_BIND_LOCAL = 1,
     FE_BIND_GLOBAL,
+    FE_BIND_WEAK,
 
     // shared libary stuff
     FE_BIND_SHARED_EXPORT,
     FE_BIND_SHARED_IMPORT,
 
-    FE_BIND_EXTERN, 
+    FE_BIND_EXTERN,
 } FeSymbolBinding;
 
 typedef enum: u8 {
@@ -456,6 +459,11 @@ typedef enum: FeInstKind {
     // FeInstMemop
     FE_MEM_BARRIER,
 
+    // (void)
+    // terminator inst that assumes control flow cannot reach it
+    // optimizations may do with this what they want
+    FE_UNREACHABLE,
+
     // FeInstBranch
     // {val}
     FE_BRANCH,
@@ -482,6 +490,7 @@ typedef enum: FeInstKind {
 
     // (void)
     FE__MACH_REG,
+    FE__MACH_RETURN, // signals that the final instruction returns, even if its not a terminator
 
     // FeInstStack
     FE__MACH_STACK_SPILL,
@@ -490,11 +499,11 @@ typedef enum: FeInstKind {
 
     FE__BASE_INST_END,
 
-    FE__X64_INST_BEGIN = FE_ARCH_X64 * 512,
-    FE__X64_INST_END = FE__X64_INST_BEGIN + 512,
+    FE__X64_INST_BEGIN = FE_ARCH_X64 * 128,
+    FE__X64_INST_END = FE__X64_INST_BEGIN + 128,
 
-    FE__XR_INST_BEGIN = FE_ARCH_XR17032 * 512,
-    FE__XR_INST_END = FE__XR_INST_BEGIN + 512,
+    FE__XR_INST_BEGIN = FE_ARCH_XR17032 * 128,
+    FE__XR_INST_END = FE__XR_INST_BEGIN + 128,
 
     FE__INST_END,
 } FeInstKindGeneric;
@@ -691,11 +700,11 @@ typedef enum : u16 {
 
 FeTrait fe_inst_traits(FeInstKind kind);
 bool fe_inst_has_trait(FeInstKind kind, FeTrait trait);
-void fe__load_trait_table(usize start_index, FeTrait* table, usize len);
+void fe__load_trait_table(usize start_index, const FeTrait* table, usize len);
 
 usize fe_inst_extra_size(FeInstKind kind);
 usize fe_inst_extra_size_unsafe(FeInstKind kind);
-void fe__load_extra_size_table(usize start_index, u8* table, usize len);
+void fe__load_extra_size_table(usize start_index, const u8* table, usize len);
 
 FeModule* fe_module_new(FeArch arch, FeSystem system);
 void fe_module_destroy(FeModule* mod);
@@ -747,6 +756,7 @@ typedef struct FeInstChain {
 FeInstChain fe_chain_new(FeInst* initial);
 FeInstChain fe_chain_append_end(FeInstChain chain, FeInst* i);
 FeInstChain fe_chain_append_begin(FeInstChain chain, FeInst* i);
+FeInstChain fe_chain_concat(FeInstChain front, FeInstChain back);
 void fe_insert_chain_before(FeInst* point, FeInstChain chain);
 void fe_insert_chain_after(FeInst* point, FeInstChain chain);
 void fe_chain_replace_pos(FeInst* from, FeInstChain to);
@@ -898,6 +908,8 @@ void fe_opt_local(FeFunc* f);
 void fe_opt_tdce(FeFunc* f);
 void fe_opt_compact_ids(FeFunc* f);
 
+void fe_opt_post_regalloc(FeFunc* f);
+
 // -------------------------------------
 // IO utilities
 // -------------------------------------
@@ -947,7 +959,9 @@ void fe_init_signal_handler();
 // code generation
 // -------------------------------------
 
+// vreg hasnt been asigned a real reg yet
 #define FE_VREG_REAL_UNASSIGNED UINT16_MAX
+
 #define FE_VREG_NONE UINT32_MAX
 
 typedef struct FeBlockLiveness {
@@ -994,7 +1008,7 @@ typedef struct FeTarget {
 
     FeTy ptr_ty;
 
-    const char* (*inst_name)(FeInstKind kind, bool ir);
+    // const char* (*inst_name)(FeInstKind kind, bool ir);
     FeInst** (*list_inputs)(FeInst* inst, usize* len_out);
     FeBlock** (*list_targets)(FeInst* term, usize* len_out);
 
@@ -1016,7 +1030,7 @@ typedef struct FeTarget {
 
 const FeTarget* fe_make_target(FeArch arch, FeSystem system);
 
-void fe_regalloc_linear_scan(FeFunc* f);
+void fe_regalloc_basic(FeFunc* f);
 
 void fe_vrbuf_init(FeVRegBuffer* buf, usize cap);
 void fe_vrbuf_clear(FeVRegBuffer* buf);

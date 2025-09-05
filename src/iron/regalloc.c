@@ -1,7 +1,8 @@
 #include "iron/iron.h"
+#include <stdio.h>
 
 bool is_canon_def(FeVirtualReg* inst_out, FeInst* inst) {
-    // upsilons are a kind of fake definition that get created during codegen as inputs for phi nodes.
+    // upsilons are a kind of fake move/definition that get created during codegen as inputs for phi nodes.
     return (inst->kind == FE__MACH_UPSILON || inst_out->def == inst);
 }
 
@@ -96,37 +97,44 @@ static void calculate_liveness(FeFunc* f) {
 }
 
 typedef struct {
-    bool** reg_live;
-} LiveSet;
+    FeVirtualReg* this;
+    
+    FeVReg* interferes;
+    u32 len;
+} ColorNode;
 
-LiveSet liveset_new(const FeTarget* target) {
-    LiveSet lvset;
-    lvset.reg_live = fe_malloc(sizeof(lvset.reg_live[0]) * target->num_regclasses);
-    for_n(i, 0, target->num_regclasses) {
-        usize regclass_size = sizeof(lvset.reg_live[0][0]) * target->regclass_lens[i];
-        lvset.reg_live[i] = fe_malloc(regclass_size);
-        memset(lvset.reg_live[i], 0, regclass_size);
+
+static void add_interefence(ColorNode* cnode, FeVReg interferes) {
+    for_n(i, 0, cnode->len) {
+        if (cnode->interferes[i] == interferes) {
+            return;
+        }
     }
-    return lvset;
+
+    cnode->interferes[cnode->len] = interferes;
+    cnode->len += 1;
 }
 
-void liveset_add(LiveSet* lvset, u8 regclass, u16 reg) {
-    lvset->reg_live[regclass][reg] = true;
+// try to take a hint, return true if taken, false if not taken
+static bool try_vr_hint(FeVRegBuffer* vbuf, ColorNode* cnode) {
+    // return false;
+    for_n(i, 0, cnode->len) {
+        if (vbuf->at[cnode->interferes[i]].real == vbuf->at[cnode->this->hint].real) {
+            return false;
+        }
+    }
+
+    cnode->this->real = vbuf->at[cnode->this->hint].real;
+    return true;
 }
 
-void liveset_remove(LiveSet* lvset, u8 regclass, u16 reg) {
-    lvset->reg_live[regclass][reg] = false;
-}
+void fe_regalloc_basic(FeFunc* f) {
 
-bool is_live(LiveSet* lvset, u8 regclass, u16 reg) {
-    return lvset->reg_live[regclass][reg];
-}
-
-void fe_regalloc_linear_scan(FeFunc* f) {
     FeVRegBuffer* vbuf = f->vregs;
     const FeTarget* target = f->mod->target;
-    calculate_liveness(f);
+    FE_ASSERT(target->num_regclasses == 2); // including the NONE regclass
 
+    calculate_liveness(f);
 
     // hints!
     for_blocks(block, f) {
@@ -146,82 +154,133 @@ void fe_regalloc_linear_scan(FeFunc* f) {
         }
     }
 
-    LiveSet lvset = liveset_new(target);
+    ColorNode* color_nodes = fe_malloc(vbuf->len * sizeof(ColorNode));
+    // memset(color_nodes, 0, vbuf->len * sizeof(ColorNode));
+
+    // all of this is horribly inefficient
+    // i just want it to work right now
+
+    for_n(i, 0, vbuf->len) {
+        color_nodes[i].this = &vbuf->at[i];
+        color_nodes[i].interferes = fe_malloc(vbuf->len * sizeof(FeVReg));
+        color_nodes[i].len = 0;
+    }
+
+    bool* live_now = fe_malloc(vbuf->len * sizeof(bool));
+    memset(live_now, 0, vbuf->len * sizeof(bool));
 
     for_blocks(block, f) {
-        // make everything in live_out live now
+        // set initial live-outs
+        memset(live_now, 0, vbuf->len * sizeof(bool));
         for_n(i, 0, block->live->out_len) {
-            FeVirtualReg* vr = fe_vreg(vbuf, block->live->out[i]);
-            if (vr->real != FE_VREG_REAL_UNASSIGNED) {
-                liveset_add(&lvset, vr->class, vr->real);
+            FeVReg live_out = block->live->out[i];
+            live_now[live_out] = true;
+            
+        }
+
+        // all of the initial live_outs interfere with each other
+        for_n(i, 0, block->live->out_len) {
+            FeVReg live_out_1 = block->live->out[i];
+            for_n(j, 0, block->live->out_len) {
+                FeVReg live_out_2 = block->live->out[j];
+                if (live_out_1 == live_out_2) {
+                    continue;
+                }
+
+                add_interefence(&color_nodes[live_out_1], live_out_2);
             }
         }
 
         for_inst_reverse(inst, block) {
-            if (inst->kind == FE_PHI || inst->vr_def != FE_VREG_NONE) {
-                // this instruction defines a virtual register
-                FeVirtualReg* inst_out = fe_vreg(vbuf, inst->vr_def);
-                
-                // if this instruction is the "canonical" definition of the 
-                // virtual register, or the instruction is an upsilon inst,
-                // KILL IT TO DEATH
-                if (is_canon_def(inst_out, inst) && inst_out->real != FE_VREG_REAL_UNASSIGNED) {
-                    liveset_remove(&lvset, inst_out->class, inst_out->real);
+            // if we come across the 'canon' definition of a vreg, end its life
+            FeVReg vr = inst->vr_def;
+            if (vr != FE_VREG_NONE && is_canon_def(&vbuf->at[vr], inst)) {
+                live_now[vr] = false;
+            }
+            
+            // start life of inputs
+            for_n(i, 0, inst->in_len) {
+                FeInst* inst_input = inst->inputs[i];
+                if (inst_input->vr_def != FE_VREG_NONE) {
+                    live_now[inst_input->vr_def] = true;
                 }
             }
+            
+            for_n(i, 0, vbuf->len) {
+                if (!live_now[i]) {
+                    continue;
+                }
+                for_n(j, 0, vbuf->len) {
+                    if (!live_now[j] || i == j) {
+                        continue;
+                    }
+                    add_interefence(&color_nodes[i], j);
+                }
+            }
+        }
+    }
 
-            FeInst** inst_inputs = inst->inputs;
-            for_n(i, 0, inst->in_len) {
-                FeInst* input = inst_inputs[i];
-                FeVirtualReg* input_vr = fe_vreg(vbuf, input->vr_def);
+    // debug print interference graph
+    for_n(vr, 0, vbuf->len) {
+        ColorNode* cnode = &color_nodes[vr];
+        for_n(i, 0, cnode->len) {
+            printf("intereferes %zu ~> %d\n", vr, cnode->interferes[i]);
+        }
+    }
 
-                // if this vreg has already been allocated, skip past it
-                if (input_vr->real != FE_VREG_REAL_UNASSIGNED) {
+    // color!
+    // if (false)
+    for_n(vr, 0, vbuf->len) {
+        ColorNode* cnode = &color_nodes[vr];
+
+        // printf("vr %zu hint %d\n", vr, cnode->this->hint);
+
+        // skip if pre-colored
+        if (cnode->this->real != FE_VREG_REAL_UNASSIGNED) {
+            continue;
+        }
+
+        // attempt to take hint if exists
+        if (cnode->this->hint != FE_VREG_NONE) {
+            // AND the hint isnt already assigned to something
+            if (try_vr_hint(vbuf, cnode)) {
+                // chosen!
+                continue;
+            }
+        }
+
+        // we gotta chose a register that doesnt interfere with anything already allocated.
+        for_n(real_candidate, 0, target->regclass_lens[1]) {
+            if (target->reg_status(f->sig->cconv, 1, real_candidate) == FE_REG_UNUSABLE) {
+                // cant touch this, we gotta continue
+                continue;
+            }
+            // printf("try alloc %zu\n", real_candidate);
+
+            for_n(i, 0, cnode->len) {
+
+                ColorNode* intereferes = &color_nodes[cnode->interferes[i]];
+                if (intereferes->this->real == FE_VREG_REAL_UNASSIGNED) {
                     continue;
                 }
 
-                // allocate this virtual register a real one!!
-                
-                // try to take a hint lmao
-                u16 real = 0;
-                // TODO only try to take hints AFTER the entire regalloc is done.
-                // taking hints early can clobber pre-colored registers
-
-                // if (input_vr->hint != FE_VREG_NONE) {
-                //     FeVirtualReg* hint_vr = fe_vreg(vbuf, input_vr->hint);
-                //     if (hint_vr->real != FE_VREG_REAL_UNASSIGNED && !is_live(lvset, hint_vr->class, hint_vr->real)) {
-                //         real = hint_vr->real;
-                //     }
-                // }
-
-                // iterate through all the real registers
-                if (!real) for (; real < target->regclass_lens[input_vr->class]; ++real) {
-                    // right now, only consider call-clobbered registers. no spilling rn.
-                    if (target->reg_status(f->sig->cconv, input_vr->class, real) != FE_REG_CALL_CLOBBERED) {
-                        continue;
-                    }
-                    // if this real register is already used, skip past it.
-                    if (is_live(&lvset, input_vr->class, real)) {
-                        continue;
-                    }
-
-                    // we've found a register we can use here!
-                    break;
+                // has this real register already been chosen?
+                if (intereferes->this->real == real_candidate) {
+                    // try the next one
+                    goto next_candidate;
                 }
-                if (real >= target->regclass_lens[input_vr->class]) {
-                    FE_CRASH("unable to allocate");
-                }
-
-                // assign real register to virtual register
-                input_vr->real = real;
-                liveset_add(&lvset, input_vr->class, input_vr->real);
             }
-        }
 
-        // unlive everything that is live_in
-        for_n(i, 0, block->live->in_len) {
-            FeVirtualReg* vr = fe_vreg(vbuf, block->live->in[i]);
-            liveset_remove(&lvset, vr->class, vr->real);
+            // chosen!
+            cnode->this->real = real_candidate;
+            break;
+
+            next_candidate:
+        }
+        if (cnode->this->real == FE_VREG_REAL_UNASSIGNED) {
+            FE_CRASH("failed to allocate register");
         }
     }
+
+    fe_free(color_nodes);
 }

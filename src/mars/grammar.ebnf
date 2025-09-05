@@ -1,28 +1,138 @@
-(* expression that requires a block after it *)
+(* expression that uses a statement block and doesn't *)
+(* need a semicolon inside of a stmt block itself *)
 expr_with_block =
     | if_expr
     | while_expr
     | switch_expr
     | def_block
-    | block
+    | stmt_block
     ;
 
-if_expr = "if" expr block {"else" if_stmt} ["else" block];
+expr_without_block = 
+    | type_literal_expr
+    | 
+    ;
 
-block = "{" {stmt} [expr] "}";
+binary_expr = 
+    | binary_expr binary_op binary_expr
+    | unary_expr
+    ;
+binary_op = 
+    | "+" | "-" | "*" | "/" | "%" 
+    | "&" | "|" | "<<" | ">>" | "~"
+    | "&&" | "||"
+    | "==" | "!=" | "<=" | ">=" | "<" | ">"
+    | "as"
+    | "orelse"
+    ;
+
+unary_expr =
+    | unary_op unary_expr
+    | atomic_expr
+    ;
+
+selector = ident | "null" | "enum";
+atomic_expr = 
+    | type
+    | literal_expr
+    | atomic_expr "." "?"
+    | atomic_expr ("." | "::") selector
+    ;
+
+type = 
+    (* pointer *)
+    | "^" {reference_qualifier} type
+    (* slice *)
+    | "[" "]" {reference_qualifier} type
+    (* many-ptr *)
+    | "[" "^" "]" {reference_qualifier} type
+    (* array *)
+    | "[" expr "]" type
+    (* optional *)
+    | "?" type
+    | struct_type
+    | union_type
+    | enum_type
+    | type_literal
+    | ident
+    ;
+
+
+reference_qualifier = 
+    | "noalias"
+    | "const"
+    | "align" "(" expr ")"
+    | "allowzero" (* better name for this ?? i dont wanna just copy zig lmao *)
+    ;
+
+type_literal_expr = 
+    | "i"('0'...'9'){'0'...'9'}
+    | "f32" | "f64"
+    | "void"
+    | "bool"
+    | "noreturn"
+    ;
+
+field_list = field {"," field} ",";
+field = 
+    (* field list with default values *)
+    | ident {"," ident} [","] ":" expr ["=" expr {"," expr} ","]
+    | "enum" (* only legal inside a "union inline enum" declaration *)
+    ;
+
+align_qualifier = "align" "(" expr ")";
+
+struct_qualifier = "packed" | align_qualifier;
+
+struct_type = "struct" {struct_qualifier} "{" 
+    [field_list]
+    {fun_decl | assign_stmt}
+"}";
+
+union_qualifier = align_qualifier;
+
+(* inline enum tag *)
+union_tag_specifier = ["inline"] "enum" [":" expr];
+
+union_type = "union" [union_tag_specifier] {union_qualifier} "{"
+    ["common" "{" [field_list] "}" [","]] (* common data *)
+
+    [field_list]
+
+    {fun_decl | assign_stmt}
+"}";
+
+enum_variant = ident ["=" expr];
+
+enum_type = "enum" [":" expr] "{" 
+    [enum_variant {"," enum_variant} ","]
+
+    {fun_decl | assign_stmt}
+"}";
+
+if_expr = "if" expr stmt_block {"else" if_stmt} ["else" stmt_block];
+while_expr = "while" expr stmt_block ["else" stmt_block];
+
+stmt_block = "{" {stmt} [expr] "}";
 
 stmt = 
     | assign_stmt
     | fun_decl
     | defer_stmt
+    | expr_with_block
+    | expr_without_block ";"
+    | stmt_block
     ;
 
-var_decl_kind = "def" | "let" | "mut";
+decl_storage = "threadlocal" | "common" | "extern" | "inline"
+decl_kind = "def" | "let" | "mut";
+assignee = "_" | expr;
+assign_stmt = [decl_storage] [decl_kind] assignee {"," [decl_kind] assignee} [","] "=" expr {"," expr} [","] ";";
 
-assign_stmt = [var_decl_kind] ident {"," [var_decl_kind] ident} [","] "=" expr {"," expr} [","] ";";
+fun_params = ["def"] ident {"," ["def"] ident} [","] ":" expr ["where" expr];
+fun_signature = "(" fun_params {"," fun_params} [","] ")" [":" expr];
+fun_type = "fun" fun_signature;
+fun_decl = "fun" ident fun_signature stmt_block;
+extern_fun_decl = "extern" "fun" ident fun_signature ";";
 
-fun_params = ["def"] ident {"," ["def"] ident} [","] ":" expr
-
-fun_signature = "fun" [ident] "(" fun_params {"," fun_params} [","] ")" [":" expr];
-
-fun_decl = fun_signature block;
+defer_stmt = "defer" stmt;

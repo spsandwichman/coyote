@@ -54,10 +54,9 @@ void fe_xr_print_inst(FeDataBuffer* db, FeFunc* f, FeInst* inst) {
     case XR_STORE8_SI:  name = "xr.store8-si"; break;
     case XR_STORE16_SI: name = "xr.store16-si"; break;
     case XR_STORE32_SI: name = "xr.store32-si"; break;
+    case XR_JALR:       name = "xr.jalr"; break;
 
-    case XR_LSH:   name = "xr.lsh"; break;
-    case XR_RSH:   name = "xr.rsh"; break;
-    case XR_ASH:   name = "xr.ash"; break;
+    case XR_SHIFT: name = "xr.shift"; break;
     case XR_ADD:   name = "xr.add"; break;
     case XR_SUB:   name = "xr.sub"; break;
     case XR_SLT:   name = "xr.slt"; break;
@@ -87,4 +86,107 @@ void fe_xr_print_inst(FeDataBuffer* db, FeFunc* f, FeInst* inst) {
 
     fe_db_writecstr(db, name);
     fe_db_writecstr(db, " ");
+
+    switch (inst->kind) {
+    case XR_J ... XR_JAL:
+        if (xr_immsym_is_imm(fe_extra(inst))) {
+            fe_db_writef(db, "0x%llx", xr_immsym_imm_val(fe_extra(inst)));
+        } else {
+            FeSymbol* sym = fe_extra(inst, XrInstImmOrSym)->sym;
+            FeCompactStr symname = sym->name;
+            fe_db_writef(db, fe_compstr_fmt, fe_compstr_arg(symname));
+        }
+        break;
+    case XR_ADDI ... XR_JALR:
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
+        fe_db_writef(db, ", %u", fe_extra(inst, XrInstImm)->imm);
+        break;
+    
+    default:
+        fe_db_writef(db, "aaa!");
+        break;
+    }
 }
+
+const char* fe_xr_reg_name(u8 regclass, u16 real) {
+    const char* name = nullptr;
+
+    switch (real) {
+    case XR_GPR_ZERO: name = "zero"; break;
+    case XR_GPR_T0: name = "t0"; break;
+    case XR_GPR_T1: name = "t1"; break;
+    case XR_GPR_T2: name = "t2"; break;
+    case XR_GPR_T3: name = "t3"; break;
+    case XR_GPR_T4: name = "t4"; break;
+    case XR_GPR_T5: name = "t5"; break;
+    case XR_GPR_A0: name = "a0"; break;
+    case XR_GPR_A1: name = "a1"; break;
+    case XR_GPR_A2: name = "a2"; break;
+    case XR_GPR_A3: name = "a3"; break;
+    case XR_GPR_S0: name = "s0"; break;
+    case XR_GPR_S1: name = "s1"; break;
+    case XR_GPR_S2: name = "s2"; break;
+    case XR_GPR_S3: name = "s3"; break;
+    case XR_GPR_S4: name = "s4"; break;
+    case XR_GPR_S5: name = "s5"; break;
+    case XR_GPR_S6: name = "s6"; break;
+    case XR_GPR_S7: name = "s7"; break;
+    case XR_GPR_S8: name = "s8"; break;
+    case XR_GPR_S9: name = "s9"; break;
+    case XR_GPR_S10: name = "s10"; break;
+    case XR_GPR_S11: name = "s11"; break;
+    case XR_GPR_S12: name = "s12"; break;
+    case XR_GPR_S13: name = "s13"; break;
+    case XR_GPR_S14: name = "s14"; break;
+    case XR_GPR_S15: name = "s15"; break;
+    case XR_GPR_S16: name = "s16"; break;
+    case XR_GPR_S17: name = "s17"; break;
+    case XR_GPR_TP: name = "tp"; break;
+    case XR_GPR_SP: name = "sp"; break;
+    case XR_GPR_LR: name = "lr"; break;
+    default: name = "invalid"; break;
+    }
+
+    return name;
+}
+
+FeRegStatus fe_xr_reg_status(u8 cconv, u8 regclass, u16 real) {
+    FE_ASSERT(cconv == FE_CCONV_ANY || cconv == FE_CCONV_JACKAL);
+    FE_ASSERT(regclass == XR_REGCLASS_GPR);
+
+    switch (real) {
+    case XR_GPR_T0 ... XR_GPR_T5:
+        return FE_REG_CALL_CLOBBERED;
+    case XR_GPR_A0 ... XR_GPR_A3:
+        return FE_REG_CALL_CLOBBERED;
+    case XR_GPR_S0 ... XR_GPR_S17:
+        return FE_REG_CALL_PRESERVED;
+    default:
+        return FE_REG_UNUSABLE;
+    }
+}
+const u16 fe_xr_regclass_lens[] = {
+    [XR_REGCLASS_NONE] = 0,
+    [XR_REGCLASS_GPR] = XR_GPR__COUNT,
+};
+
+#define R(x, y) [x - FE__XR_INST_BEGIN ... y - FE__XR_INST_BEGIN]
+#define S(x) [x - FE__XR_INST_BEGIN]
+
+const u8 fe_xr_extra_size_table[FE__XR_INST_END - FE__XR_INST_BEGIN] = {
+    R(XR_J, XR_JAL) = sizeof(XrInstImmOrSym),
+    R(XR_BEQ, XR_BPO) = sizeof(XrInstBranch),
+    R(XR_ADDI, XR_JALR) = sizeof(XrInstImm),
+    R(XR_SHIFT, XR_SC) = 0,
+    R(XR_MB, XR_SYS) = 0,
+    R(XR_MFCR, XR_RFE) = sizeof(XrInstImm),
+};
+
+#include "../short_traits.h"
+
+const FeTrait fe_xr_trait_table[FE__XR_INST_END - FE__XR_INST_BEGIN] = {
+    R(XR_BEQ, XR_BPO) = VOL | TERM,
+    S(XR_J) = VOL,
+    S(XR_JAL) = VOL,
+    S(XR_JALR) = VOL,
+};

@@ -1,4 +1,5 @@
 #include "iron/iron.h"
+#include <stdio.h>
 #include <string.h>
 
 void fe_vrbuf_init(FeVRegBuffer* buf, usize cap) {
@@ -96,32 +97,61 @@ void fe_codegen(FeFunc* f) {
         if (from == nullptr || selected.begin == nullptr) {
             continue;
         }
-        fe_chain_replace_pos(from, selected);
+        // fe_chain_replace_pos(from, selected);
+        fe_insert_chain_after(from, selected);
+    }
+
+    // fe_opt_compact_ids(f);
+
+    // replace uses
+    for_n (i, 0, value_map_len) {
+        FeInst* from = value_map[i].from;
+        FeInstChain selected = value_map[i].selected;
+
+        if (from == nullptr || selected.begin == nullptr) {
+            continue;
+        }
+
         fe_replace_uses(f, from, selected.end);
     }
 
-    // fe_opt_tdce(f);
+    // destroy old insts
+    for_n (i, 0, value_map_len) {
+        FeInst* from = value_map[i].from;
+        if (from == nullptr || from->use_len != 0) {
+            continue;
+        }
 
-    // fe_free(value_map);
+        fe_inst_destroy(f, from);
+    }
 
-    // fe_opt_tdce(f);
+    fe_opt_tdce(f);
+
+    fe_opt_compact_ids(f);
+
+    fe_free(value_map);
 
     // create virtual registers for instructions that dont have them yet
-    // for_blocks(block, f) {
-    //     for_inst(inst, block) {
-    //         if (inst->kind == FE__MACH_UPSILON) continue;
-    //         if ((inst->ty != FE_TY_VOID && inst->ty != FE_TY_TUPLE) && inst->vr_def == FE_VREG_NONE) {
-    //             // TODO choose register class based on architecture and type
-    //             inst->vr_def = fe_vreg_new(f->vregs, inst, block, target->choose_regclass(inst->kind, inst->ty));
-    //         }
-    //     }
-    // }
-    // for_blocks(block, f) {
-    //     for_inst(inst, block) {
-    //         if (inst->kind != FE_PHI) continue;
+    for_blocks(block, f) {
+        for_inst(inst, block) {
+            if (inst->kind == FE__MACH_UPSILON) continue;
+            if ((inst->ty != FE_TY_VOID && inst->ty != FE_TY_TUPLE) && inst->vr_def == FE_VREG_NONE) {
+                // chose regclass based on inst kind and type
+                FeRegClass regclass = target->choose_regclass(inst->kind, inst->ty);
+                inst->vr_def = fe_vreg_new(f->vregs, inst, block, regclass);
+            }
+        }
+    }
+    for_blocks(block, f) {
+        for_inst(inst, block) {
+            if (inst->kind != FE_PHI) continue;
 
-    //         FE_ASSERT(false);
+            FE_ASSERT(false);
 
-    //     }
-    // }
+        }
+    }
+
+    fe_regalloc_basic(f);
+
+    fe_opt_post_regalloc(f);
 }

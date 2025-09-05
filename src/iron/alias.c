@@ -24,6 +24,7 @@ FeInst* fe_solve_alias_space(FeFunc* f, u32 alias_space) {
             if (fe_extra(inst, FeInstMemop)->alias_space != alias_space) {
                 continue;
             }
+            break;
         default:
             break;
         }

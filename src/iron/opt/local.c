@@ -203,7 +203,20 @@ static bool try_identity_binop(FeFunc* f, FeInstSet* wlist, FeInst* inst) {
         } else if (is_const(lhs, 1)) {
             replace = lhs;
         }
-        
+        break;
+    case FE_SHL:
+    case FE_ISR:
+    case FE_USR:
+        if (is_const(rhs, 0)) {
+            replace = lhs;
+        } else if (is_const(lhs, 0)) {
+            replace = rhs;
+        }
+        break;
+    case FE_XOR:
+        if (is_const(rhs, 0)) {
+            replace = lhs;
+        }
         break;
     }
 

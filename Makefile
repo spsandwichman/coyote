@@ -10,6 +10,10 @@ COYOTE_SRC_PATHS = \
 COBALT_SRC_PATHS = \
 	src/cobalt/*.c \
 	src/common/*.c \
+	
+MARS_SRC_PATHS = \
+	src/mars/*.c \
+	src/common/*.c \
 
 IRON_SRC = $(wildcard $(IRON_SRC_PATHS))
 IRON_OBJECTS = $(IRON_SRC:src/%.c=build/%.o)
@@ -19,6 +23,9 @@ COYOTE_OBJECTS = $(COYOTE_SRC:src/%.c=build/%.o)
 
 COBALT_SRC = $(wildcard $(COBALT_SRC_PATHS))
 COBALT_OBJECTS = $(COBALT_SRC:src/%.c=build/%.o)
+
+MARS_SRC = $(wildcard $(MARS_SRC_PATHS))
+MARS_OBJECTS = $(MARS_SRC:src/%.c=build/%.o)
 
 CC = gcc
 LD = gcc
@@ -58,6 +65,11 @@ cobalt: bin/cobalt
 bin/cobalt: bin/libiron.a $(COBALT_OBJECTS)
 	@$(LD) $(LDFLAGS) $(COBALT_OBJECTS) -o bin/cobalt -Lbin -liron
 
+.PHONY: mars
+mars: bin/mars
+bin/mars: bin/libiron.a $(MARS_OBJECTS)
+	@$(LD) $(LDFLAGS) $(MARS_OBJECTS) -o bin/mars -Lbin -liron
+
 .PHONY: iron-test
 iron-test: bin/iron-test
 bin/iron-test: bin/libiron.a src/iron/driver/driver.c
@@ -80,10 +92,12 @@ clean:
 	@mkdir -p $(dir $(IRON_OBJECTS))
 	@mkdir -p $(dir $(COYOTE_OBJECTS))
 	@mkdir -p $(dir $(COBALT_OBJECTS))
+	@mkdir -p $(dir $(MARS_OBJECTS))
 
 -include $(IRON_OBJECTS:.o=.d)
 -include $(COYOTE_OBJECTS:.o=.d)
 -include $(COBALT_OBJECTS:.o=.d)
+-include $(MARS_OBJECTS:.o=.d)
 
 # generate compile commands with bear if u got it!!! 
 # very good highly recommended ʕ·ᴥ·ʔ

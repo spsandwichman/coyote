@@ -55,17 +55,21 @@ static void init_kw_map() {
     strmap_init(&kw_map, 256);
     
     strmap_put(&kw_map, strlit("module"), (void*)TOK_KW_MODULE);
+    strmap_put(&kw_map, strlit("builtin"), (void*)TOK_KW_BUILTIN);
     strmap_put(&kw_map, strlit("common"), (void*)TOK_KW_COMMON);
     strmap_put(&kw_map, strlit("threadlocal"), (void*)TOK_KW_THREADLOCAL);
     strmap_put(&kw_map, strlit("extern"), (void*)TOK_KW_EXTERN);
-    strmap_put(&kw_map, strlit("builtin"), (void*)TOK_KW_BUILTIN);
     strmap_put(&kw_map, strlit("pub"), (void*)TOK_KW_PUB);
+    strmap_put(&kw_map, strlit("const"), (void*)TOK_KW_CONST);
     strmap_put(&kw_map, strlit("def"), (void*)TOK_KW_DEF);
     strmap_put(&kw_map, strlit("let"), (void*)TOK_KW_LET);
     strmap_put(&kw_map, strlit("mut"), (void*)TOK_KW_MUT);
     strmap_put(&kw_map, strlit("true"), (void*)TOK_KW_TRUE);
     strmap_put(&kw_map, strlit("false"), (void*)TOK_KW_FALSE);
     strmap_put(&kw_map, strlit("null"), (void*)TOK_KW_NULL);
+    strmap_put(&kw_map, strlit("undef"), (void*)TOK_KW_UNDEF);
+    strmap_put(&kw_map, strlit("unreachable"), (void*)TOK_KW_UNREACHABLE);
+    strmap_put(&kw_map, strlit("defer"), (void*)TOK_KW_DEFER);
     strmap_put(&kw_map, strlit("if"), (void*)TOK_KW_IF);
     strmap_put(&kw_map, strlit("else"), (void*)TOK_KW_ELSE);
     strmap_put(&kw_map, strlit("while"), (void*)TOK_KW_WHILE);
@@ -73,6 +77,9 @@ static void init_kw_map() {
     strmap_put(&kw_map, strlit("in"), (void*)TOK_KW_IN);
     strmap_put(&kw_map, strlit("as"), (void*)TOK_KW_AS);
     strmap_put(&kw_map, strlit("inline"), (void*)TOK_KW_INLINE);
+    strmap_put(&kw_map, strlit("packed"), (void*)TOK_KW_PACKED);
+    strmap_put(&kw_map, strlit("noalias"), (void*)TOK_KW_NOALIAS);
+    strmap_put(&kw_map, strlit("align"), (void*)TOK_KW_ALIGN);
     strmap_put(&kw_map, strlit("void"), (void*)TOK_KW_VOID);
     strmap_put(&kw_map, strlit("bool"), (void*)TOK_KW_BOOL);
     strmap_put(&kw_map, strlit("f32"), (void*)TOK_KW_F32);
@@ -84,10 +91,6 @@ static void init_kw_map() {
     strmap_put(&kw_map, strlit("noreturn"), (void*)TOK_KW_NORETURN);
     strmap_put(&kw_map, strlit("usize"), (void*)TOK_KW_USIZE);
     strmap_put(&kw_map, strlit("isize"), (void*)TOK_KW_ISIZE);
-}
-
-static usize scan_integer(Lexer* l, usize start) {
-    
 }
 
 Token lex_next(Lexer* l) {
@@ -122,11 +125,12 @@ Token lex_next(Lexer* l) {
 
     case 'u':
         if (isdigit(peek(l, 1))) {
-            while (isdigit(peek(l, start))) {
-                
+            usize len = 1;
+            while (isdigit(peek(l, len))) {
+                len += 1;
             }
+            
         }
         break;
     }
-    // english
 }

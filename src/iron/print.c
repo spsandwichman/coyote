@@ -52,9 +52,10 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_STACK_ADDR] = "stack-addr",
     [FE_SYM_ADDR] = "sym-addr",
 
-    [FE__MACH_REG] = "mach-reg",
     [FE__MACH_MOV] = "mach-mov",
     [FE__MACH_UPSILON] = "mach-upsilon",
+    [FE__MACH_REG] = "mach-reg",
+    [FE__MACH_RETURN] = "mach-return",
 
     [FE__ROOT] = "root",
 
@@ -96,11 +97,10 @@ static const char* inst_name[FE__BASE_INST_END] = {
     [FE_F2U] = "f2u",
 
     [FE_LOAD] = "load",
-
     [FE_STORE] = "store",
-
     [FE_MEM_BARRIER] = "mem-barrier",
 
+    [FE_UNREACHABLE] = "unreachable",
     [FE_BRANCH] = "branch",
     [FE_JUMP] = "jump",
     [FE_RETURN] = "return",
@@ -197,10 +197,10 @@ void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref) {
     if (ref->vr_def != FE_VREG_NONE) {
         // BAD ASSUMPTION
         if (fe_vreg(f->vregs, ref->vr_def)->real == FE_VREG_REAL_UNASSIGNED) {
-            fe_db_writef(db, "(vr%u)", ref->vr_def);
+            fe_db_writef(db, "/v%u", ref->vr_def);
         } else {
             FeVirtualReg* vr = fe_vreg(f->vregs, ref->vr_def);
-            fe_db_writef(db, "(%s)", f->mod->target->reg_name(vr->class, vr->real));
+            fe_db_writef(db, "/%s", f->mod->target->reg_name(vr->class, vr->real));
         }
     }
     if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
@@ -210,7 +210,7 @@ const char* fe_inst_name(const FeTarget* target, FeInstKind kind) {
     if (kind < FE__BASE_INST_END) {
         return inst_name[kind];
     } else {
-        return target->inst_name(kind, true);
+        return "<target-specific>";
     }
 }
 
@@ -231,7 +231,7 @@ static void print_input_list(FeDataBuffer* db, FeFunc* f, FeInst* inst, usize st
 static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
     const FeTarget* target = f->mod->target;
 
-    if (inst->use_len != 0) {
+    if (!(inst->ty == FE_TY_VOID && inst->use_len == 0)) {
         fe__emit_ir_ref(db, f, inst);
         if (inst->ty != FE_TY_VOID) {
             fe_db_writef(db, ": ");
@@ -239,15 +239,16 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         }
         fe_db_writecstr(db, " = ");
     }
-
+    
     if (inst->kind < FE__BASE_INST_END) {
         const char* name = inst_name[inst->kind];
         
         if (name) fe_db_writecstr(db, name);
         else fe_db_writef(db, "<kind %d>", inst->kind);
     } else {
-        fe_db_writecstr(db, target->inst_name(inst->kind, true));
-        
+        target->ir_print_inst(db, f, inst);
+        fe_db_writecstr(db, "\n");
+        return;
     }
 
     fe_db_writecstr(db, " ");
@@ -357,10 +358,10 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         case FE_TY_BOOL: fe_db_writef(db, "%s", fe_extra(inst, FeInstConst)->val ? "true" : "false"); break;
         case FE_TY_F64:  fe_db_writef(db, "%lf", (f64)fe_extra(inst, FeInstConst)->val_f64); break;
         case FE_TY_F32:  fe_db_writef(db, "%lf", (f64)fe_extra(inst, FeInstConst)->val_f32); break;
-        case FE_TY_I64:  fe_db_writef(db, "%llx", (u64)fe_extra(inst, FeInstConst)->val); break;
-        case FE_TY_I32:  fe_db_writef(db, "%llx", (u64)(u32)fe_extra(inst, FeInstConst)->val); break;
-        case FE_TY_I16:  fe_db_writef(db, "%llx", (u64)(u16)fe_extra(inst, FeInstConst)->val); break;
-        case FE_TY_I8:   fe_db_writef(db, "%llx", (u64)(u8)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I64:  fe_db_writef(db, "%llu", (u64)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I32:  fe_db_writef(db, "%llu", (u64)(u32)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I16:  fe_db_writef(db, "%llu", (u64)(u16)fe_extra(inst, FeInstConst)->val); break;
+        case FE_TY_I8:   fe_db_writef(db, "%llu", (u64)(u8)fe_extra(inst, FeInstConst)->val); break;
         default:
             fe_db_writef(db, "[TODO]");
             break;
@@ -373,6 +374,8 @@ static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
         u8 class = vreg->class;
         u16 real = vreg->real;
         fe_db_writecstr(db, f->mod->target->reg_name(class, real));
+        break;
+    case FE__MACH_RETURN:
         break;
     default:
         fe_db_writef(db, "[TODO LMFAO]");
@@ -387,6 +390,7 @@ void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
     case FE_BIND_EXTERN: fe_db_writecstr(db, "extern "); break;
     case FE_BIND_GLOBAL: fe_db_writecstr(db, "global "); break;
     case FE_BIND_LOCAL:  fe_db_writecstr(db, "local "); break;
+    case FE_BIND_WEAK:  fe_db_writecstr(db, "weak "); break;
     case FE_BIND_SHARED_EXPORT: fe_db_writecstr(db, "shared_export "); break;
     case FE_BIND_SHARED_IMPORT: fe_db_writecstr(db, "shared_import "); break;
     }

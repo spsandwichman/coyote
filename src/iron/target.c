@@ -20,25 +20,16 @@ const FeTarget* fe_make_target(FeArch arch, FeSystem system) {
     case FE_ARCH_XR17032:
         t->ptr_ty = FE_TY_I32;
         t->stack_pointer_align = 4;
-        t->num_regclasses = 1;
+        t->num_regclasses = 2; // counting the NONE regclass
+        t->regclass_lens = fe_xr_regclass_lens;
         t->isel = fe_xr_isel;
         t->choose_regclass = fe_xr_choose_regclass;
-        // t->isel = xr_isel;
-        // t->ir_print_args = xr_print_args;
-        // t->inst_name = xr_inst_name;
-        // t->list_inputs = xr_list_inputs;
-        // t->list_targets = xr_term_list_targets;
-        // t->reg_name = XR_GPR_name;
-        // t->reg_status = XR_GPR_status;
-        // t->num_regclasses = XR_REGCLASS_GPR + 1;
-        // t->regclass_lens = xr_regclass_lens;
-        // t->emit_asm = xr_emit_assembly;
-        // t->choose_regclass = xr_choose_regclass;
-        // t->pre_regalloc_opt = xr_pre_regalloc_opt;
-        // t->final_touchups = xr_final_touchups;
+        t->ir_print_inst = fe_xr_print_inst;
+        t->reg_name = fe_xr_reg_name;
+        t->reg_status = fe_xr_reg_status;
 
-        // fe__load_extra_size_table(FE__XR_INST_BEGIN, xr_size_table, FE__XR_INST_END - FE__XR_INST_BEGIN);
-        // fe__load_trait_table(FE__XR_INST_BEGIN, xr_trait_table, FE__XR_INST_END - FE__XR_INST_BEGIN);
+        fe__load_extra_size_table(FE__XR_INST_BEGIN, fe_xr_extra_size_table, FE__XR_INST_END - FE__XR_INST_BEGIN);
+        fe__load_trait_table(FE__XR_INST_BEGIN, fe_xr_trait_table, FE__XR_INST_END - FE__XR_INST_BEGIN);
         break;
     default:
         FE_CRASH("arch unsupported");
