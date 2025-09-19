@@ -20,10 +20,10 @@ static inline void xr_immsym_set_imm(XrInstImmOrSym* immsym, u32 imm) {
 }
 
 typedef enum : u8 {
-    XR_SHIFT_LSH,
-    XR_SHIFT_RSH,
-    XR_SHIFT_ASH,
-    XR_SHIFT_ROR,
+    XR_SHIFT_LSH = 0, // left shift
+    XR_SHIFT_RSH = 1, // logical right shift
+    XR_SHIFT_ASH = 2, // arithmetic right shift
+    XR_SHIFT_ROR = 3, // rotate right
 } XrShiftKind;
 
 typedef struct {
@@ -63,6 +63,7 @@ typedef enum : FeInstKind {
     XR_SLTI,    // Set Less Than Immediate
     XR_SLTI_S,  // Set Less Than Immediate, Signed
     XR_ANDI,    // And Immediate
+    XR_XORI,    // Xor Immediate
     XR_ORI,     // Or Immediate
     XR_LUI,     // Load Upper Immediate
     XR_JALR,    // Jump And Link, Register
@@ -115,6 +116,25 @@ typedef enum : FeInstKind {
     XR_MTCR,    // Move To Control Register
     XR_HLT,     // Halt Until Next Interrupt
     XR_RFE,     // Return From Exception
+
+    // Psuedo-instructions
+    XR_P_B,     // Unconditional Relative Branch
+    XR_P_RET,   // Return
+    XR_P_JR,    // Jump to Register
+    XR_P_MOV,   // Move Register
+    XR_P_LI,    // Load 16-bit Immediate
+    XR_P_LA,    // Load 32-bit Immediate
+    XR_P_NOP,   // No Operation
+    XR_P_SHI,   // (LSHI/RSHI/ASHI/RORI)
+    XR_P_LOAD8_DIRECT,   // Load Byte from 32-bit Address
+    XR_P_LOAD16_DIRECT,  // Load Int from 32-bit Address
+    XR_P_LOAD32_DIRECT,  // Load Long from 32-bit Address
+    XR_P_STORE8_DIRECT,  // Store Byte to 32-bit Address
+    XR_P_STORE16_DIRECT, // Store Int to 32-bit Address
+    XR_P_STORE32_DIRECT, // Store Long to 32-bit Address
+
+    // fake instruction for obtaining a temp register for a STORE*_DIRECT
+    XR__STORE_DIRECT_SYMBOL,
 } XrInstKind;
 
 typedef enum : FeRegClass {
@@ -159,5 +179,23 @@ FeRegStatus fe_xr_reg_status(u8 cconv, u8 regclass, u16 real);
 extern const u8 fe_xr_extra_size_table[];
 extern const FeTrait fe_xr_trait_table[];
 extern const u16 fe_xr_regclass_lens[];
+
+// small representation for the disassembler and assembler to work with
+
+typedef struct {
+    u8 opcode;
+    u8 ra;
+    u8 rb;
+    u8 rc;
+    union {    
+        u32 imm;
+        struct {
+            u8 shamt;
+            u8 xsh;
+            u8 funct;
+        };
+    };
+} XrMachInst;
+#define XR_MACH_INST_NULL (XrMachInst){0}
 
 #endif

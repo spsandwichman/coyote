@@ -22,6 +22,23 @@ static void assign_real_reg(FeFunc* f, FeBlock* b, FeInst* inst, XrGpr real) {
     fe_vreg(f->vregs, inst->vr_def)->real = real;
 }
 
+static bool is_const_u5(FeInst* inst) {
+    if (inst->kind != FE_CONST) {
+        return false;
+    }
+    u64 val = fe_extra(inst, FeInstConst)->val;
+    return (val & 0xFFFF) == val;
+}
+
+static bool is_const_zero(FeInst* inst) {
+    if (inst->kind != FE_CONST) {
+        return false;
+    }
+    u64 val = fe_extra(inst, FeInstConst)->val;
+    return val == 0;
+}
+
+
 static bool is_const_u16(FeInst* inst) {
     if (inst->kind != FE_CONST) {
         return false;
@@ -91,76 +108,100 @@ static FeInstChain store_returnval(FeFunc* f, FeBlock* exit, usize index, FeInst
 
 FeInstChain fe_xr_isel(FeFunc* f, FeBlock* block, FeInst* inst) {
     switch (inst->kind) {
-    case FE__ROOT:
-        return FE_EMPTY_CHAIN;
-    case FE_PROJ:
-        if (inst->inputs[0]->kind == FE__ROOT) {
-            // FE_CRASH("select parameter");
+        case FE__ROOT:
+            return FE_EMPTY_CHAIN;
+        case FE_PROJ:
+            if (inst->inputs[0]->kind == FE__ROOT) {
+                // FE_CRASH("select parameter");
 
-            // figure out what parameter we're looking at.
-            usize index = fe_extra(inst, FeInstProj)->index;
-            return get_parameter(f, block, index);
-        }
-        FE_CRASH("unknown proj selection");
-    case FE_IADD: {
-        if (is_const_u16(inst->inputs[1])) {
-            FeInst* sel = xr_inst(f, XR_ADDI, 1, sizeof(XrInstImm));
+                // figure out what parameter we're looking at.
+                usize index = fe_extra(inst, FeInstProj)->index;
+                return get_parameter(f, block, index);
+            }
+            FE_CRASH("unknown proj selection");
+        case FE_IADD: {
+            if (is_const_u16(inst->inputs[1])) {
+                FeInst* sel = xr_inst(f, XR_ADDI, 1, sizeof(XrInstImm));
+                sel->ty = FE_TY_I32;
+                fe_set_input(f, sel, 0, inst->inputs[0]);
+                fe_extra(sel, XrInstImm)->imm = const_val(inst->inputs[1]);
+                return fe_chain_new(sel);
+            }
+            FeInst* sel = xr_inst(f, XR_ADD, 2, sizeof(XrInstImm));
             sel->ty = FE_TY_I32;
             fe_set_input(f, sel, 0, inst->inputs[0]);
-            fe_extra(sel, XrInstImm)->imm = const_val(inst->inputs[1]);
+            fe_set_input(f, sel, 0, inst->inputs[1]);
             return fe_chain_new(sel);
         }
-        FeInst* sel = xr_inst(f, XR_ADD, 2, sizeof(XrInstImm));
-        sel->ty = FE_TY_I32;
-        fe_set_input(f, sel, 0, inst->inputs[0]);
-        fe_set_input(f, sel, 0, inst->inputs[1]);
-        return fe_chain_new(sel);
-    }
-    case FE_CONST: {
-        if (is_const_u16(inst)) {
-            // create addi with zero
-            FeInst* zero = mach_reg(f, block, XR_GPR_ZERO);
-            FeInst* addi = xr_inst(f, XR_ADDI, 1, sizeof(XrInstImm));
-            fe_extra(addi, XrInstImm)->imm = const_val(inst);
-            fe_set_input(f, addi, 0, zero);
+        case FE_CONST: {
+            if (is_const_zero(inst)) {
+                // just use the zero register lmao
+                FeInst* zero = mach_reg(f, block, XR_GPR_ZERO);
+                FeInstChain chain = fe_chain_new(zero);
+                return chain;
+            }
 
-            FeInstChain chain = fe_chain_new(zero);
-            chain = fe_chain_append_end(chain, addi);
+            if (is_const_u16(inst)) {
+                // create addi with zero
+                FeInst* zero = mach_reg(f, block, XR_GPR_ZERO);
+                FeInst* addi = xr_inst(f, XR_ADDI, 1, sizeof(XrInstImm));
+                addi->ty = FE_TY_I32;
+                fe_extra(addi, XrInstImm)->imm = const_val(inst);
+                fe_set_input(f, addi, 0, zero);
+
+                FeInstChain chain = fe_chain_new(zero);
+                chain = fe_chain_append_end(chain, addi);
+                return chain;
+            }
+
+            // FeInst* la = xr_inst(f, XR_P_LA)
+            FE_CRASH("constant too big!");
+        }
+        case FE_STORE: {
+            FeInst* ptr = inst->inputs[1];
+            FeInst* val = inst->inputs[2];
+
+            // can put in small-immediate?
+
+            FeInst* store = xr_inst(f, XR_STORE32_IO, 2, sizeof(XrInstImm));
+            store->ty = FE_TY_VOID;
+            fe_extra(store, XrInstImm)->imm = 0;
+            
+            fe_set_input(f, store, 0, ptr);
+            fe_set_input(f, store, 1, val);
+            
+            FeInstChain chain = fe_chain_new(store);
             return chain;
         }
-        FE_CRASH("constant too big!");
-    }
-    case FE_RETURN: {
-        FeInstChain chain = FE_EMPTY_CHAIN;
-        
-        // store the return values
-        for_n(i, 1, inst->in_len) {
-            FeInstChain retval = store_returnval(f, block, i - 1, inst->inputs[i]);
-            chain = fe_chain_concat(chain, retval);
+        case FE_LOAD: {
+            FeInst* ptr = inst->inputs[1];
+
+            FeInst* load = xr_inst(f, XR_LOAD32_IO, 1, sizeof(XrInstImm));
+            load->ty = inst->ty;
+            fe_extra(load, XrInstImm)->imm = 0;
+            
+            fe_set_input(f, load, 0, ptr);
+            
+            FeInstChain chain = fe_chain_new(load);
+            return chain;
         }
-        
-        // actual return instruction lmao
-        // jalr zero, lr, 0
-        FeInst* lr = mach_reg(f, block, XR_GPR_LR);
-        FeInst* jalr = xr_inst(f, XR_JALR, 1, sizeof(XrInstImm));
-        jalr->ty = FE_TY_I32;
-        // jalr->vr_def = fe_vreg_new(&f->vregs, jalr, FeBlock *def_block, u8 class)
-        assign_real_reg(f, block, jalr, XR_GPR_ZERO);
-        fe_set_input(f, jalr, 0, lr);
-        fe_extra(jalr, XrInstImm)->imm = 0;
+        case FE_RETURN: {
+            FeInstChain chain = FE_EMPTY_CHAIN;
+            
+            // store the return values
+            for_n(i, 1, inst->in_len) {
+                FeInstChain retval = store_returnval(f, block, i - 1, inst->inputs[i]);
+                chain = fe_chain_concat(chain, retval);
+            }
+            
+            // actual return instruction lmao
+            FeInst* ret = xr_inst(f, XR_P_RET, 0, 0);
 
-        chain = fe_chain_append_end(chain, lr);
-        chain = fe_chain_append_end(chain, jalr);
+            chain = fe_chain_append_end(chain, ret);
 
-        // fake return to make iron's verifier happy
-        FeInst* mach_ret = fe_inst_new(f, 0, 0);
-        mach_ret->kind = FE__MACH_RETURN;
-
-        chain = fe_chain_append_end(chain, mach_ret);
-
-        return chain;
-    }
-    default:
-        FE_CRASH("cannot select from inst %s (%d)", fe_inst_name(f->mod->target, inst->kind), inst->kind);
+            return chain;
+        }
+        default:
+            FE_CRASH("cannot select from inst %s (%d)", fe_inst_name(f->mod->target, inst->kind), inst->kind);
     }
 }

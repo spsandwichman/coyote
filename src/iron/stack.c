@@ -9,8 +9,7 @@ static inline usize align_forward_p2(usize value, usize align) {
 }
 
 FeStackItem* fe_stack_item_new(FeTy ty, FeComplexTy* cty) {
-    FeStackItem* item = fe_malloc(sizeof(FeStackItem));
-    memset(item, 0, sizeof(*item));
+    FeStackItem* item = fe_zalloc(sizeof(FeStackItem));
     item->_offset = FE_STACK_OFFSET_UNDEF;
     item->ty = ty;
     item->complex_ty = cty;

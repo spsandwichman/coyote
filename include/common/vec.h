@@ -2,6 +2,7 @@
 #define VEC_H
 
 #include <stdlib.h>
+#include <string.h>
 
 #define Vec(type) _Vec_##type
 #define VecPtr(type) _VecPtr_##type
@@ -41,6 +42,11 @@ void _vec_shrink(_VecGeneric* v, size_t stride);
 #define vec_append(v, element) do { \
     _vec_expand_if_necessary((_VecGeneric*)(v), vec_stride((v)));\
     (v)->at[(v)->len++] = (element); \
+} while (0)
+
+#define vec_append_many(v, elements, len) do { \
+    _vec_reserve((_VecGeneric*)(v), vec_stride((v)), (len));\
+    memcpy(&(v)->at[(v)->len], (elements), (len) * vec_stride((v))); \
 } while (0)
 #define vec_reserve(v, num_slots) _vec_reserve((_VecGeneric*)(v), vec_stride((v)), num_slots)
 

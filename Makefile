@@ -2,6 +2,8 @@ IRON_SRC_PATHS = \
 	src/iron/*.c \
 	src/iron/opt/*.c \
 	src/iron/xr17032/*.c \
+	src/iron/mir/*.c \
+	src/common/vec.c
 
 COYOTE_SRC_PATHS = \
 	src/coyote/*.c \

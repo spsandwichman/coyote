@@ -22,7 +22,7 @@ void _vec_init(_VecGeneric* v, size_t stride, size_t initial_cap) {
 
 void _vec_reserve(_VecGeneric* v, size_t stride, size_t slots) {
     if (slots + v->len > v->cap) {
-        v->cap += slots;
+        v->cap = slots + (v->cap >> 1);
         v->at = realloc(v->at, v->cap * stride);
     }
 }

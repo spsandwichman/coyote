@@ -34,6 +34,7 @@ void fe_xr_print_inst(FeDataBuffer* db, FeFunc* f, FeInst* inst) {
     case XR_SLTI:   name = "xr.slti"; break;
     case XR_SLTI_S: name = "xr.slti-s"; break;
     case XR_ANDI:   name = "xr.andi"; break;
+    case XR_XORI:   name = "xr.xori"; break;
     case XR_ORI:    name = "xr.ori"; break;
     case XR_LUI:    name = "xr.lui"; break;
 
@@ -82,6 +83,21 @@ void fe_xr_print_inst(FeDataBuffer* db, FeFunc* f, FeInst* inst) {
     case XR_MTCR: name = "xr.mtcr"; break;
     case XR_HLT:  name = "xr.hlt"; break;
     case XR_RFE:  name = "xr.rfe"; break;
+
+    case XR_P_B:    name = "xr.p.b"; break;
+    case XR_P_RET:  name = "xr.p.ret"; break;
+    case XR_P_JR:   name = "xr.p.jr"; break;
+    case XR_P_MOV:  name = "xr.p.mov"; break;
+    case XR_P_LI:   name = "xr.p.li"; break;
+    case XR_P_LA:   name = "xr.p.la"; break;
+    case XR_P_NOP:  name = "xr.p.nop"; break;
+    case XR_P_SHI:  name = "xr.p.shi"; break;
+    case XR_P_LOAD8_DIRECT:     name = "xr.p.load8-direct"; break;
+    case XR_P_LOAD16_DIRECT:    name = "xr.p.load16-direct"; break;
+    case XR_P_LOAD32_DIRECT:    name = "xr.p.load32-direct"; break;
+    case XR_P_STORE8_DIRECT:    name = "xr.p.store8-direct"; break;
+    case XR_P_STORE16_DIRECT:   name = "xr.p.store16-direct"; break;
+    case XR_P_STORE32_DIRECT:   name = "xr.p.store32-direct"; break;
     }
 
     fe_db_writecstr(db, name);
@@ -101,7 +117,26 @@ void fe_xr_print_inst(FeDataBuffer* db, FeFunc* f, FeInst* inst) {
         fe__emit_ir_ref(db, f, inst->inputs[0]);
         fe_db_writef(db, ", %u", fe_extra(inst, XrInstImm)->imm);
         break;
-    
+    case XR_LOAD8_IO ... XR_LOAD32_IO:
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
+        fe_db_writef(db, ", %u", fe_extra(inst, XrInstImm)->imm);
+        break;
+    case XR_STORE8_IO ... XR_STORE32_IO:
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
+        fe_db_writecstr(db, ", ");
+        fe__emit_ir_ref(db, f, inst->inputs[1]);
+        fe_db_writef(db, ", %u", fe_extra(inst, XrInstImm)->imm);
+        break;
+    case XR_STORE8_RO ... XR_STORE32_RO:
+        fe__emit_ir_ref(db, f, inst->inputs[0]);
+        fe_db_writecstr(db, ", ");
+        fe__emit_ir_ref(db, f, inst->inputs[1]);
+        fe_db_writecstr(db, ", ");
+        fe__emit_ir_ref(db, f, inst->inputs[2]);
+        break;
+    case XR_P_RET:
+    case XR_P_NOP:
+        break;
     default:
         fe_db_writef(db, "aaa!");
         break;
@@ -189,4 +224,11 @@ const FeTrait fe_xr_trait_table[FE__XR_INST_END - FE__XR_INST_BEGIN] = {
     S(XR_J) = VOL,
     S(XR_JAL) = VOL,
     S(XR_JALR) = VOL,
+    R(XR_STORE8_IO, XR_STORE32_IO) = VOL,
+    R(XR_STORE8_RO, XR_STORE32_RO) = VOL,
+    R(XR_STORE8_SI, XR_STORE32_SI) = VOL,
+
+    S(XR_P_MOV) = MOV_HINT,
+    S(XR_P_RET) = VOL | TERM,
+    S(XR_P_B)   = VOL | TERM,
 };

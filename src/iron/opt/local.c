@@ -93,6 +93,9 @@ static FeInst* try_store_elim(FeFunc* f, FeInstSet* wlist, FeInst* store) {
 static bool try_tdce(FeFunc* f, FeInstSet* wlist, FeInst* inst) {
     if (inst->use_len == 0 && !fe_inst_has_trait(inst->kind, FE_TRAIT_VOLATILE)) {
         for_n(i, 0, inst->in_len) {
+            if (inst->inputs[i] == nullptr) {
+                continue;
+            }
             fe_iset_push(wlist, inst->inputs[i]);
         }
         fe_inst_destroy(f, inst);

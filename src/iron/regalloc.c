@@ -45,8 +45,7 @@ static void calculate_liveness(FeFunc* f) {
 
     // give every basic block a liveness chunk.
     for_blocks(block, f) {
-        FeBlockLiveness* lv = fe_malloc(sizeof(FeBlockLiveness));
-        memset(lv, 0, sizeof(FeBlockLiveness));
+        FeBlockLiveness* lv = fe_zalloc(sizeof(FeBlockLiveness));
         lv->block = block;
         block->live = lv;
 
@@ -104,7 +103,7 @@ typedef struct {
 } ColorNode;
 
 
-static void add_interefence(ColorNode* cnode, FeVReg interferes) {
+static void add_interference(ColorNode* cnode, FeVReg interferes) {
     for_n(i, 0, cnode->len) {
         if (cnode->interferes[i] == interferes) {
             return;
@@ -187,7 +186,7 @@ void fe_regalloc_basic(FeFunc* f) {
                     continue;
                 }
 
-                add_interefence(&color_nodes[live_out_1], live_out_2);
+                add_interference(&color_nodes[live_out_1], live_out_2);
             }
         }
 
@@ -214,7 +213,7 @@ void fe_regalloc_basic(FeFunc* f) {
                     if (!live_now[j] || i == j) {
                         continue;
                     }
-                    add_interefence(&color_nodes[i], j);
+                    add_interference(&color_nodes[i], j);
                 }
             }
         }
@@ -224,7 +223,7 @@ void fe_regalloc_basic(FeFunc* f) {
     for_n(vr, 0, vbuf->len) {
         ColorNode* cnode = &color_nodes[vr];
         for_n(i, 0, cnode->len) {
-            printf("intereferes %zu ~> %d\n", vr, cnode->interferes[i]);
+            printf("interference %zu ~> %d\n", vr, cnode->interferes[i]);
         }
     }
 
@@ -259,13 +258,13 @@ void fe_regalloc_basic(FeFunc* f) {
 
             for_n(i, 0, cnode->len) {
 
-                ColorNode* intereferes = &color_nodes[cnode->interferes[i]];
-                if (intereferes->this->real == FE_VREG_REAL_UNASSIGNED) {
+                ColorNode* interferes = &color_nodes[cnode->interferes[i]];
+                if (interferes->this->real == FE_VREG_REAL_UNASSIGNED) {
                     continue;
                 }
 
                 // has this real register already been chosen?
-                if (intereferes->this->real == real_candidate) {
+                if (interferes->this->real == real_candidate) {
                     // try the next one
                     goto next_candidate;
                 }

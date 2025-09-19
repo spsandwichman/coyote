@@ -106,6 +106,7 @@ int main() {
     FeModule* mod = fe_module_new(FE_ARCH_XR17032, FE_SYSTEM_FREESTANDING);
 
     FeFunc* func = make_alg_test(mod, &ipool, &vregs);
+    // FeFunc* func = make_store_test(mod, &ipool, &vregs);
 
     quick_print(func);
     fe_opt_local(func);

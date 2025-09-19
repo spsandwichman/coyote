@@ -64,7 +64,8 @@ typedef float    f32;
     #define fe_compstr_data(compstr) ((char*)(i64)(compstr).data)
     #define fe_compstr_fmt "%.*s"
     #define fe_compstr_arg(compstr) (compstr).data, (char*)(i64)(compstr).data
-#else // fallback to regular string
+#else
+    // fallback to regular string
     typedef struct FeCompactStr {
         char* data;
         u16 len;
@@ -74,6 +75,7 @@ typedef float    f32;
 #endif
 
 // feel free to make iron use your own heap-like allocator.
+// only works when statically linking.
 #ifndef FE_CUSTOM_ALLOCATOR
     #define fe_malloc  malloc
     #define fe_realloc realloc
@@ -83,6 +85,8 @@ typedef float    f32;
     void* fe_realloc(void* ptr, usize size);
     void fe_free(void* ptr);
 #endif
+
+#define fe_zalloc(size) memset(fe_malloc(size), 0, size);
 
 // simple ++n loop
 #ifndef for_n
@@ -178,13 +182,13 @@ typedef struct FeComplexTy {
     union {
         FeTy ty;
         struct {
-            FeTy _ty; // mirror of ty for layout
+            FeTy _ty; // shadow of ty for layout
             FeTy elem_ty;
             u32 len;
             FeComplexTy* complex_elem_ty;
         } array;
         struct {
-            FeTy _ty; // mirror of ty for layout
+            FeTy _ty; // shadow of ty for layout
             u32 fields_len;
             FeRecordField* fields;
         } record;
@@ -224,7 +228,7 @@ typedef enum : u8 {
     // likely picks based on target
     FE_CCONV_ANY = 0,
 
-    // OS specific
+    // os specific
         // standard linux c callconv
         FE_CCONV_SYSV,
         // standard windows c callconv
@@ -234,7 +238,6 @@ typedef enum : u8 {
         // standard c calling convention on the corresponding target
         FE_CCONV_C,
         // jackal (xr17032) calling convention
-        // adapted and expanded to other targets
         FE_CCONV_JACKAL,
 } FeCallConv;
 
@@ -243,7 +246,7 @@ typedef enum : u8 {
 // -------------------------------------
 
 typedef enum: u8 {
-    FE_BIND_LOCAL = 1,
+    FE_BIND_LOCAL,
     FE_BIND_GLOBAL,
     FE_BIND_WEAK,
 
@@ -306,7 +309,6 @@ typedef struct FeFunc {
 
     FeStackItem* stack_top; // most-positive offset from stack pointer
     FeStackItem* stack_bottom;
-
 } FeFunc;
 
 typedef struct FeSymTab {

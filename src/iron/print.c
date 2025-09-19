@@ -193,6 +193,15 @@ void fe__emit_ir_ref(FeDataBuffer* db, FeFunc* f, FeInst* ref) {
     }
 
     if (should_ansi) fe_db_writef(db, "\x1b[%dm", ansi(ref->id));
+    if (ref->kind == FE__MACH_REG) {
+        FE_ASSERT(ref->vr_def != FE_VREG_NONE);
+        FeVirtualReg* vr = fe_vreg(f->vregs, ref->vr_def);
+        FE_ASSERT(vr->real != FE_VREG_REAL_UNASSIGNED);
+        fe_db_writef(db, "%s", f->mod->target->reg_name(vr->class, vr->real));
+        if (should_ansi) fe_db_writecstr(db, "\x1b[0m");
+        return;
+    }
+
     fe_db_writef(db, "%%%u", ref->id);
     if (ref->vr_def != FE_VREG_NONE) {
         // BAD ASSUMPTION
@@ -229,6 +238,7 @@ static void print_input_list(FeDataBuffer* db, FeFunc* f, FeInst* inst, usize st
 }
 
 static void print_inst(FeFunc* f, FeDataBuffer* db, FeInst* inst) {
+
     const FeTarget* target = f->mod->target;
 
     if (!(inst->ty == FE_TY_VOID && inst->use_len == 0)) {
@@ -446,7 +456,10 @@ void fe_emit_ir_func(FeDataBuffer* db, FeFunc* f, bool fancy) {
             fe_db_writecstr(db, "\n");
         }
 
-        for_inst(inst, block) {
+        for_inst(inst, block) {            
+            if (inst->kind == FE__MACH_REG) {
+                continue;
+            }
             fe_db_writecstr(db, "    ");
             print_inst(f, db, inst);
         }

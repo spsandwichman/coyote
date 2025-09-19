@@ -71,6 +71,7 @@ void fe_codegen(FeFunc* f) {
 
     fe_opt_compact_ids(f);
 
+
     // create mapping from old values to new values
     // [old_inst->id] == new_inst
     struct {
