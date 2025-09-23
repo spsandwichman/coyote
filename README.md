@@ -1,5 +1,8 @@
 # Coyote
 
+> [!CAUTION]
+> This project has been moved to [Mars](https://github.com/orbit-systems/mars)
+
 Coyote (stylized `coyote`) is a **work-in-progress** implementation of the [Jackal](https://github.com/xrarch/newsdk) programming language by [hyenasky](https://github.com/hyenasky).
 Coyote focuses on useful diagnostics, lower memory usage, faster compile times, and high quality code generation compared to the XR/SDK implementation.
 
